@@ -1,0 +1,73 @@
+.root {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ds-space-3);
+  cursor: pointer;
+  user-select: none;
+}
+
+.rootDisabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.track {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  flex-shrink: 0;
+  border-radius: var(--ds-radius-full);
+  background: var(--ds-border);
+  transition: background 0.2s ease;
+}
+
+.track::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--ds-surface);
+  box-shadow: var(--ds-shadow-sm);
+  transition: transform 0.2s ease;
+}
+
+.input:checked + .track {
+  background: var(--ds-accent);
+}
+
+.input:checked + .track::after {
+  transform: translateX(20px);
+}
+
+.input:focus-visible + .track {
+  outline: 2px solid var(--ds-accent);
+  outline-offset: 2px;
+}
+
+.rootSuccess .input:checked + .track {
+  background: #22c55e;
+}
+
+.rootSuccess .input:focus-visible + .track {
+  outline-color: #22c55e;
+}
+
+.label {
+  font-size: 0.875rem;
+  color: var(--ds-text-secondary);
+}

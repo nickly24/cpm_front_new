@@ -1,0 +1,42 @@
+.root {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: var(--ds-text-secondary);
+}
+
+.label {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.screen {
+  min-height: 100vh;
+  flex-direction: column;
+  background: var(--ds-bg);
+}
+
+.block {
+  width: 100%;
+  min-height: 280px;
+  flex-direction: column;
+}
+
+.inline {
+  justify-content: flex-start;
+  padding: 8px 0;
+}
+
+.panel {
+  width: 100%;
+  flex-direction: column;
+  padding: var(--ds-space-6) 0;
+}
+
+.compact {
+  flex-direction: column;
+  gap: 10px;
+  padding: var(--ds-space-4) 0;
+}
