@@ -1,4 +1,4 @@
-import { ClipboardList, NotebookPen } from "lucide-react";
+import { NotebookPen, Users } from "lucide-react";
 import type { RoleNavigation } from "./types";
 
 export const proctorNavigation: RoleNavigation = {
@@ -8,7 +8,7 @@ export const proctorNavigation: RoleNavigation = {
       title: "Меню",
       items: [
         { id: "homework", label: "Домашние задания", icon: NotebookPen },
-        { id: "ov-table", label: "Таблица ОВ", icon: ClipboardList },
+        { id: "students", label: "Список учеников", icon: Users },
       ],
     },
   ],

@@ -1,0 +1,182 @@
+.pageSubtitle {
+  margin: 6px 0 0;
+  font-size: 14px;
+  color: var(--ds-text-secondary);
+}
+
+.filtersRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ds-space-4);
+}
+
+.filterGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 180px;
+}
+
+.filterLabel {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ds-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.gradeGood {
+  color: #15803d;
+  font-weight: 700;
+}
+
+.gradeMid {
+  color: #2563eb;
+  font-weight: 700;
+}
+
+.gradeOk {
+  color: #b45309;
+  font-weight: 700;
+}
+
+.gradeLow {
+  color: var(--ds-danger);
+  font-weight: 700;
+}
+
+.clickableRow {
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.clickableRow:hover {
+  background: var(--ds-surface-muted);
+}
+
+.detailCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-5);
+  padding: var(--ds-space-6);
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-lg);
+  background: var(--ds-surface);
+  box-shadow: var(--ds-shadow-sm);
+}
+
+.detailTitle {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--ds-text);
+}
+
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: var(--ds-space-4);
+}
+
+.statCard {
+  padding: var(--ds-space-4);
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-md);
+  background: var(--ds-surface-muted);
+}
+
+.statLabel {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ds-text-muted);
+}
+
+.statValue {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--ds-text);
+}
+
+.statHint {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--ds-text-secondary);
+}
+
+.infoBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.infoLine {
+  margin: 0;
+  font-size: 14px;
+  color: var(--ds-text-secondary);
+}
+
+.infoLine strong {
+  color: var(--ds-text);
+}
+
+.emptyState {
+  padding: var(--ds-space-6);
+  border: 1px dashed var(--ds-border);
+  border-radius: var(--ds-radius-md);
+  background: var(--ds-surface-muted);
+  text-align: center;
+  color: var(--ds-text-secondary);
+  font-size: 14px;
+}
+
+.examsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--ds-space-4);
+}
+
+.examListCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-3);
+  padding: var(--ds-space-5);
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-lg);
+  background: var(--ds-surface);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.examListCard:hover {
+  border-color: var(--ds-accent);
+  box-shadow: var(--ds-shadow-sm);
+}
+
+.examListCardTitle {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--ds-text);
+}
+
+.examListCardDate {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ds-text-secondary);
+}
+
+.examListCardHint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--ds-text-muted);
+}

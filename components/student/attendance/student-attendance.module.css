@@ -1,0 +1,188 @@
+.page {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 24px 28px;
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-lg);
+  background: var(--ds-surface);
+  box-shadow: var(--ds-shadow-sm);
+}
+
+.title {
+  margin: 0 0 6px;
+  font-size: clamp(24px, 2.2vw, 30px);
+  font-weight: 700;
+}
+
+.subtitle {
+  margin: 0;
+  font-size: 14px;
+  color: var(--ds-text-secondary);
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 20px 24px;
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-lg);
+  background: var(--ds-surface);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 140px;
+}
+
+.fieldLabel {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ds-text-muted);
+  text-transform: uppercase;
+}
+
+.select {
+  height: 42px;
+  padding: 0 12px;
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-md);
+  background: var(--ds-surface-muted);
+  font-size: 14px;
+}
+
+.cardsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 20px;
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-lg);
+  background: var(--ds-surface);
+}
+
+.cardDate {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--ds-text);
+}
+
+.cardWeekday,
+.cardComment {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ds-text-secondary);
+}
+
+.typeBadge {
+  align-self: flex-start;
+  padding: 6px 10px;
+  border-radius: var(--ds-radius-full);
+  background: var(--ds-accent-soft);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ds-text);
+}
+
+.zapLink {
+  align-self: flex-start;
+  border: none;
+  background: none;
+  color: var(--ds-accent);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.emptyState {
+  padding: 40px 24px;
+  border: 1px dashed var(--ds-border);
+  border-radius: var(--ds-radius-lg);
+  background: var(--ds-surface-muted);
+  text-align: center;
+  color: var(--ds-text-secondary);
+}
+
+.errorText {
+  margin: 0;
+  color: var(--ds-danger);
+}
+
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.modal {
+  width: 100%;
+  max-width: 520px;
+  max-height: 85vh;
+  overflow: auto;
+  padding: 24px;
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-lg);
+  background: var(--ds-surface);
+}
+
+.modalTitle {
+  margin: 0 0 16px;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.modalText {
+  margin: 0 0 12px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ds-text-secondary);
+}
+
+.modalClose {
+  margin-top: 16px;
+}
+
+.imagesGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.image {
+  width: 100%;
+  border-radius: var(--ds-radius-md);
+}
+
+.pdfBadge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 80px;
+  border: 1px dashed var(--ds-border);
+  border-radius: var(--ds-radius-md);
+  background: var(--ds-surface-muted);
+  font-weight: 600;
+}

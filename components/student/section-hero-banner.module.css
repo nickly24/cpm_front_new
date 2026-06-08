@@ -1,0 +1,195 @@
+.hero {
+  position: relative;
+  overflow: hidden;
+  min-height: 168px;
+  padding: 28px 32px;
+  border-radius: var(--ds-radius-lg);
+  box-shadow: var(--ds-shadow-md);
+}
+
+.heroBg {
+  position: absolute;
+  inset: 0;
+  background-color: #efb09a;
+  background-size: 100% auto;
+  background-position: center center;
+  background-repeat: no-repeat;
+}
+
+.heroOverlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.heroContent {
+  position: relative;
+  z-index: 1;
+  max-width: min(100%, 560px);
+}
+
+.heroLeading {
+  margin: 0 0 8px;
+}
+
+.breadcrumb {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.breadcrumbLink {
+  padding: 0;
+  border: none;
+  background: none;
+  color: rgba(255, 255, 255, 0.92);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.breadcrumbLink:hover {
+  color: #ffffff;
+}
+
+.breadcrumbSep {
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.breadcrumbCurrent {
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.heroLeading :global(button) {
+  padding: 0;
+  border: none;
+  background: none;
+  color: rgba(255, 255, 255, 0.92);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.heroLeading :global(button:hover) {
+  color: #ffffff;
+}
+
+.heroLeading :global(span) {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.heroEyebrow {
+  display: block;
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #ffffff;
+}
+
+.heroTitle {
+  margin: 0 0 8px;
+  font-size: clamp(26px, 2.5vw, 36px);
+  font-weight: 800;
+  line-height: 1.15;
+  color: #ffffff;
+}
+
+.heroSubtitle {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.heroFooter {
+  margin: 12px 0 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.heroFooter strong {
+  font-size: 18px;
+  font-weight: 800;
+  color: #ffffff;
+}
+
+@media (max-width: 768px) {
+  .heroBg {
+    background-size: 118% auto;
+    background-position: 4% center;
+  }
+
+  .heroOverlay {
+    background: linear-gradient(
+      90deg,
+      rgba(16, 12, 10, 0.42) 0%,
+      rgba(16, 12, 10, 0.22) 52%,
+      rgba(16, 12, 10, 0.06) 100%
+    );
+  }
+
+  .heroContent {
+    max-width: 68%;
+  }
+}
+
+@media (max-width: 640px) {
+  .hero {
+    min-height: 176px;
+    padding: 20px 18px;
+  }
+
+  .heroBg {
+    background-size: 138% auto;
+    background-position: -12% center;
+  }
+
+  .heroOverlay {
+    background: linear-gradient(
+      90deg,
+      rgba(14, 10, 8, 0.78) 0%,
+      rgba(14, 10, 8, 0.52) 46%,
+      rgba(14, 10, 8, 0.14) 72%,
+      rgba(14, 10, 8, 0.04) 100%
+    );
+  }
+
+  .heroContent {
+    max-width: min(100%, 240px);
+  }
+
+  .heroTitle {
+    font-size: clamp(20px, 6vw, 26px);
+    text-shadow: 0 1px 10px rgba(0, 0, 0, 0.35);
+  }
+
+  .heroSubtitle,
+  .heroFooter,
+  .heroEyebrow {
+    text-shadow: 0 1px 8px rgba(0, 0, 0, 0.28);
+  }
+
+  .breadcrumbLink,
+  .breadcrumbCurrent {
+    text-shadow: 0 1px 8px rgba(0, 0, 0, 0.28);
+  }
+}
+
+@media (max-width: 400px) {
+  .heroBg {
+    background-size: 152% auto;
+    background-position: -18% center;
+  }
+
+  .heroContent {
+    max-width: min(100%, 210px);
+  }
+}

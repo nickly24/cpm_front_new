@@ -45,6 +45,11 @@
   display: flex;
   flex-wrap: wrap;
   gap: 20px 28px;
+  padding: 18px 22px;
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-lg);
+  background: var(--ds-surface);
+  box-shadow: var(--ds-shadow-sm);
 }
 
 .summaryStat {

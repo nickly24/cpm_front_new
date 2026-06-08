@@ -30,6 +30,8 @@ export interface StudentTestItem {
   date?: string | null;
   timeLimitMinutes?: number | null;
   visible?: boolean;
+  directionName?: string;
+  direction?: string;
   status: TestStatus;
   isCompleted?: boolean;
   isExternal?: boolean;
@@ -61,16 +63,29 @@ export interface TestSession {
   stats?: TestSessionStats | null;
 }
 
+export interface TestsPagination {
+  current_page: number;
+  total_pages: number;
+  total_items: number;
+  items_per_page: number;
+}
+
 export interface TestsWithSessionsResponse {
+  success?: boolean;
   tests: StudentTestItem[];
   sessions: TestSession[];
+  pagination?: TestsPagination;
+  counts?: Record<string, number>;
   serverTimeMoscow?: string;
+  totalActionable?: number;
 }
 
 export interface TestsDateFilter {
   startDate: string;
   endDate: string;
 }
+
+export const STUDENT_TESTS_PAGE_SIZE = 5;
 
 export const TESTS_STATUS_LABELS: Record<TestStatus, string> = {
   available: "Доступен",

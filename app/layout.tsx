@@ -1,13 +1,7 @@
-import { Inter } from "next/font/google";
 import { Providers } from "@/components/Providers";
 import type { Metadata } from "next";
 import Script from "next/script";
 import "./globals.css";
-
-const inter = Inter({
-  subsets: ["latin", "cyrillic"],
-  variable: "--font-inter",
-});
 
 export const metadata: Metadata = {
   title: "CPM",
@@ -41,11 +35,21 @@ export default function RootLayout({
   return (
     <html lang="ru" suppressHydrationWarning>
       <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link
+          rel="preconnect"
+          href="https://fonts.gstatic.com"
+          crossOrigin="anonymous"
+        />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Ubuntu:ital,wght@0,300;0,400;0,500;0,700;1,300;1,400;1,500;1,700&display=swap"
+          rel="stylesheet"
+        />
         <Script id="theme-init" strategy="beforeInteractive">
           {themeScript}
         </Script>
       </head>
-      <body className={`${inter.variable} antialiased`}>
+      <body className="antialiased">
         <Providers>{children}</Providers>
       </body>
     </html>

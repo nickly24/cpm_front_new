@@ -26,13 +26,25 @@ export async function apiRequest<T>(
     headers.set("Authorization", `Bearer ${token}`);
   }
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...options,
-    headers,
-    credentials: "include",
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      ...options,
+      headers,
+      credentials: "include",
+    });
+  } catch {
+    throw new ApiError(
+      "Не удалось связаться с сервером. Проверьте интернет и попробуйте снова.",
+    );
+  }
 
-  const data = (await response.json()) as T;
+  let data: T;
+  try {
+    data = (await response.json()) as T;
+  } catch {
+    data = {} as T;
+  }
 
   if (!response.ok) {
     const message =
@@ -47,6 +59,55 @@ export async function apiRequest<T>(
             typeof (data as { error?: string }).error === "string"
           ? (data as { error: string }).error
           : "Ошибка запроса";
+
+    throw new ApiError(message, response.status);
+  }
+
+  return data;
+}
+
+export async function apiFormRequest<T>(
+  path: string,
+  formData: FormData,
+  options: Omit<RequestInit, "body"> = {},
+): Promise<T> {
+  const token = getToken();
+  const headers = new Headers(options.headers);
+
+  if (token) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      ...options,
+      method: options.method ?? "POST",
+      headers,
+      body: formData,
+      credentials: "include",
+    });
+  } catch {
+    throw new ApiError(
+      "Не удалось связаться с сервером. Проверьте интернет и попробуйте снова.",
+    );
+  }
+
+  let data: T;
+  try {
+    data = (await response.json()) as T;
+  } catch {
+    data = {} as T;
+  }
+
+  if (!response.ok) {
+    const message =
+      typeof data === "object" &&
+      data !== null &&
+      "error" in data &&
+      typeof (data as { error?: string }).error === "string"
+        ? (data as { error: string }).error
+        : "Ошибка запроса";
 
     throw new ApiError(message, response.status);
   }

@@ -2,6 +2,7 @@ import styles from "@/components/student/tests/tests.module.css";
 import {
   formatTestDateCompact,
   formatTestPeriod,
+  getTestDirectionLabel,
   getTestId,
   getTestTitle,
   isExternalTest,
@@ -14,11 +15,18 @@ interface TestsListItemProps {
   test: StudentTestItem;
   selected: boolean;
   onSelect: (testId: string) => void;
+  showDirection?: boolean;
 }
 
-export function TestsListItem({ test, selected, onSelect }: TestsListItemProps) {
+export function TestsListItem({
+  test,
+  selected,
+  onSelect,
+  showDirection = false,
+}: TestsListItemProps) {
   const external = isExternalTest(test);
   const testId = getTestId(test);
+  const directionLabel = showDirection ? getTestDirectionLabel(test) : null;
   const statusLabel = external ? "Вне системы" : TESTS_STATUS_LABELS[test.status];
   const timeLimit =
     !external && test.timeLimitMinutes != null && test.timeLimitMinutes > 0
@@ -35,6 +43,10 @@ export function TestsListItem({ test, selected, onSelect }: TestsListItemProps) 
       onClick={() => onSelect(testId)}
     >
       <span className={styles.listItemTitle}>{getTestTitle(test)}</span>
+
+      {directionLabel ? (
+        <span className={styles.listItemDirection}>{directionLabel}</span>
+      ) : null}
 
       <span
         className={`${styles.statusText} ${

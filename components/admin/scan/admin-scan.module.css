@@ -1,0 +1,461 @@
+.page {
+  display: flex;
+  width: 100%;
+  max-width: 640px;
+  flex-direction: column;
+  gap: var(--ds-space-5);
+  margin: 0 auto;
+}
+
+.pageWide {
+  max-width: 960px;
+}
+
+.header {
+  padding: var(--ds-space-5) var(--ds-space-6);
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-lg);
+  background: var(--ds-surface);
+  box-shadow: var(--ds-shadow-sm);
+}
+
+.title {
+  margin: 0 0 6px;
+  font-size: clamp(22px, 2vw, 28px);
+  font-weight: 700;
+  color: var(--ds-text);
+}
+
+.subtitle {
+  margin: 0;
+  font-size: 14px;
+  color: var(--ds-text-secondary);
+}
+
+.periodBar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-end;
+  padding: var(--ds-space-4) var(--ds-space-5);
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-lg);
+  background: var(--ds-surface);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 120px;
+}
+
+.fieldLabel {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ds-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.select {
+  height: 42px;
+  padding: 0 12px;
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-md);
+  background: var(--ds-surface-muted);
+  color: var(--ds-text);
+  font-size: 14px;
+}
+
+.todayBtn {
+  margin-left: auto;
+  height: 42px;
+  padding: 0 16px;
+  border: 1px solid var(--ds-accent);
+  border-radius: var(--ds-radius-md);
+  background: var(--ds-accent-soft);
+  color: var(--ds-text);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.todayBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.daysList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.dayBtn {
+  width: 100%;
+  padding: 16px 18px;
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-lg);
+  background: var(--ds-surface);
+  text-align: left;
+  font-size: 15px;
+  color: var(--ds-text);
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.dayBtn:hover {
+  border-color: var(--ds-accent);
+  box-shadow: var(--ds-shadow-sm);
+}
+
+.dayBtnToday {
+  border-color: color-mix(in oklab, var(--ds-accent) 45%, var(--ds-border));
+  background: var(--ds-accent-soft);
+}
+
+.scanPanel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-4);
+  padding: var(--ds-space-5);
+  border: 2px solid color-mix(in oklab, var(--ds-accent) 35%, var(--ds-border));
+  border-radius: var(--ds-radius-lg);
+  background: var(--ds-surface);
+  box-shadow: var(--ds-shadow-md);
+}
+
+.selectedDay {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: var(--ds-radius-md);
+  background: var(--ds-accent-soft);
+  font-size: 14px;
+  color: var(--ds-text);
+}
+
+.selectedDay strong {
+  display: block;
+  margin-top: 4px;
+  font-size: 16px;
+}
+
+.changeDayBtn {
+  align-self: flex-start;
+  border: none;
+  background: none;
+  color: var(--ds-accent);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.scanInput {
+  width: 100%;
+  height: 56px;
+  padding: 0 16px;
+  border: 2px solid var(--ds-border);
+  border-radius: var(--ds-radius-md);
+  background: var(--ds-surface-muted);
+  color: var(--ds-text);
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.scanInput:focus {
+  outline: none;
+  border-color: var(--ds-accent);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--ds-accent) 18%, transparent);
+}
+
+.scanHint {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ds-text-secondary);
+}
+
+.actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.primaryBtn,
+.secondaryBtn,
+.cameraBtn {
+  height: 48px;
+  border-radius: var(--ds-radius-md);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.primaryBtn {
+  grid-column: 1 / -1;
+  border: none;
+  background: var(--ds-accent);
+  color: #fff;
+}
+
+.primaryBtn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.secondaryBtn {
+  border: 1px solid var(--ds-border);
+  background: var(--ds-surface-muted);
+  color: var(--ds-text);
+}
+
+.cameraBtn {
+  border: 1px solid var(--ds-accent);
+  background: transparent;
+  color: var(--ds-accent);
+}
+
+.toast {
+  padding: 12px 14px;
+  border-radius: var(--ds-radius-md);
+  font-size: 14px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.toastSuccess {
+  background: rgba(34, 197, 94, 0.14);
+  color: #15803d;
+}
+
+.toastError {
+  background: rgba(239, 68, 68, 0.12);
+  color: var(--ds-danger);
+}
+
+.toastWarning {
+  background: rgba(249, 115, 22, 0.18);
+  border: 1px solid rgba(249, 115, 22, 0.45);
+  color: #9a3412;
+  box-shadow: 0 8px 20px rgba(249, 115, 22, 0.12);
+}
+
+.history {
+  padding-top: var(--ds-space-4);
+  border-top: 1px solid var(--ds-border);
+}
+
+.historyHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.historyTitle {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ds-text);
+}
+
+.clearBtn {
+  border: none;
+  background: none;
+  color: var(--ds-danger);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.historyList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.historyItem {
+  padding: 12px 14px;
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-md);
+  background: var(--ds-surface-muted);
+}
+
+.historyTop {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.historyName {
+  font-weight: 600;
+  color: var(--ds-text);
+}
+
+.historyClass {
+  color: var(--ds-text-secondary);
+  font-size: 13px;
+}
+
+.historyMeta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--ds-text-muted);
+}
+
+.empty {
+  padding: 24px;
+  border: 1px dashed var(--ds-border);
+  border-radius: var(--ds-radius-md);
+  background: var(--ds-surface-muted);
+  text-align: center;
+  color: var(--ds-text-secondary);
+  font-size: 14px;
+}
+
+.errorText {
+  margin: 0;
+  color: var(--ds-danger);
+  font-size: 14px;
+}
+
+.cameraOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.88);
+}
+
+.cameraModal {
+  display: flex;
+  width: 100%;
+  max-width: 420px;
+  max-height: 100vh;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: var(--ds-radius-lg);
+  background: var(--ds-surface);
+}
+
+.cameraHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.cameraBack {
+  border: none;
+  background: none;
+  color: var(--ds-accent);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.cameraTitle {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ds-text);
+}
+
+.cameraBody {
+  padding: 16px;
+}
+
+.cameraReaderWrap {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--ds-radius-md);
+  background: #000;
+}
+
+.cameraReader {
+  width: 100%;
+  min-height: 280px;
+}
+
+.cameraReader video {
+  display: block;
+  width: 100%;
+}
+
+.cameraMask {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.cameraFrame {
+  display: flex;
+  width: min(260px, 80%);
+  height: 200px;
+  align-items: center;
+  justify-content: center;
+  border: 4px solid #6b7280;
+  border-radius: 12px;
+  background: rgba(107, 114, 128, 0.18);
+  transition:
+    border-color 0.2s ease,
+    background-color 0.2s ease;
+}
+
+.cameraFrameScanning {
+  border-color: #f97316;
+  background: rgba(249, 115, 22, 0.22);
+}
+
+.cameraFrameSuccess {
+  border-color: #22c55e;
+  background: rgba(34, 197, 94, 0.22);
+}
+
+.cameraFrameDuplicate {
+  border-color: #f97316;
+  background: rgba(249, 115, 22, 0.28);
+}
+
+.cameraFrameText {
+  padding: 8px;
+  text-align: center;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.cameraError {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: var(--ds-radius-md);
+  background: rgba(127, 29, 29, 0.85);
+  color: #fecaca;
+  font-size: 14px;
+}
+
+@media (max-width: 640px) {
+  .periodBar {
+    align-items: stretch;
+  }
+
+  .todayBtn {
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .scanInput {
+    font-size: 20px;
+  }
+}

@@ -124,6 +124,11 @@
   color: #dc2626;
 }
 
+.attemptSyncPending {
+  color: var(--ds-text-muted);
+  font-size: 0.85em;
+}
+
 .attemptProgressMeta {
   font-size: 13px;
   color: var(--ds-text-secondary);
@@ -205,14 +210,159 @@
   color: var(--ds-accent);
 }
 
-.attemptQuestionPillAnswered {
-  border-color: rgba(34, 197, 94, 0.35);
-  background: rgba(34, 197, 94, 0.1);
-  color: #16a34a;
+.attemptSyncLegend {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
 }
 
-.attemptQuestionPillLocked {
-  opacity: 0.85;
+.attemptSyncLegendItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--ds-text-muted);
+}
+
+.attemptSyncLegendDot {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  border: 1px solid var(--ds-border);
+  border-radius: 4px;
+  background: var(--ds-surface-muted);
+}
+
+.attemptSyncLegendDotPending {
+  border-color: #f59e0b;
+  background: linear-gradient(
+    110deg,
+    rgba(245, 158, 11, 0.2) 25%,
+    rgba(251, 191, 36, 0.45) 50%,
+    rgba(245, 158, 11, 0.2) 75%
+  );
+  background-size: 200% 100%;
+  animation: attemptPillShimmerFlow 1.8s ease-in-out infinite;
+}
+
+.attemptSyncLegendDotSynced {
+  border-color: rgba(34, 197, 94, 0.55);
+  background: rgba(34, 197, 94, 0.22);
+}
+
+@keyframes attemptPillShimmerFlow {
+  0% {
+    background-position: 100% 0;
+  }
+
+  100% {
+    background-position: -100% 0;
+  }
+}
+
+@keyframes attemptPillPulse {
+  0%,
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.35);
+  }
+
+  50% {
+    transform: scale(1.04);
+    box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.12);
+  }
+}
+
+.attemptQuestionPillPending {
+  border-color: #f59e0b;
+  background: linear-gradient(
+    110deg,
+    rgba(245, 158, 11, 0.14) 25%,
+    rgba(251, 191, 36, 0.32) 50%,
+    rgba(245, 158, 11, 0.14) 75%
+  );
+  background-size: 200% 100%;
+  color: #b45309;
+  animation: attemptPillShimmerFlow 1.8s ease-in-out infinite;
+}
+
+.attemptQuestionPillSyncing {
+  animation:
+    attemptPillShimmerFlow 0.85s ease-in-out infinite,
+    attemptPillPulse 1.1s ease-in-out infinite;
+}
+
+.attemptQuestionPillSynced {
+  border-color: rgba(34, 197, 94, 0.55);
+  background: rgba(34, 197, 94, 0.2);
+  color: #15803d;
+  box-shadow: inset 0 0 0 1px rgba(34, 197, 94, 0.25);
+  animation: attemptPillSyncedPop 0.35s ease-out;
+}
+
+@keyframes attemptPillSyncedPop {
+  0% {
+    transform: scale(0.92);
+    filter: brightness(1.15);
+  }
+
+  100% {
+    transform: scale(1);
+    filter: none;
+  }
+}
+
+.attemptSyncStatus {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--ds-radius-md);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.attemptSyncStatusPending {
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  background: linear-gradient(
+    110deg,
+    rgba(245, 158, 11, 0.08) 25%,
+    rgba(251, 191, 36, 0.18) 50%,
+    rgba(245, 158, 11, 0.08) 75%
+  );
+  background-size: 200% 100%;
+  color: #b45309;
+  animation: attemptPillShimmerFlow 2s ease-in-out infinite;
+}
+
+.attemptSyncStatusSyncing {
+  border: 1px solid rgba(245, 158, 11, 0.45);
+  background: rgba(245, 158, 11, 0.12);
+  color: #b45309;
+}
+
+.attemptSyncStatusSyncing .attemptSyncStatusIcon {
+  animation: attemptSyncSpin 0.9s linear infinite;
+}
+
+@keyframes attemptSyncSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.attemptSyncStatusSynced {
+  border: 1px solid rgba(34, 197, 94, 0.35);
+  background: rgba(34, 197, 94, 0.1);
+  color: #15803d;
+}
+
+.attemptSyncStatusIcon {
+  flex-shrink: 0;
 }
 
 .attemptMain {
@@ -481,6 +631,94 @@
 
 .attemptExpiredSubmitBtn {
   flex-shrink: 0;
+}
+
+.submitDialogOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(4px);
+}
+
+.submitDialog {
+  width: 100%;
+  max-width: 420px;
+  padding: 24px;
+  border-radius: var(--ds-radius-lg);
+  border: 1px solid var(--ds-border);
+  background: var(--ds-surface);
+  box-shadow: var(--ds-shadow-lg);
+}
+
+.submitDialogIconWrap {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 12px;
+}
+
+.submitDialogIconError {
+  color: var(--ds-danger);
+}
+
+.submitDialogTitle {
+  margin: 0 0 10px;
+  font-size: 20px;
+  font-weight: 700;
+  text-align: center;
+  color: var(--ds-text);
+}
+
+.submitDialogText {
+  margin: 0 0 20px;
+  font-size: 14px;
+  line-height: 1.55;
+  text-align: center;
+  color: var(--ds-text-secondary);
+}
+
+.submitDialogActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: stretch;
+}
+
+.submitDialogBtnSecondary,
+.submitDialogBtnPrimary {
+  display: inline-flex;
+  flex: 1 1 140px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: var(--ds-radius-md);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.submitDialogBtnSecondary {
+  border: 1px solid var(--ds-border);
+  background: var(--ds-surface-muted);
+  color: var(--ds-text);
+}
+
+.submitDialogBtnPrimary {
+  border: none;
+  background: var(--ds-accent);
+  color: #fff;
+}
+
+.submitDialogBtnSecondary:disabled,
+.submitDialogBtnPrimary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 @media (max-width: 900px) {

@@ -1,4 +1,11 @@
-import { CalendarDays, ClipboardList, Trophy } from "lucide-react";
+import {
+  BarChart3,
+  CalendarDays,
+  GraduationCap,
+  LayoutDashboard,
+  NotebookPen,
+  Trophy,
+} from "lucide-react";
 import type { RoleNavigation } from "./types";
 
 export const supervisorNavigation: RoleNavigation = {
@@ -7,9 +14,12 @@ export const supervisorNavigation: RoleNavigation = {
     {
       title: "Меню",
       items: [
+        { id: "dashboard", label: "Главная", icon: LayoutDashboard },
         { id: "ratings", label: "Рейтинг", icon: Trophy },
-        { id: "homework-table", label: "Таблица ОВ", icon: ClipboardList },
         { id: "attendance", label: "Посещаемость", icon: CalendarDays },
+        { id: "homework", label: "Домашние задания", icon: NotebookPen },
+        { id: "tests", label: "Тесты", icon: BarChart3 },
+        { id: "exams", label: "Экзамены", icon: GraduationCap },
       ],
     },
   ],

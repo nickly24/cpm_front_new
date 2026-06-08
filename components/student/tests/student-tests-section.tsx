@@ -5,12 +5,16 @@ import { TestReviewScreen } from "@/components/student/tests/review/test-review-
 import { TestsListSearch } from "@/components/student/tests/tests-list-search";
 import { TestDetailPanel } from "@/components/student/tests/test-detail-panel";
 import { TestsListItem } from "@/components/student/tests/tests-list-item";
+import { TestsPagination } from "@/components/student/tests/tests-pagination";
 import { TestsToolbar } from "@/components/student/tests/tests-toolbar";
+import { SectionHeroBanner } from "@/components/student/section-hero-banner";
 import styles from "@/components/student/tests/tests.module.css";
 import { LoadingState } from "@/components/ui/loading-state";
+import { STUDENT_SECTION_BANNERS } from "@/lib/student/section-banners";
 import {
   buildSessionMap,
   fetchDirections,
+  fetchStudentAvailableTests,
   fetchTestsWithSessions,
   filterTestsByDate,
   filterTestsBySearch,
@@ -23,18 +27,26 @@ import type {
   StudentTestItem,
   TestSession,
   TestsDateFilter,
+  TestsPagination as TestsPaginationMeta,
   TestStatusFilter,
 } from "@/lib/student/tests-types";
 import { useMediaQuery } from "@/lib/hooks/use-media-query";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+type TestsViewMode = "overview" | "catalog";
+
 export function StudentTestsSection() {
+  const [viewMode, setViewMode] = useState<TestsViewMode>("overview");
   const [directions, setDirections] = useState<Direction[]>([]);
   const [directionName, setDirectionName] = useState("");
   const [tests, setTests] = useState<StudentTestItem[]>([]);
   const [sessions, setSessions] = useState<TestSession[]>([]);
-  const [loadingDirections, setLoadingDirections] = useState(true);
-  const [loadingTests, setLoadingTests] = useState(false);
+  const [pagination, setPagination] = useState<TestsPaginationMeta | null>(
+    null,
+  );
+  const [page, setPage] = useState(1);
+  const [loadingDirections, setLoadingDirections] = useState(false);
+  const [loadingTests, setLoadingTests] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<TestStatusFilter>("all");
   const [searchTerm, setSearchTerm] = useState("");
@@ -58,6 +70,10 @@ export function StudentTestsSection() {
   const isMobileLayout = useMediaQuery("(max-width: 768px)");
 
   useEffect(() => {
+    if (viewMode !== "catalog") {
+      return;
+    }
+
     let cancelled = false;
 
     async function loadDirections() {
@@ -70,10 +86,11 @@ export function StudentTestsSection() {
           return;
         }
 
-        setDirections(Array.isArray(data) ? data : []);
+        const list = Array.isArray(data) ? data : [];
+        setDirections(list);
 
-        if (data.length > 0) {
-          setDirectionName(data[0].name);
+        if (list.length > 0) {
+          setDirectionName((current) => current || list[0].name);
         }
       } catch (err) {
         if (!cancelled) {
@@ -96,31 +113,37 @@ export function StudentTestsSection() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [viewMode]);
 
   useEffect(() => {
-    if (!directionName) {
-      return;
-    }
-
     let cancelled = false;
 
     async function loadTests() {
+      if (viewMode === "catalog" && !directionName) {
+        return;
+      }
+
       setLoadingTests(true);
       setError(null);
 
       try {
-        const response = await fetchTestsWithSessions(directionName);
+        const response =
+          viewMode === "overview"
+            ? await fetchStudentAvailableTests(page)
+            : await fetchTestsWithSessions(directionName, page);
+
         if (cancelled) {
           return;
         }
 
         setTests(Array.isArray(response.tests) ? response.tests : []);
         setSessions(Array.isArray(response.sessions) ? response.sessions : []);
+        setPagination(response.pagination ?? null);
       } catch (err) {
         if (!cancelled) {
           setTests([]);
           setSessions([]);
+          setPagination(null);
           setError(
             err instanceof Error ? err.message : "Не удалось загрузить тесты",
           );
@@ -137,7 +160,7 @@ export function StudentTestsSection() {
     return () => {
       cancelled = true;
     };
-  }, [directionName, reloadToken]);
+  }, [viewMode, directionName, page, reloadToken]);
 
   const sessionMap = useMemo(() => buildSessionMap(sessions), [sessions]);
 
@@ -176,7 +199,8 @@ export function StudentTestsSection() {
     setSearchTerm("");
     setDateFilter({ startDate: "", endDate: "" });
     setSelectedTestId(null);
-  }, [directionName]);
+    setPage(1);
+  }, [directionName, viewMode]);
 
   const selectedTest = useMemo(
     () =>
@@ -291,7 +315,30 @@ export function StudentTestsSection() {
     [tests],
   );
 
-  if (loadingDirections) {
+  const openCatalog = useCallback(() => {
+    setViewMode("catalog");
+    setPage(1);
+  }, []);
+
+  const backToOverview = useCallback(() => {
+    setViewMode("overview");
+    setPage(1);
+    setDirectionName("");
+    setDirections([]);
+  }, []);
+
+  const handlePageChange = useCallback((nextPage: number) => {
+    setPage(nextPage);
+    setSelectedTestId(null);
+  }, []);
+
+  const isOverview = viewMode === "overview";
+  const heroTitle = isOverview ? "Доступные тесты" : "Все тесты";
+  const heroSubtitle = isOverview
+    ? "Тесты, которые можно начать или продолжить прямо сейчас. Полный каталог — по кнопке ниже."
+    : "Выберите направление и тест. Список загружается по 5 штук на страницу.";
+
+  if (viewMode === "catalog" && loadingDirections) {
     return (
       <div className={styles.page}>
         <LoadingState label="Загрузка направлений…" variant="block" />
@@ -299,18 +346,26 @@ export function StudentTestsSection() {
     );
   }
 
-  if (directions.length === 0) {
+  if (viewMode === "catalog" && directions.length === 0) {
     return (
       <div className={styles.page}>
-        <header className={styles.header}>
-          <span className={styles.eyebrow}>Тесты</span>
-          <h1 className={styles.title}>Тесты</h1>
-        </header>
+        <SectionHeroBanner
+          imageSrc={STUDENT_SECTION_BANNERS.tests}
+          eyebrow="Тесты"
+          title="Тесты"
+        />
         <div className={styles.empty}>
           <h2 className={styles.emptyTitle}>Направления не найдены</h2>
           <p className={styles.emptyText}>
             Нет доступных направлений для загрузки тестов.
           </p>
+          <button
+            type="button"
+            className={styles.backToOverviewBtn}
+            onClick={backToOverview}
+          >
+            К доступным тестам
+          </button>
         </div>
       </div>
     );
@@ -343,96 +398,136 @@ export function StudentTestsSection() {
       ) : null}
 
       <div className={styles.page}>
-      <header className={styles.header}>
-        <div>
-          <span className={styles.eyebrow}>Тесты</span>
-          <h1 className={styles.title}>Список тестов</h1>
-          <p className={styles.subtitle}>
-            Выберите тест слева — справа откроется карточка с деталями и
-            действиями.
-          </p>
-        </div>
-      </header>
+        <SectionHeroBanner
+          imageSrc={STUDENT_SECTION_BANNERS.tests}
+          eyebrow="Тесты"
+          title={heroTitle}
+          subtitle={heroSubtitle}
+        />
 
-      {error ? <div className={styles.alert}>{error}</div> : null}
+        {viewMode === "catalog" ? (
+          <div className={styles.catalogNav}>
+            <button
+              type="button"
+              className={styles.backToOverviewBtn}
+              onClick={backToOverview}
+            >
+              ← Доступные тесты
+            </button>
+          </div>
+        ) : null}
 
-      <TestsToolbar
-        directions={directions}
-        directionName={directionName}
-        onDirectionChange={setDirectionName}
-        statusFilter={statusFilter}
-        onStatusFilterChange={setStatusFilter}
-        dateFilter={dateFilter}
-        onDateFilterChange={setDateFilter}
-      />
+        {error ? <div className={styles.alert}>{error}</div> : null}
 
-      {loadingTests ? (
-        <LoadingState label="Загрузка тестов…" variant="inline" />
-      ) : null}
-
-      <div className={styles.layout}>
-        <section className={styles.listPane}>
-          <TestsListSearch
-            value={searchTerm}
-            onChange={setSearchTerm}
-            disabled={!directionName || loadingTests}
-            resultCount={filteredTests.length}
-          />
-
-          {filteredTests.length > 0 ? (
-            <div className={styles.list}>
-              {filteredTests.map((test) => (
-                <TestsListItem
-                  key={getTestId(test)}
-                  test={test}
-                  selected={getTestId(test) === selectedTestId}
-                  onSelect={handleSelectTest}
-                />
-              ))}
-            </div>
-          ) : (
-            <div className={styles.listEmpty}>
-              <p className={styles.listEmptyTitle}>Тесты не найдены</p>
-              <p className={styles.listEmptyText}>
-                Измените фильтры или выберите другое направление.
-              </p>
-            </div>
-          )}
-        </section>
-
-        {!isMobileLayout ? (
-          <TestDetailPanel
-            test={selectedTest}
-            session={selectedSession}
-            onStartTest={handleStartTest}
-            onResumeTest={handleResumeTest}
-            onPractice={handlePractice}
-            onViewAnswers={handleViewAnswers}
+        {viewMode === "catalog" ? (
+          <TestsToolbar
+            directions={directions}
+            directionName={directionName}
+            onDirectionChange={setDirectionName}
+            statusFilter={statusFilter}
+            onStatusFilterChange={setStatusFilter}
+            dateFilter={dateFilter}
+            onDateFilterChange={setDateFilter}
           />
         ) : null}
-      </div>
 
-      {isMobileLayout && mobileSheetOpen && selectedTest ? (
-        <>
-          <button
-            type="button"
-            className={styles.mobileSheetOverlay}
-            aria-label="Закрыть карточку теста"
-            onClick={closeMobileSheet}
-          />
-          <TestDetailPanel
-            variant="sheet"
-            test={selectedTest}
-            session={selectedSession}
-            onClose={closeMobileSheet}
-            onStartTest={handleStartTest}
-            onResumeTest={handleResumeTest}
-            onPractice={handlePractice}
-            onViewAnswers={handleViewAnswers}
-          />
-        </>
-      ) : null}
-    </div>
+        {loadingTests ? (
+          <LoadingState label="Загрузка тестов…" variant="inline" />
+        ) : null}
+
+        <div className={styles.layout}>
+          <section className={styles.listPane}>
+            {viewMode === "catalog" ? (
+              <TestsListSearch
+                value={searchTerm}
+                onChange={setSearchTerm}
+                disabled={!directionName || loadingTests}
+                resultCount={filteredTests.length}
+              />
+            ) : null}
+
+            {filteredTests.length > 0 ? (
+              <div className={styles.list}>
+                {filteredTests.map((test) => (
+                  <TestsListItem
+                    key={getTestId(test)}
+                    test={test}
+                    selected={getTestId(test) === selectedTestId}
+                    onSelect={handleSelectTest}
+                    showDirection={isOverview}
+                  />
+                ))}
+              </div>
+            ) : !loadingTests ? (
+              <div className={styles.listEmpty}>
+                <p className={styles.listEmptyTitle}>
+                  {isOverview
+                    ? "Сейчас нет доступных тестов"
+                    : "Тесты не найдены"}
+                </p>
+                <p className={styles.listEmptyText}>
+                  {isOverview
+                    ? "Когда откроется окно сдачи или останется незавершённая попытка, тест появится здесь."
+                    : "Измените фильтры или выберите другое направление."}
+                </p>
+              </div>
+            ) : null}
+
+            <TestsPagination
+              pagination={pagination}
+              onPageChange={handlePageChange}
+              disabled={loadingTests}
+            />
+
+            {isOverview ? (
+              <div className={styles.viewAllBlock}>
+                <button
+                  type="button"
+                  className={styles.viewAllBtn}
+                  onClick={openCatalog}
+                >
+                  Смотреть все тесты
+                </button>
+                <p className={styles.viewAllHint}>
+                  Направления и полный каталог с фильтрами
+                </p>
+              </div>
+            ) : null}
+          </section>
+
+          {!isMobileLayout ? (
+            <TestDetailPanel
+              test={selectedTest}
+              session={selectedSession}
+              onStartTest={handleStartTest}
+              onResumeTest={handleResumeTest}
+              onPractice={handlePractice}
+              onViewAnswers={handleViewAnswers}
+            />
+          ) : null}
+        </div>
+
+        {isMobileLayout && mobileSheetOpen && selectedTest ? (
+          <>
+            <button
+              type="button"
+              className={styles.mobileSheetOverlay}
+              aria-label="Закрыть карточку теста"
+              onClick={closeMobileSheet}
+            />
+            <TestDetailPanel
+              variant="sheet"
+              test={selectedTest}
+              session={selectedSession}
+              onClose={closeMobileSheet}
+              onStartTest={handleStartTest}
+              onResumeTest={handleResumeTest}
+              onPractice={handlePractice}
+              onViewAnswers={handleViewAnswers}
+            />
+          </>
+        ) : null}
+      </div>
     </>
   );
 }

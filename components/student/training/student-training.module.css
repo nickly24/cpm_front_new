@@ -1,0 +1,821 @@
+.page {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 24px 28px;
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-lg);
+  background: var(--ds-surface);
+  box-shadow: var(--ds-shadow-sm);
+}
+
+.eyebrow {
+  display: block;
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ds-accent);
+}
+
+.title {
+  margin: 0 0 6px;
+  font-size: clamp(24px, 2.2vw, 30px);
+  font-weight: 700;
+}
+
+.subtitle {
+  margin: 0;
+  font-size: 14px;
+  color: var(--ds-text-secondary);
+}
+
+.breadcrumb {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 4px;
+  font-size: 13px;
+  color: var(--ds-text-secondary);
+}
+
+.breadcrumbLink {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--ds-accent);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.breadcrumbLink:hover {
+  opacity: 0.85;
+}
+
+.breadcrumbSep {
+  opacity: 0.5;
+}
+
+.breadcrumbCurrent {
+  font-weight: 600;
+  color: var(--ds-text);
+}
+
+.backRow {
+  margin-bottom: 4px;
+}
+
+.backButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--ds-accent);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.backButton:hover {
+  opacity: 0.85;
+}
+
+.panel {
+  padding: 24px 28px;
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-lg);
+  background: var(--ds-surface);
+}
+
+.alert {
+  margin: 0;
+  padding: 12px 16px;
+  border-radius: var(--ds-radius-md);
+  background: color-mix(in srgb, var(--ds-danger) 12%, transparent);
+  color: var(--ds-danger);
+  font-size: 14px;
+}
+
+.emptyState {
+  padding: 40px 28px;
+  border: 1px dashed var(--ds-border);
+  border-radius: var(--ds-radius-lg);
+  background: var(--ds-surface);
+  text-align: center;
+}
+
+.emptyTitle {
+  margin: 0 0 8px;
+  font-size: 20px;
+}
+
+.emptyText {
+  margin: 0;
+  font-size: 14px;
+  color: var(--ds-text-secondary);
+}
+
+.cardGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 14px;
+}
+
+.sectionCard,
+.topicCard {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px 20px;
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-md);
+  background: var(--ds-surface-elevated, var(--ds-surface));
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.15s ease;
+}
+
+.sectionCard:hover,
+.topicCard:hover {
+  border-color: color-mix(in srgb, var(--ds-accent) 40%, var(--ds-border));
+  box-shadow: var(--ds-shadow-sm);
+  transform: translateY(-1px);
+}
+
+.cardName {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.cardMeta {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ds-text-secondary);
+}
+
+.progressTrack {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ds-border) 60%, transparent);
+}
+
+.progressFill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(
+    90deg,
+    var(--ds-accent),
+    color-mix(in srgb, var(--ds-success) 70%, var(--ds-accent))
+  );
+  transition: width 0.35s ease;
+}
+
+.progressRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.progressLabel {
+  color: var(--ds-text-secondary);
+}
+
+.progressValue {
+  color: var(--ds-accent);
+}
+
+/* Topic detail */
+.detailHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  width: 100%;
+}
+
+.detailProgressBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(100%, 420px);
+  margin-top: 12px;
+}
+
+.detailProgressMeta {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.detailProgressMeta strong {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ds-text);
+}
+
+.detailProgressTrack {
+  height: 10px;
+  overflow: hidden;
+  border-radius: var(--ds-radius-full);
+  background: color-mix(in srgb, var(--ds-border) 55%, transparent);
+}
+
+.detailProgressFill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(
+    90deg,
+    var(--ds-accent),
+    color-mix(in srgb, var(--ds-success) 65%, var(--ds-accent))
+  );
+  transition: width 0.35s ease;
+}
+
+.detailActions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: flex-start;
+}
+
+.flashModeBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cardsPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  padding: 20px 22px;
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-lg);
+  background: var(--ds-surface);
+}
+
+.cardsSection {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cardsSectionHead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 4px;
+}
+
+.cardsSectionTitle {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ds-text-secondary);
+}
+
+.cardsSectionCount {
+  display: inline-flex;
+  min-width: 26px;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 8px;
+  border-radius: var(--ds-radius-full);
+  background: var(--ds-surface-muted, color-mix(in srgb, var(--ds-border) 40%, transparent));
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ds-text);
+}
+
+.cardsList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cardRow {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-md);
+  background: var(--ds-surface-muted, var(--ds-surface));
+  overflow: hidden;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.cardRow:hover {
+  border-color: color-mix(in srgb, var(--ds-accent) 28%, var(--ds-border));
+}
+
+.cardRowLearned {
+  opacity: 0.88;
+  background: color-mix(in srgb, var(--ds-success) 6%, var(--ds-surface));
+}
+
+.cardRowMain {
+  display: flex;
+  flex: 1;
+  align-items: flex-start;
+  gap: 12px;
+  min-width: 0;
+  padding: 12px 14px;
+  border: none;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+
+.cardRowStatus {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  margin-top: 7px;
+  border-radius: 50%;
+  background: var(--ds-accent);
+}
+
+.cardRowLearned .cardRowStatus {
+  background: var(--ds-success);
+}
+
+.cardRowBody {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.cardRowQuestion {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.45;
+  word-break: break-word;
+}
+
+.cardRowAnswer {
+  padding: 10px 12px;
+  border-radius: var(--ds-radius-sm);
+  background: color-mix(in srgb, var(--ds-accent) 8%, var(--ds-surface));
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--ds-text-secondary);
+}
+
+.cardRowAnswerLabel {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ds-accent);
+}
+
+.cardRowChevron {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--ds-text-muted, var(--ds-text-secondary));
+  transition: transform 0.2s ease;
+}
+
+.cardRowChevronOpen {
+  transform: rotate(180deg);
+}
+
+.cardRowToggle {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  border: none;
+  border-left: 1px solid var(--ds-border);
+  background: color-mix(in srgb, var(--ds-surface) 80%, transparent);
+  color: var(--ds-text-secondary);
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+
+.cardRowToggle:hover {
+  background: color-mix(in srgb, var(--ds-success) 12%, var(--ds-surface));
+  color: var(--ds-success);
+}
+
+.cardRowToggleLearned {
+  color: var(--ds-success);
+  background: color-mix(in srgb, var(--ds-success) 10%, var(--ds-surface));
+}
+
+.cardRowToggleLearned:hover {
+  background: color-mix(in srgb, var(--ds-text-secondary) 12%, var(--ds-surface));
+  color: var(--ds-text-secondary);
+}
+
+/* Flashcards — immersive */
+.flashShell {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  width: 100%;
+  max-width: 560px;
+  margin: 0 auto;
+  min-height: min(72vh, 640px);
+}
+
+.flashTop {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 0 4px 20px;
+}
+
+.flashTopNav {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.flashBackBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 0;
+  border: none;
+  background: none;
+  color: var(--ds-accent);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.flashBackBtn:hover {
+  opacity: 0.85;
+}
+
+.flashTopicName {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.flashProgressRow {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.flashProgressLabel {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ds-text-secondary);
+}
+
+.flashProgressLabel strong {
+  color: var(--ds-text);
+}
+
+.flashProgressTrack {
+  height: 8px;
+  overflow: hidden;
+  border-radius: var(--ds-radius-full);
+  background: color-mix(in srgb, var(--ds-border) 50%, transparent);
+}
+
+.flashProgressFill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--ds-accent);
+  transition: width 0.3s ease;
+}
+
+.flashHint {
+  margin: 0;
+  text-align: center;
+  font-size: 13px;
+  color: var(--ds-text-muted, var(--ds-text-secondary));
+}
+
+.cardsWrapper {
+  position: relative;
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  min-height: 340px;
+  padding: 8px 0 20px;
+  touch-action: pan-y;
+}
+
+.flashcard {
+  position: relative;
+  width: min(100%, 520px);
+  height: min(52vh, 400px);
+  min-height: 300px;
+  perspective: 1400px;
+  cursor: grab;
+  user-select: none;
+}
+
+.flashcard:active {
+  cursor: grabbing;
+}
+
+.flashcardInner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  transition: transform 0.45s cubic-bezier(0.4, 0.2, 0.2, 1);
+}
+
+.flashcardFlipped .flashcardInner {
+  transform: rotateY(180deg);
+}
+
+.flashcardFace {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 16px;
+  padding: 28px 26px 32px;
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-xl);
+  background: var(--ds-surface);
+  box-shadow: var(--ds-shadow-lg);
+  backface-visibility: hidden;
+  overflow: auto;
+}
+
+.flashcardFaceLabel {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ds-accent);
+}
+
+.flashcardFaceText {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  font-size: clamp(20px, 4vw, 26px);
+  font-weight: 700;
+  line-height: 1.35;
+  text-align: center;
+  word-break: break-word;
+}
+
+.flashcardTapHint {
+  margin: auto 0 0;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ds-text-muted, var(--ds-text-secondary));
+}
+
+.flashcardBack {
+  transform: rotateY(180deg);
+  background: linear-gradient(
+    165deg,
+    color-mix(in srgb, var(--ds-accent) 10%, var(--ds-surface)),
+    var(--ds-surface)
+  );
+}
+
+.flashcardBack .flashcardFaceLabel {
+  color: var(--ds-success);
+}
+
+.flashcardNext {
+  position: absolute;
+  width: min(94%, 500px);
+  height: min(48vh, 360px);
+  opacity: 0.28;
+  transform: scale(0.96) translateY(14px);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.flashcardCurrent {
+  z-index: 2;
+}
+
+.swipeLeft {
+  animation: swipeLeftOut 0.32s ease forwards;
+}
+
+.swipeRight {
+  animation: swipeRightOut 0.32s ease forwards;
+}
+
+@keyframes swipeLeftOut {
+  to {
+    transform: translateX(-120%) rotate(-12deg);
+    opacity: 0;
+  }
+}
+
+@keyframes swipeRightOut {
+  to {
+    transform: translateX(120%) rotate(12deg);
+    opacity: 0;
+  }
+}
+
+.dragBadge {
+  position: absolute;
+  top: 20px;
+  padding: 8px 14px;
+  border-radius: var(--ds-radius-sm);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.badgeRemember {
+  right: 20px;
+  color: var(--ds-success);
+  border: 2px solid var(--ds-success);
+  background: color-mix(in srgb, var(--ds-success) 14%, var(--ds-surface));
+}
+
+.badgeRepeat {
+  left: 20px;
+  color: var(--ds-text-secondary);
+  border: 2px solid var(--ds-border);
+  background: var(--ds-surface-muted, var(--ds-surface));
+}
+
+.flashActionBar {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  padding: 4px 0 8px;
+}
+
+.flashActionBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 52px;
+  padding: 14px 18px;
+  border-radius: var(--ds-radius-md);
+  border: 1px solid var(--ds-border);
+  background: var(--ds-surface);
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    transform 0.12s ease,
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+
+.flashActionBtn:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.flashActionBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.flashActionSkip {
+  color: var(--ds-text-secondary);
+  background: var(--ds-surface-muted, var(--ds-surface));
+}
+
+.flashActionSkip:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--ds-text-secondary) 40%, var(--ds-border));
+}
+
+.flashActionRemember {
+  border-color: transparent;
+  background: var(--ds-accent);
+  color: var(--ds-text-inverse, #fff);
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--ds-accent) 45%, transparent);
+}
+
+.flashActionRemember:hover:not(:disabled) {
+  background: var(--ds-accent-hover, var(--ds-accent));
+}
+
+.onboardingOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: color-mix(in srgb, var(--ds-bg, #0a0a0a) 55%, transparent);
+  backdrop-filter: blur(6px);
+}
+
+.onboardingCard {
+  width: min(100%, 400px);
+  padding: 24px;
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-lg);
+  background: var(--ds-surface);
+  box-shadow: var(--ds-shadow-md);
+}
+
+.onboardingCard h3 {
+  margin: 0 0 12px;
+  font-size: 20px;
+}
+
+.onboardingCard ul {
+  margin: 0 0 16px;
+  padding-left: 20px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--ds-text-secondary);
+}
+
+.swipeHints {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ds-text-secondary);
+}
+
+.swipeHintItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.completeBox {
+  padding: 48px 24px;
+  text-align: center;
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-lg);
+  background: var(--ds-surface);
+}
+
+.completeBox h3 {
+  margin: 0 0 16px;
+  font-size: 22px;
+}

@@ -2,8 +2,10 @@
 
 import { HomeworkCard } from "@/components/student/homework/homework-card";
 import { HomeworkPagination } from "@/components/student/homework/homework-pagination";
+import { SectionHeroBanner } from "@/components/student/section-hero-banner";
 import styles from "@/components/student/homework/homework.module.css";
 import { LoadingState } from "@/components/ui/loading-state";
+import { STUDENT_SECTION_BANNERS } from "@/lib/student/section-banners";
 import {
   buildHomeworkSummary,
   fetchStudentHomework,
@@ -99,6 +101,12 @@ export function StudentHomeworkSection() {
   if (loading) {
     return (
       <div className={styles.page}>
+        <SectionHeroBanner
+          imageSrc={STUDENT_SECTION_BANNERS.homework}
+          eyebrow="Домашка"
+          title="Домашние задания"
+          subtitle="Все ваши задания с типом, дедлайном, статусом сдачи и баллом."
+        />
         <LoadingState label="Загрузка домашних заданий…" variant="block" />
       </div>
     );
@@ -106,30 +114,27 @@ export function StudentHomeworkSection() {
 
   return (
     <div className={styles.page}>
-      <header className={styles.header}>
-        <div>
-          <span className={styles.eyebrow}>Домашка</span>
-          <h1 className={styles.title}>Домашние задания</h1>
-          <p className={styles.subtitle}>
-            Все ваши задания с типом, дедлайном, статусом сдачи и баллом.
-          </p>
-        </div>
+      <SectionHeroBanner
+        imageSrc={STUDENT_SECTION_BANNERS.homework}
+        eyebrow="Домашка"
+        title="Домашние задания"
+        subtitle="Все ваши задания с типом, дедлайном, статусом сдачи и баллом."
+      />
 
-        <div className={styles.summaryGrid}>
-          <div className={`${styles.summaryStat} ${styles.summaryStatTotal}`}>
-            <span className={styles.summaryLabel}>Всего</span>
-            <span className={styles.summaryValue}>{summary.total}</span>
-          </div>
-          <div className={`${styles.summaryStat} ${styles.summaryStatDone}`}>
-            <span className={styles.summaryLabel}>Сдано</span>
-            <span className={styles.summaryValue}>{summary.submitted}</span>
-          </div>
-          <div className={`${styles.summaryStat} ${styles.summaryStatPending}`}>
-            <span className={styles.summaryLabel}>Не сдано</span>
-            <span className={styles.summaryValue}>{summary.pending}</span>
-          </div>
+      <div className={styles.summaryGrid}>
+        <div className={`${styles.summaryStat} ${styles.summaryStatTotal}`}>
+          <span className={styles.summaryLabel}>Всего</span>
+          <span className={styles.summaryValue}>{summary.total}</span>
         </div>
-      </header>
+        <div className={`${styles.summaryStat} ${styles.summaryStatDone}`}>
+          <span className={styles.summaryLabel}>Сдано</span>
+          <span className={styles.summaryValue}>{summary.submitted}</span>
+        </div>
+        <div className={`${styles.summaryStat} ${styles.summaryStatPending}`}>
+          <span className={styles.summaryLabel}>Не сдано</span>
+          <span className={styles.summaryValue}>{summary.pending}</span>
+        </div>
+      </div>
 
       {error ? <div className={styles.alert}>{error}</div> : null}
 

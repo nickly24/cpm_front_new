@@ -1,4 +1,4 @@
-import { apiRequest } from "@/lib/api/client";
+import { ApiError, apiRequest } from "@/lib/api/client";
 import type {
   AttemptEnvelope,
   StoredAttemptAnswer,
@@ -43,12 +43,47 @@ export async function saveTestAttemptAnswer(
   });
 }
 
+export interface BatchSyncResponse {
+  success: boolean;
+  attempt?: TestAttempt;
+  syncedQuestionIds?: number[];
+  skippedQuestionIds?: number[];
+  errors?: Array<{ questionId?: number; error: string }>;
+  error?: string;
+}
+
+export async function syncTestAttemptAnswersBatch(
+  attemptId: string,
+  answers: StoredAttemptAnswer[],
+): Promise<BatchSyncResponse> {
+  return apiRequest<BatchSyncResponse>(`/test-attempt/${attemptId}/answers`, {
+    method: "POST",
+    body: JSON.stringify({ answers }),
+  });
+}
+
 export async function submitTestAttempt(
   attemptId: string,
 ): Promise<SubmitAttemptResponse> {
   return apiRequest<SubmitAttemptResponse>(`/test-attempt/${attemptId}/submit`, {
     method: "POST",
   });
+}
+
+export function getNetworkErrorMessage(err: unknown): string {
+  if (err instanceof ApiError) {
+    return getAttemptErrorMessage(err.message);
+  }
+  if (err instanceof TypeError) {
+    return "Не удалось связаться с сервером. Проверьте интернет и попробуйте снова.";
+  }
+  if (err instanceof Error) {
+    if (/failed to fetch|network|load failed/i.test(err.message)) {
+      return "Не удалось связаться с сервером. Проверьте интернет и попробуйте снова.";
+    }
+    return err.message;
+  }
+  return "Не удалось отправить. Попробуйте ещё раз.";
 }
 
 export function getAttemptErrorMessage(code: string): string {
@@ -68,7 +103,8 @@ export function getAttemptErrorMessage(code: string): string {
     invalid_answer_type: "Неверный тип ответа",
     invalid_question_id: "Неверный вопрос",
     test_not_completed: "Сначала нужно официально сдать этот тест",
-    practice_use_frontend_only: "Тренировка пока недоступна через сервер",
+    answers_required: "Нет ответов для синхронизации",
+    answers_batch_too_large: "Слишком много ответов в одном запросе",
   };
 
   return messages[code] ?? code;

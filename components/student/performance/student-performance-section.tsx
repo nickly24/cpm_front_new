@@ -2,9 +2,11 @@
 
 import { AttendanceQrCard } from "@/components/student/performance/attendance-qr-card";
 import { RatingMetricCard } from "@/components/student/performance/rating-metric-card";
+import { SectionHeroBanner } from "@/components/student/section-hero-banner";
 import styles from "@/components/student/performance/performance.module.css";
 import { LoadingState } from "@/components/ui/loading-state";
 import { useAuth } from "@/contexts/AuthContext";
+import { STUDENT_SECTION_BANNERS } from "@/lib/student/section-banners";
 import {
   buildRatingMetrics,
   calculateAverageRating,
@@ -13,7 +15,6 @@ import {
   formatRatingValue,
 } from "@/lib/student/performance-api";
 import type { StudentRatingData } from "@/lib/student/performance-types";
-import { TrendingUp } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 function buildSubtitle(groupId?: number | null, period?: string | null): string {
@@ -89,9 +90,26 @@ export function StudentPerformanceSection() {
   );
   const subtitle = buildSubtitle(user?.group_id, period);
 
+  const hero = (
+    <SectionHeroBanner
+      imageSrc={STUDENT_SECTION_BANNERS.performance}
+      eyebrow="Успеваемость"
+      title={user?.full_name ?? "Студент"}
+      subtitle={subtitle || undefined}
+      footer={
+        !loading && data && average != null ? (
+          <>
+            Средний балл <strong>{formatRatingValue(average)}</strong>
+          </>
+        ) : undefined
+      }
+    />
+  );
+
   if (loading) {
     return (
       <div className={styles.page}>
+        {hero}
         <LoadingState label="Загрузка успеваемости…" variant="block" />
       </div>
     );
@@ -99,25 +117,7 @@ export function StudentPerformanceSection() {
 
   return (
     <div className={styles.page}>
-      <header className={styles.header}>
-        <div className={styles.headerMain}>
-          <span className={styles.eyebrow}>Успеваемость</span>
-          <h1 className={styles.title}>{user?.full_name ?? "Студент"}</h1>
-          {subtitle ? <p className={styles.subtitle}>{subtitle}</p> : null}
-        </div>
-
-        <div className={styles.average}>
-          <div className={styles.averageIcon}>
-            <TrendingUp size={20} />
-          </div>
-          <div>
-            <p className={styles.averageLabel}>Средний балл</p>
-            <p className={styles.averageValue}>
-              {formatRatingValue(average)}
-            </p>
-          </div>
-        </div>
-      </header>
+      {hero}
 
       {error ? <div className={styles.alert}>{error}</div> : null}
 

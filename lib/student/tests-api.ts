@@ -7,17 +7,42 @@ import type {
   TestsWithSessionsResponse,
   TestStatusFilter,
 } from "./tests-types";
+import { STUDENT_TESTS_PAGE_SIZE } from "./tests-types";
 
 export async function fetchDirections(): Promise<Direction[]> {
   return apiRequest<Direction[]>("/directions");
 }
 
+export async function fetchStudentAvailableTests(
+  page = 1,
+  limit = STUDENT_TESTS_PAGE_SIZE,
+): Promise<TestsWithSessionsResponse> {
+  const params = new URLSearchParams({
+    page: String(page),
+    limit: String(limit),
+  });
+  return apiRequest<TestsWithSessionsResponse>(
+    `/tests/student/available?${params.toString()}`,
+  );
+}
+
 export async function fetchTestsWithSessions(
   directionName: string,
+  page = 1,
+  limit = STUDENT_TESTS_PAGE_SIZE,
 ): Promise<TestsWithSessionsResponse> {
+  const params = new URLSearchParams({
+    page: String(page),
+    limit: String(limit),
+  });
   return apiRequest<TestsWithSessionsResponse>(
-    `/tests/${encodeURIComponent(directionName)}/with-sessions`,
+    `/tests/${encodeURIComponent(directionName)}/with-sessions?${params.toString()}`,
   );
+}
+
+export function getTestDirectionLabel(test: StudentTestItem): string | null {
+  const name = test.directionName ?? test.direction;
+  return name?.trim() ? name.trim() : null;
 }
 
 export function getTestId(test: StudentTestItem): string {

@@ -208,6 +208,12 @@
   line-height: 1.5;
 }
 
+.credentialCode {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  word-break: break-all;
+}
+
 .searchResults {
   display: flex;
   flex-direction: column;

@@ -5,6 +5,39 @@ import type {
   TestAttempt,
 } from "./test-attempt-types";
 
+export type QuestionSyncState = "empty" | "pending" | "syncing" | "synced";
+
+export function getQuestionSyncState(
+  questionId: number,
+  attempt: TestAttempt,
+  pendingQuestionIds: number[],
+  syncing: boolean,
+): QuestionSyncState {
+  const hasLocal = attempt.answers.some(
+    (answer) => answer.questionId === questionId,
+  );
+  if (!hasLocal) {
+    return "empty";
+  }
+  if (pendingQuestionIds.includes(questionId)) {
+    return syncing ? "syncing" : "pending";
+  }
+  return "synced";
+}
+
+export function questionSyncStateLabel(state: QuestionSyncState): string {
+  switch (state) {
+    case "pending":
+      return "Сохранено на устройстве";
+    case "syncing":
+      return "Отправляем на сервер…";
+    case "synced":
+      return "На сервере";
+    default:
+      return "";
+  }
+}
+
 export function formatRemainingSeconds(total: number): string {
   const seconds = Math.max(0, Math.floor(total));
   const hours = Math.floor(seconds / 3600);
@@ -98,6 +131,33 @@ export function draftToStoredAnswer(
     questionId,
     type: "text",
     textAnswer: draft.textAnswer.trim(),
+  };
+}
+
+/** Слияние лёгкого ответа сервера с локальным пакетом вопросов. */
+export function mergeAttemptFromServer(
+  local: TestAttempt,
+  server: TestAttempt,
+): TestAttempt {
+  const answeredIds = new Set(
+    server.answers.map((answer) => answer.questionId),
+  );
+  const questions = local.questions.map((question) => ({
+    ...question,
+    locked: answeredIds.has(question.questionId),
+  }));
+
+  return {
+    ...local,
+    status: server.status,
+    expiresAt: server.expiresAt,
+    remainingSeconds: server.remainingSeconds,
+    timeExpired: server.timeExpired,
+    answers: server.answers,
+    answeredCount: server.answeredCount,
+    totalQuestions: server.totalQuestions,
+    questionOrder: server.questionOrder,
+    questions,
   };
 }
 

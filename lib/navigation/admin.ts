@@ -1,6 +1,7 @@
 import {
   BarChart3,
   BookOpen,
+  Brain,
   Building2,
   CalendarDays,
   Camera,
@@ -9,6 +10,7 @@ import {
   LayoutDashboard,
   NotebookPen,
   Trophy,
+  Upload,
   Users,
 } from "lucide-react";
 import type { RoleNavigation } from "./types";
@@ -22,6 +24,7 @@ export const adminNavigation: RoleNavigation = {
         { id: "dashboard", label: "Главная", icon: LayoutDashboard },
         { id: "users", label: "Пользователи", icon: Users },
         { id: "schools", label: "Школы", icon: Building2 },
+        { id: "upload", label: "Загрузка", icon: Upload },
         { id: "schedule", label: "Расписание", icon: BookOpen },
       ],
     },
@@ -35,6 +38,7 @@ export const adminNavigation: RoleNavigation = {
         { id: "attendance", label: "Посещаемость", icon: CalendarDays },
         { id: "scan", label: "Сканирование", icon: Camera },
         { id: "zaps", label: "Запросы на отгул", icon: ClipboardList },
+        { id: "train", label: "Тренировки", icon: Brain },
         { id: "ratings", label: "Рейтинг", icon: Trophy },
       ],
     },

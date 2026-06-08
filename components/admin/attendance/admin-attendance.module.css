@@ -1,0 +1,236 @@
+.pageSubtitle {
+  margin: 6px 0 0;
+  font-size: 14px;
+  color: var(--ds-text-secondary);
+}
+
+.periodRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-end;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 140px;
+}
+
+.fieldLabel {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ds-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.daysGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--ds-space-4);
+}
+
+.dayCard {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 0;
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-lg);
+  background: var(--ds-surface);
+  overflow: hidden;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.dayCard:hover {
+  border-color: var(--ds-accent);
+  box-shadow: var(--ds-shadow-sm);
+}
+
+.dayCardMain {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  gap: 8px;
+  padding: var(--ds-space-5);
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.dayCardActions {
+  display: flex;
+  gap: 8px;
+  padding: 0 var(--ds-space-5) var(--ds-space-4);
+}
+
+.cardActionBtn {
+  padding: 6px 10px;
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-sm);
+  background: var(--ds-surface-muted);
+  color: var(--ds-text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.cardActionBtn:hover {
+  border-color: var(--ds-accent);
+  color: var(--ds-accent);
+}
+
+.cardActionBtnDanger:hover {
+  border-color: var(--ds-danger);
+  color: var(--ds-danger);
+}
+
+.headerActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.dangerBtn {
+  color: var(--ds-danger) !important;
+}
+
+.rowActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.modalHint {
+  margin: 0 0 var(--ds-space-4);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.typeFieldWide {
+  width: 100%;
+  min-width: 0;
+  margin-bottom: var(--ds-space-4);
+}
+
+.dayCardTitle {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ds-text);
+}
+
+.dayCardComment {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ds-text-secondary);
+}
+
+.addBlock {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: flex-end;
+  margin-bottom: var(--ds-space-5);
+  padding-bottom: var(--ds-space-5);
+  border-bottom: 1px solid var(--ds-border);
+}
+
+.addInput {
+  width: 120px;
+  height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-md);
+  background: var(--ds-surface-muted);
+  font-size: 14px;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    background-color 0.2s ease;
+}
+
+.addInput:focus {
+  border-color: var(--ds-accent);
+  background: var(--ds-surface);
+  box-shadow: 0 0 0 4px var(--ds-accent-soft);
+  outline: none;
+}
+
+.typeField {
+  min-width: min(100%, 280px);
+  flex: 1 1 280px;
+}
+
+.typeDropdown {
+  width: max(100%, 340px);
+}
+
+.emptyState {
+  padding: var(--ds-space-6);
+  border: 1px dashed var(--ds-border);
+  border-radius: var(--ds-radius-md);
+  background: var(--ds-surface-muted);
+  text-align: center;
+  color: var(--ds-text-secondary);
+}
+
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.modal {
+  width: 100%;
+  max-width: 420px;
+  padding: var(--ds-space-6);
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-lg);
+  background: var(--ds-surface);
+  box-shadow: var(--ds-shadow-md);
+}
+
+.modalTitle {
+  margin: 0 0 var(--ds-space-4);
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.modalField {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: var(--ds-space-4);
+}
+
+.modalInput {
+  height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-md);
+  background: var(--ds-surface-muted);
+  font-size: 14px;
+}
+
+.modalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.studentIdMuted {
+  color: var(--ds-text-muted);
+  font-size: 13px;
+}

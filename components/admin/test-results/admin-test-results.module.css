@@ -1,0 +1,173 @@
+.scoreGood {
+  color: #15803d;
+}
+
+.pageSubtitle {
+  margin: 6px 0 0;
+  font-size: 14px;
+  color: var(--ds-text-secondary);
+}
+
+.scoreMid {
+  color: #b45309;
+}
+
+.scoreLow {
+  color: var(--ds-danger);
+}
+
+.studentRow {
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.studentRow:hover {
+  background: var(--ds-surface-muted);
+}
+
+.sessionsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--ds-space-4);
+}
+
+.sessionCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-3);
+  padding: var(--ds-space-5);
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-lg);
+  background: var(--ds-surface);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.sessionCard:hover {
+  border-color: var(--ds-accent);
+  box-shadow: var(--ds-shadow-sm);
+}
+
+.sessionCardActive {
+  border-color: var(--ds-accent);
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--ds-accent) 30%, transparent);
+}
+
+.sessionCardHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--ds-space-3);
+}
+
+.sessionTitle {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--ds-text);
+}
+
+.sessionScore {
+  flex-shrink: 0;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.sessionMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--ds-text-secondary);
+}
+
+.emptyState {
+  padding: var(--ds-space-6);
+  border: 1px dashed var(--ds-border);
+  border-radius: var(--ds-radius-md);
+  background: var(--ds-surface-muted);
+  text-align: center;
+  color: var(--ds-text-secondary);
+  font-size: 14px;
+}
+
+.studentAvatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--ds-radius-full);
+  background: var(--ds-accent-soft);
+  color: var(--ds-accent);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.studentCell {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-3);
+}
+
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: var(--ds-space-3);
+  margin-bottom: var(--ds-space-4);
+}
+
+.statCard {
+  padding: var(--ds-space-4);
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-md);
+  background: var(--ds-surface-muted);
+}
+
+.statLabel {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--ds-text-muted);
+}
+
+.statValue {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--ds-text);
+}
+
+.typeGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: var(--ds-space-3);
+  margin-bottom: var(--ds-space-5);
+}
+
+.typeCard {
+  padding: var(--ds-space-4);
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-md);
+  background: var(--ds-surface);
+}
+
+.typeTitle {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ds-text);
+}
+
+.typeMeta {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--ds-text-secondary);
+}

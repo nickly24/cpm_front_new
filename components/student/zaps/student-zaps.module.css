@@ -1,0 +1,508 @@
+.page {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 24px 28px;
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-lg);
+  background: var(--ds-surface);
+  box-shadow: var(--ds-shadow-sm);
+}
+
+.eyebrow {
+  display: block;
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ds-accent);
+}
+
+.title {
+  margin: 0 0 6px;
+  font-size: clamp(24px, 2.2vw, 30px);
+  font-weight: 700;
+}
+
+.subtitle {
+  margin: 0;
+  font-size: 14px;
+  color: var(--ds-text-secondary);
+}
+
+.headerActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.panel {
+  padding: 24px 28px;
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-lg);
+  background: var(--ds-surface);
+}
+
+.formDescription {
+  margin: 0 0 20px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--ds-text-secondary);
+}
+
+.alert {
+  margin: 0 0 16px;
+  padding: 12px 16px;
+  border-radius: var(--ds-radius-md);
+  background: color-mix(in srgb, var(--ds-danger) 12%, transparent);
+  color: var(--ds-danger);
+  font-size: 14px;
+}
+
+.success {
+  margin: 0;
+  padding: 20px;
+  border-radius: var(--ds-radius-md);
+  background: color-mix(in srgb, var(--ds-success) 14%, transparent);
+  color: var(--ds-success);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.emptyState {
+  padding: 40px 24px;
+  border: 1px dashed var(--ds-border);
+  border-radius: var(--ds-radius-lg);
+  background: var(--ds-surface-muted);
+  text-align: center;
+}
+
+.emptyTitle {
+  margin: 0 0 8px;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.emptyText {
+  margin: 0 0 20px;
+  font-size: 14px;
+  color: var(--ds-text-secondary);
+}
+
+.zapsList {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.zapCard {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 20px 22px;
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-lg);
+  background: var(--ds-surface);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.zapCard:hover {
+  border-color: color-mix(in srgb, var(--ds-accent) 40%, var(--ds-border));
+  box-shadow: var(--ds-shadow-sm);
+}
+
+.zapCardHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.zapCardId {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ds-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.zapCardText {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ds-text-primary);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.zapCardMeta {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ds-text-secondary);
+}
+
+.zapCardAnswer {
+  margin: 0;
+  padding-top: 8px;
+  border-top: 1px solid var(--ds-border);
+  font-size: 13px;
+  color: var(--ds-text-secondary);
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.badgeSuccess {
+  background: color-mix(in srgb, var(--ds-success) 18%, transparent);
+  color: var(--ds-success);
+}
+
+.badgeWarning {
+  background: color-mix(in srgb, var(--ds-warning, #d97706) 18%, transparent);
+  color: var(--ds-warning, #b45309);
+}
+
+.badgeDanger {
+  background: color-mix(in srgb, var(--ds-danger) 18%, transparent);
+  color: var(--ds-danger);
+}
+
+.badgeMuted {
+  background: var(--ds-surface-muted);
+  color: var(--ds-text-secondary);
+}
+
+.detailSection {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.detailLabel {
+  margin: 0 0 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ds-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.detailText {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+.datesTableWrap {
+  overflow-x: auto;
+  margin-bottom: 24px;
+}
+
+.datesTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.datesTable th,
+.datesTable td {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--ds-border);
+  text-align: left;
+}
+
+.datesTable th {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ds-text-muted);
+  text-transform: uppercase;
+  background: var(--ds-surface-muted);
+}
+
+.imagesSectionTitle {
+  margin: 0 0 12px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.imagesGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
+}
+
+.imageWrap {
+  overflow: hidden;
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-md);
+  background: var(--ds-surface-muted);
+}
+
+.image {
+  display: block;
+  width: 100%;
+  height: 140px;
+  object-fit: cover;
+}
+
+.pdfLink {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 140px;
+  padding: 16px;
+  color: var(--ds-accent);
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.pdfLink:hover {
+  text-decoration: underline;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.fieldLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ds-text-primary);
+}
+
+.textarea,
+.input,
+.select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-md);
+  background: var(--ds-surface-muted);
+  font-size: 14px;
+  font-family: inherit;
+}
+
+.textarea {
+  min-height: 120px;
+  resize: vertical;
+}
+
+.helpText {
+  margin: 0;
+  font-size: 12px;
+  color: var(--ds-text-muted);
+}
+
+.dateBreadcrumbs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin: 2px 0 12px;
+}
+
+.dateCrumb {
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ds-text-muted);
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.dateCrumb:hover:not(:disabled) {
+  color: var(--ds-accent);
+}
+
+.dateCrumb:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.dateCrumbActive {
+  font-weight: 700;
+  color: var(--ds-accent);
+  cursor: default;
+}
+
+.dateCrumbActive:hover:not(:disabled) {
+  color: var(--ds-accent);
+}
+
+.dateCrumbSep {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ds-text-muted);
+  user-select: none;
+}
+
+.selectedDatesBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.selectedDatesLabel {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ds-text-secondary);
+}
+
+.datePickerRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: flex-end;
+}
+
+.datePickerRow .input {
+  flex: 1;
+  min-width: 140px;
+}
+
+.rangeRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 10px;
+  align-items: end;
+}
+
+@media (max-width: 640px) {
+  .rangeRow {
+    grid-template-columns: 1fr;
+  }
+}
+
+.selectedDates {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.dateTag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: var(--ds-surface-muted);
+  font-size: 13px;
+}
+
+.dateTagRemove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--ds-text-muted);
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.dateTagRemove:hover {
+  color: var(--ds-danger);
+  background: color-mix(in srgb, var(--ds-danger) 10%, transparent);
+}
+
+.fileInput {
+  font-size: 14px;
+}
+
+.previewGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 12px;
+}
+
+.previewItem {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-md);
+  background: var(--ds-surface-muted);
+}
+
+.previewImage {
+  width: 100%;
+  height: 100px;
+  object-fit: cover;
+  border-radius: var(--ds-radius-sm);
+}
+
+.pdfPreview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100px;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--ds-text-secondary);
+}
+
+.formNote {
+  margin: 0;
+  padding: 14px 16px;
+  border-radius: var(--ds-radius-md);
+  background: var(--ds-surface-muted);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ds-text-secondary);
+}
+
+.formActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.backBar {
+  margin-bottom: 4px;
+}

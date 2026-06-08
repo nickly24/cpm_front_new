@@ -4,6 +4,9 @@ import type {
   AdminGroupsOverviewResponse,
   AdminGroupsSearchResponse,
   AdminGroupItem,
+  AdminStaffAddResponse,
+  AdminStaffFormData,
+  AdminStaffResetPasswordResponse,
   AdminStaffRole,
   AdminStaffUser,
   AdminStudent,
@@ -54,6 +57,43 @@ export async function fetchAdminStaff(role: AdminStaffRole): Promise<AdminStaffU
     body: JSON.stringify({ role }),
   });
   return data.status && Array.isArray(data.res) ? data.res : [];
+}
+
+export async function addAdminStaffUser(
+  role: AdminStaffRole,
+  payload: AdminStaffFormData,
+): Promise<AdminStaffAddResponse> {
+  return apiRequest<AdminStaffAddResponse>("/api/add-staff-user", {
+    method: "POST",
+    body: JSON.stringify({
+      role,
+      full_name: payload.full_name,
+      group_id: payload.group_id ?? undefined,
+    }),
+  });
+}
+
+export async function editAdminStaffUser(payload: {
+  role: AdminStaffRole;
+  user_id: number;
+  full_name?: string;
+  group_id?: number | null;
+  login?: string;
+}): Promise<{ status: boolean; user_data?: AdminStaffUser; error?: string }> {
+  return apiRequest("/api/edit-staff-user", {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function resetAdminStaffPassword(
+  role: AdminStaffRole,
+  userId: number,
+): Promise<AdminStaffResetPasswordResponse> {
+  return apiRequest<AdminStaffResetPasswordResponse>("/api/reset-staff-password", {
+    method: "POST",
+    body: JSON.stringify({ role, user_id: userId }),
+  });
 }
 
 export async function fetchAdminGroupsList(): Promise<AdminGroupItem[]> {

@@ -7,10 +7,21 @@ import {
   fetchTestAttempt,
   getAttemptErrorMessage,
   isValidAttempt,
-  saveTestAttemptAnswer,
   startTestAttempt,
   submitTestAttempt,
 } from "@/lib/student/test-attempt-api";
+import {
+  addPendingQuestionId,
+  deleteAttemptBundle,
+  loadAttemptBundle,
+  upsertLocalAnswer,
+} from "@/lib/student/test-attempt-store";
+import { TestAttemptSubmitDialog } from "@/components/student/tests/attempt/test-attempt-submit-dialog";
+import {
+  flushPendingAnswers,
+  persistBundle,
+  resolveAttemptBundleState,
+} from "@/lib/student/test-attempt-sync";
 import type {
   AnswerDraft,
   AttemptQuestion,
@@ -23,6 +34,9 @@ import {
   formatRemainingSeconds,
   getStoredAnswer,
   isDraftValid,
+  getQuestionSyncState,
+  mergeAttemptFromServer,
+  questionSyncStateLabel,
   toggleMultipleAnswer,
 } from "@/lib/student/test-attempt-utils";
 import {
@@ -30,6 +44,8 @@ import {
   ArrowRight,
   CheckCircle2,
   Clock3,
+  Cloud,
+  CloudUpload,
   Send,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -67,14 +83,44 @@ export function TestAttemptScreen({
     accuracy?: number;
     timeSpentMinutes?: number;
   } | null>(null);
+  const [pendingQuestionIds, setPendingQuestionIds] = useState<number[]>([]);
+  const [syncing, setSyncing] = useState(false);
+  const [submitDialog, setSubmitDialog] = useState<"confirm" | "error" | null>(
+    null,
+  );
+  const pendingCount = pendingQuestionIds.length;
 
   const questions = attempt?.questions ?? [];
   const currentQuestion = questions[currentIndex] ?? null;
 
-  const syncAttempt = useCallback((next: TestAttempt) => {
-    setAttempt(next);
-    setRemainingSeconds(next.remainingSeconds);
-  }, []);
+  const applyAttempt = useCallback(
+    async (next: TestAttempt, pendingQuestionIds: number[]) => {
+      setAttempt(next);
+      setRemainingSeconds(next.remainingSeconds);
+      setPendingQuestionIds(pendingQuestionIds);
+      await persistBundle(next, pendingQuestionIds);
+    },
+    [],
+  );
+
+  const runBackgroundSync = useCallback(
+    async (current: TestAttempt) => {
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        return;
+      }
+
+      setSyncing(true);
+      try {
+        const result = await flushPendingAnswers(current.attemptId, current);
+        if (result) {
+          await applyAttempt(result.attempt, result.pendingQuestionIds);
+        }
+      } finally {
+        setSyncing(false);
+      }
+    },
+    [applyAttempt],
+  );
 
   const loadAttempt = useCallback(async () => {
     setPhase("loading");
@@ -91,9 +137,33 @@ export function TestAttemptScreen({
         );
       }
 
-      syncAttempt(response.attempt!);
+      let nextAttempt = response.attempt!;
+      let pending: number[] = [];
+
+      if (resumeAttemptId) {
+        const cached = await loadAttemptBundle(resumeAttemptId);
+        if (cached?.attempt?.questions?.length) {
+          nextAttempt = mergeAttemptFromServer(cached.attempt, nextAttempt);
+          pending = cached.pendingQuestionIds;
+          for (const answer of cached.attempt.answers) {
+            if (
+              !nextAttempt.answers.some(
+                (item) => item.questionId === answer.questionId,
+              )
+            ) {
+              nextAttempt = upsertLocalAnswer(nextAttempt, answer);
+              if (!pending.includes(answer.questionId)) {
+                pending = addPendingQuestionId(pending, answer.questionId);
+              }
+            }
+          }
+        }
+      }
+
+      await applyAttempt(nextAttempt, pending);
       setCurrentIndex(0);
       setPhase("active");
+      void runBackgroundSync(nextAttempt);
     } catch (err) {
       const message =
         err instanceof ApiError
@@ -105,7 +175,7 @@ export function TestAttemptScreen({
       setError(message);
       setPhase("fatal");
     }
-  }, [isPractice, resumeAttemptId, syncAttempt, testId]);
+  }, [applyAttempt, isPractice, resumeAttemptId, runBackgroundSync, testId]);
 
   useEffect(() => {
     void loadAttempt();
@@ -157,50 +227,52 @@ export function TestAttemptScreen({
     void fetchTestAttempt(attempt.attemptId)
       .then((response) => {
         if (response.success && response.attempt) {
-          syncAttempt(response.attempt);
+          const merged = mergeAttemptFromServer(attempt, response.attempt);
+          void applyAttempt(merged, pendingQuestionIds);
         }
       })
       .catch(() => {
         /* ignore */
       });
-  }, [attempt, phase, remainingSeconds, syncAttempt]);
+  }, [attempt, applyAttempt, pendingQuestionIds, phase, remainingSeconds]);
 
   useEffect(() => {
-    if (phase !== "active" || !attempt || attempt.timeExpired || remainingSeconds > 0) {
+    if (phase !== "active" || !attempt) {
       return;
     }
 
     const syncTimer = window.setInterval(() => {
-      void fetchTestAttempt(attempt.attemptId)
-        .then((response) => {
-          if (response.success && response.attempt) {
-            syncAttempt(response.attempt);
-          }
-        })
-        .catch(() => {
-          /* ignore background sync errors */
-        });
-    }, 45000);
+      void runBackgroundSync(attempt);
+    }, 12000);
+
+    const handleOnline = () => {
+      void runBackgroundSync(attempt);
+    };
 
     const handleFocus = () => {
       void fetchTestAttempt(attempt.attemptId)
         .then((response) => {
           if (response.success && response.attempt) {
-            syncAttempt(response.attempt);
+            const merged = mergeAttemptFromServer(attempt, response.attempt);
+            void applyAttempt(merged, pendingQuestionIds).then(() => {
+              void runBackgroundSync(merged);
+            });
           }
         })
         .catch(() => {
-          /* ignore */
+          void runBackgroundSync(attempt);
         });
     };
 
+    window.addEventListener("online", handleOnline);
     window.addEventListener("focus", handleFocus);
 
     return () => {
       window.clearInterval(syncTimer);
+      window.removeEventListener("online", handleOnline);
       window.removeEventListener("focus", handleFocus);
     };
-  }, [attempt, phase, syncAttempt]);
+  }, [attempt, applyAttempt, pendingQuestionIds, phase, runBackgroundSync]);
 
   const timerClass = useMemo(() => {
     if (remainingSeconds <= 60) {
@@ -223,7 +295,7 @@ export function TestAttemptScreen({
     const confirmed = window.confirm(
       timeExpired
         ? "Выйти? Сохранённые ответы останутся — их можно отправить позже из списка тестов."
-        : "Выйти из теста? Прогресс сохранён на сервере — можно продолжить позже.",
+        : "Выйти из теста? Ответы сохранены на устройстве и синхронизируются при появлении сети.",
     );
 
     if (confirmed) {
@@ -240,7 +312,7 @@ export function TestAttemptScreen({
     setError(null);
   };
 
-  const persistCurrentAnswer = async (): Promise<boolean> => {
+  const saveLocalAnswer = async (): Promise<boolean> => {
     if (!attempt || !currentQuestion || !draft || timeExpired) {
       return true;
     }
@@ -254,36 +326,16 @@ export function TestAttemptScreen({
       return false;
     }
 
-    setBusy(true);
     setError(null);
-
-    try {
-      const response = await saveTestAttemptAnswer(
-        attempt.attemptId,
-        draftToStoredAnswer(currentQuestion.questionId, draft),
-      );
-
-      if (!response.success || !response.attempt) {
-        throw new Error(
-          getAttemptErrorMessage(response.error ?? "invalid_answer_type"),
-        );
-      }
-
-      syncAttempt(response.attempt);
-      return true;
-    } catch (err) {
-      const message =
-        err instanceof ApiError
-          ? getAttemptErrorMessage(err.message)
-          : err instanceof Error
-            ? err.message
-            : "Не удалось сохранить ответ";
-
-      setError(message);
-      return false;
-    } finally {
-      setBusy(false);
-    }
+    const stored = draftToStoredAnswer(currentQuestion.questionId, draft);
+    const next = upsertLocalAnswer(attempt, stored);
+    const pending = addPendingQuestionId(
+      pendingQuestionIds,
+      currentQuestion.questionId,
+    );
+    await applyAttempt(next, pending);
+    void runBackgroundSync(next);
+    return true;
   };
 
   const handleNext = async () => {
@@ -292,7 +344,7 @@ export function TestAttemptScreen({
     }
 
     if (!timeExpired && !currentQuestion.locked) {
-      const saved = await persistCurrentAnswer();
+      const saved = await saveLocalAnswer();
       if (!saved) {
         return;
       }
@@ -303,44 +355,45 @@ export function TestAttemptScreen({
     }
   };
 
-  const handleSubmit = async () => {
+  const buildDraftPayload = () => {
+    if (!currentQuestion || !draft || timeExpired) {
+      return null;
+    }
+    return {
+      questionId: currentQuestion.questionId,
+      draft,
+      timeExpired,
+    };
+  };
+
+  const performSubmit = useCallback(async () => {
     if (!attempt) {
       return;
     }
 
-    if (
-      !timeExpired &&
-      currentQuestion &&
-      !currentQuestion.locked &&
-      draft &&
-      isDraftValid(draft)
-    ) {
-      const saved = await persistCurrentAnswer();
-      if (!saved) {
-        return;
-      }
-    }
-
-    const confirmed = window.confirm(
-      timeExpired
-        ? isPractice
-          ? "Отправить сохранённые ответы? Результат тренировки не засчитается."
-          : "Отправить сохранённые ответы на проверку? Новые ответы добавить уже нельзя."
-        : isPractice
-          ? "Завершить тренировку и посмотреть результат? Официальный балл не изменится."
-          : "Завершить тест и отправить ответы на проверку?",
-    );
-
-    if (!confirmed) {
-      return;
-    }
-
     setBusy(true);
-    setPhase("submitting");
     setError(null);
 
     try {
-      const response = await submitTestAttempt(attempt.attemptId);
+      const resolved = await resolveAttemptBundleState(
+        attempt.attemptId,
+        { attempt, pendingQuestionIds },
+        buildDraftPayload(),
+      );
+      await applyAttempt(resolved.attempt, resolved.pendingQuestionIds);
+
+      const flush = await flushPendingAnswers(attempt.attemptId);
+      if (!flush) {
+        throw new Error("attempt_not_found");
+      }
+
+      await applyAttempt(flush.attempt, flush.pendingQuestionIds);
+
+      if (flush.hadErrors || flush.pendingQuestionIds.length > 0) {
+        throw new Error("sync_incomplete");
+      }
+
+      const response = await submitTestAttempt(flush.attempt.attemptId);
 
       if (!response.success) {
         throw new Error(
@@ -348,24 +401,62 @@ export function TestAttemptScreen({
         );
       }
 
+      setSubmitDialog(null);
+      await deleteAttemptBundle(flush.attempt.attemptId);
       setSubmitScore(
         response.score != null ? Math.round(Number(response.score)) : null,
       );
       setSubmitStats(response.stats ?? null);
       setPhase("done");
     } catch (err) {
-      const message =
-        err instanceof ApiError
-          ? getAttemptErrorMessage(err.message)
-          : err instanceof Error
-            ? err.message
-            : "Не удалось сдать тест";
-
-      setError(message);
+      setError(null);
+      setSubmitDialog("error");
       setPhase("active");
     } finally {
       setBusy(false);
     }
+  }, [
+    applyAttempt,
+    attempt,
+    currentQuestion,
+    draft,
+    pendingQuestionIds,
+    timeExpired,
+  ]);
+
+  const openSubmitConfirm = async () => {
+    if (!attempt) {
+      return;
+    }
+
+    if (
+      !timeExpired &&
+      currentQuestion &&
+      draft &&
+      !isDraftValid(draft) &&
+      !getStoredAnswer(attempt, currentQuestion.questionId)
+    ) {
+      setError("Выберите или введите ответ перед завершением");
+      return;
+    }
+
+    setError(null);
+
+    try {
+      const resolved = await resolveAttemptBundleState(
+        attempt.attemptId,
+        { attempt, pendingQuestionIds },
+        buildDraftPayload(),
+      );
+      await applyAttempt(resolved.attempt, resolved.pendingQuestionIds);
+      setSubmitDialog("confirm");
+    } catch {
+      setError("Не удалось сохранить ответ локально");
+    }
+  };
+
+  const handleSubmit = () => {
+    void openSubmitConfirm();
   };
 
   const renderQuestionBody = (
@@ -511,6 +602,34 @@ export function TestAttemptScreen({
   const readOnly = currentQuestion.locked || timeExpired;
   const isLastQuestion = currentIndex === questions.length - 1;
   const answeredCount = attempt.answeredCount;
+  const currentSyncState = getQuestionSyncState(
+    currentQuestion.questionId,
+    attempt,
+    pendingQuestionIds,
+    syncing,
+  );
+
+  const renderSyncStatusIcon = (state: ReturnType<typeof getQuestionSyncState>) => {
+    if (state === "synced") {
+      return <CheckCircle2 size={16} className={styles.attemptSyncStatusIcon} />;
+    }
+    if (state === "syncing") {
+      return <CloudUpload size={16} className={styles.attemptSyncStatusIcon} />;
+    }
+    if (state === "pending") {
+      return <Cloud size={16} className={styles.attemptSyncStatusIcon} />;
+    }
+    return null;
+  };
+
+  const currentSyncStatusClass =
+    currentSyncState === "synced"
+      ? styles.attemptSyncStatusSynced
+      : currentSyncState === "syncing"
+        ? styles.attemptSyncStatusSyncing
+        : currentSyncState === "pending"
+          ? styles.attemptSyncStatusPending
+          : "";
 
   return (
     <div className={styles.attemptOverlay}>
@@ -544,6 +663,15 @@ export function TestAttemptScreen({
 
           <span className={styles.attemptProgressMeta}>
             Отвечено {answeredCount} / {attempt.totalQuestions}
+            {pendingCount > 0 ? (
+              <span className={styles.attemptSyncPending}>
+                {" "}
+                · ждут отправки: {pendingCount}
+                {syncing ? " · отправка…" : ""}
+              </span>
+            ) : syncing ? (
+              <span className={styles.attemptSyncPending}> · синхронизация…</span>
+            ) : null}
           </span>
 
           <button
@@ -588,20 +716,48 @@ export function TestAttemptScreen({
       <div className={styles.attemptBody}>
         <aside className={styles.attemptSidebar}>
           <p className={styles.attemptSidebarTitle}>Вопросы</p>
+          <ul className={styles.attemptSyncLegend} aria-label="Статусы ответов">
+            <li className={styles.attemptSyncLegendItem}>
+              <span
+                className={`${styles.attemptSyncLegendDot} ${styles.attemptSyncLegendDotPending}`.trim()}
+                aria-hidden
+              />
+              ждёт отправки
+            </li>
+            <li className={styles.attemptSyncLegendItem}>
+              <span
+                className={`${styles.attemptSyncLegendDot} ${styles.attemptSyncLegendDotSynced}`.trim()}
+                aria-hidden
+              />
+              на сервере
+            </li>
+          </ul>
           <div className={styles.attemptQuestionGrid}>
             {questions.map((question, index) => {
-              const answered = question.locked;
               const isCurrent = index === currentIndex;
+              const syncState = getQuestionSyncState(
+                question.questionId,
+                attempt,
+                pendingQuestionIds,
+                syncing,
+              );
+              const syncClass =
+                syncState === "synced"
+                  ? styles.attemptQuestionPillSynced
+                  : syncState === "syncing"
+                    ? `${styles.attemptQuestionPillPending} ${styles.attemptQuestionPillSyncing}`
+                    : syncState === "pending"
+                      ? styles.attemptQuestionPillPending
+                      : "";
 
               return (
                 <button
                   key={question.questionId}
                   type="button"
+                  title={questionSyncStateLabel(syncState)}
                   className={`${styles.attemptQuestionPill} ${
                     isCurrent ? styles.attemptQuestionPillCurrent : ""
-                  } ${answered ? styles.attemptQuestionPillAnswered : ""} ${
-                    answered ? styles.attemptQuestionPillLocked : ""
-                  }`.trim()}
+                  } ${syncClass}`.trim()}
                   onClick={() => goToQuestion(index)}
                 >
                   {index + 1}
@@ -626,11 +782,20 @@ export function TestAttemptScreen({
 
             <h2 className={styles.attemptQuestionText}>{currentQuestion.text}</h2>
 
-            {readOnly && currentQuestion.locked ? (
+            {currentSyncState !== "empty" ? (
+              <p
+                className={`${styles.attemptSyncStatus} ${currentSyncStatusClass}`.trim()}
+              >
+                {renderSyncStatusIcon(currentSyncState)}
+                {questionSyncStateLabel(currentSyncState)}
+              </p>
+            ) : null}
+
+            {readOnly && currentSyncState === "synced" ? (
               <p className={styles.attemptLockedNote}>
                 {timeExpired
                   ? "Время вышло — ответ только для просмотра"
-                  : "Ответ зафиксирован — можно только просмотреть"}
+                  : "Ответ на сервере — изменить нельзя"}
               </p>
             ) : null}
 
@@ -647,9 +812,13 @@ export function TestAttemptScreen({
             <span className={styles.attemptHint}>
               {timeExpired
                 ? "Можно просмотреть вопросы и отправить сохранённые ответы"
-                : readOnly
-                  ? "Этот вопрос уже сохранён на сервере"
-                  : "После «Далее» ответ нельзя изменить"}
+                : currentSyncState === "syncing"
+                  ? "Отправляем ответ на сервер…"
+                  : currentSyncState === "pending"
+                    ? "Ответ на устройстве — уйдёт на сервер, когда появится сеть"
+                    : currentSyncState === "synced"
+                      ? "Ответ на сервере — изменить нельзя"
+                      : "После «Далее» ответ сохранится и отправится в фоне"}
             </span>
 
             {!isLastQuestion ? (
@@ -676,6 +845,22 @@ export function TestAttemptScreen({
           </footer>
         </main>
       </div>
+
+      {submitDialog ? (
+        <TestAttemptSubmitDialog
+          mode={submitDialog}
+          isPractice={isPractice}
+          timeExpired={timeExpired}
+          loading={busy}
+          onCancel={() => {
+            if (!busy) {
+              setSubmitDialog(null);
+            }
+          }}
+          onConfirm={() => void performSubmit()}
+          onRetry={() => void performSubmit()}
+        />
+      ) : null}
     </div>
   );
 }

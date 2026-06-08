@@ -1,0 +1,275 @@
+.sectionTabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ds-space-2);
+}
+
+.pageSubtitle {
+  margin: 6px 0 0;
+  font-size: 14px;
+  color: var(--ds-text-secondary);
+}
+
+.jobCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-3);
+  padding: var(--ds-space-5);
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-lg);
+  background: var(--ds-surface);
+}
+
+.jobCardActive {
+  border-color: var(--ds-accent);
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--ds-accent) 25%, transparent);
+}
+
+.jobHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--ds-space-3);
+}
+
+.jobTitle {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ds-text);
+}
+
+.jobMeta {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--ds-text-secondary);
+}
+
+.statusBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: var(--ds-radius-full);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.statusQueued {
+  background: rgba(59, 130, 246, 0.14);
+  color: #1d4ed8;
+}
+
+.statusRunning {
+  background: var(--ds-accent-soft);
+  color: var(--ds-accent-hover);
+}
+
+.statusCompleted {
+  background: rgba(34, 197, 94, 0.14);
+  color: #15803d;
+}
+
+.statusFailed {
+  background: var(--ds-danger-bg);
+  color: var(--ds-danger);
+}
+
+.progressTrack {
+  overflow: hidden;
+  height: 8px;
+  border-radius: var(--ds-radius-full);
+  background: var(--ds-surface-muted);
+}
+
+.progressFill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--ds-accent);
+  transition: width 0.25s ease;
+}
+
+.jobStats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ds-space-4);
+  font-size: 13px;
+  color: var(--ds-text-secondary);
+}
+
+.jobMessage {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--ds-text-secondary);
+}
+
+.jobsList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-3);
+}
+
+.placeBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: var(--ds-radius-full);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.place1 {
+  background: rgba(245, 158, 11, 0.18);
+  color: #b45309;
+}
+
+.place2 {
+  background: rgba(148, 163, 184, 0.22);
+  color: #475569;
+}
+
+.place3 {
+  background: rgba(180, 83, 9, 0.14);
+  color: #92400e;
+}
+
+.placeOther {
+  background: var(--ds-surface-muted);
+  color: var(--ds-text-secondary);
+}
+
+.finalScore {
+  font-weight: 700;
+  color: var(--ds-text);
+}
+
+.detailsHeader {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-4);
+}
+
+.detailsMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ds-space-4);
+}
+
+.detailsMetaItem {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.detailsMetaLabel {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ds-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.detailsMetaValue {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ds-text);
+}
+
+.detailsMetaValueLarge {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--ds-accent);
+}
+
+.detailGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--ds-space-4);
+}
+
+.detailCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-3);
+  padding: var(--ds-space-4);
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-md);
+  background: var(--ds-surface);
+}
+
+.detailCardSuccess {
+  border-color: rgba(34, 197, 94, 0.35);
+}
+
+.detailCardMuted {
+  opacity: 0.88;
+}
+
+.detailCardHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--ds-space-3);
+}
+
+.detailCardTitle {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--ds-text);
+}
+
+.detailScore {
+  flex-shrink: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ds-text);
+}
+
+.detailInfo {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ds-text-secondary);
+}
+
+.directionsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: var(--ds-space-3);
+  margin-bottom: var(--ds-space-4);
+}
+
+.directionCard {
+  padding: var(--ds-space-4);
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-md);
+  background: var(--ds-surface-muted);
+}
+
+.directionName {
+  font-size: 13px;
+  color: var(--ds-text-secondary);
+}
+
+.directionScore {
+  margin-top: 4px;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--ds-text);
+}
+
+.emptyState {
+  padding: var(--ds-space-6);
+  border: 1px dashed var(--ds-border);
+  border-radius: var(--ds-radius-md);
+  background: var(--ds-surface-muted);
+  text-align: center;
+  color: var(--ds-text-secondary);
+  font-size: 14px;
+}

@@ -10,6 +10,7 @@ import { getCabinetPath } from "@/lib/auth/roles";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
+import styles from "./login-form.module.css";
 
 export function LoginForm() {
   const { user, loading, login } = useAuth();
@@ -48,12 +49,12 @@ export function LoginForm() {
   return (
     <div className="login-page">
       <section className="login-brand">
-        <div>
-          <div className="login-brand-logo">
+        <div className="login-brand-content">
+          <div className={styles.logoCard}>
             <Image src="/logo.svg" alt="CPM" width={56} height={56} />
             <div>
-              <p className="login-brand-title">CPM Platform</p>
-              <p className="login-brand-subtitle">Образовательная платформа</p>
+              <p className={styles.logoTitle}>CPM Platform</p>
+              <p className={styles.logoSubtitle}>Образовательная платформа</p>
             </div>
           </div>
 
@@ -65,22 +66,10 @@ export function LoginForm() {
             с единым входом и понятной навигацией.
           </p>
         </div>
-
-        <div className="login-brand-note">
-          Современный интерфейс с поддержкой светлой и тёмной темы.
-        </div>
       </section>
 
       <section className="login-panel">
         <div className="login-panel-inner">
-          <div className="login-mobile-header">
-            <div className="login-mobile-brand">
-              <Image src="/logo.svg" alt="CPM" width={44} height={44} />
-              <span>CPM</span>
-            </div>
-            <ThemeToggle />
-          </div>
-
           <Card>
             <div className="login-card-top">
               <ThemeToggle />

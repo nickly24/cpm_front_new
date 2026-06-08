@@ -18,6 +18,40 @@ export interface AdminStaffUser {
   id: number;
   full_name: string;
   group_id?: number | null;
+  group_name?: string | null;
+  login?: string | null;
+  password?: string | null;
+  password_hidden?: boolean;
+}
+
+export interface AdminStaffFormData {
+  full_name: string;
+  group_id?: number | null;
+  login?: string;
+}
+
+export interface AdminStaffAddResponse {
+  status: boolean;
+  message?: string;
+  user_data?: {
+    id: number;
+    full_name: string;
+    login: string;
+    password: string;
+    group_id?: number | null;
+  };
+  error?: string;
+}
+
+export interface AdminStaffResetPasswordResponse {
+  status: boolean;
+  message?: string;
+  user_data?: {
+    id: number;
+    login: string;
+    password: string;
+  };
+  error?: string;
 }
 
 export interface AdminGroupItem {
