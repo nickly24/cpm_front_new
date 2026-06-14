@@ -1,13 +1,15 @@
 "use client";
 
 import reportStyles from "@/components/admin/attendance/report/report.module.css";
-import ratingReportStyles from "@/components/admin/ratings/report/ratings-report.module.css";
+import gridStyles from "@/components/supervisor/reports/supervisor-homework-report.module.css";
+import { SupervisorOvHomeworkGrid } from "@/components/supervisor/reports/supervisor-ov-homework-grid";
 import styles from "@/components/admin/tests/admin-tests.module.css";
 import type { ReportPeriodSelection } from "@/components/admin/attendance/report/period-modal";
 import { ReportMacClose } from "@/components/admin/attendance/report/report-mac-close";
 import { LoadingState } from "@/components/ui/loading-state";
 import { fetchSupervisorOvHomeworkReport } from "@/lib/supervisor/supervisor-homework-api";
 import { exportSupervisorOvHomeworkExcel } from "@/lib/supervisor/supervisor-homework-export";
+import type { HomeworkHeaderMode } from "@/lib/supervisor/supervisor-homework-display";
 import {
   filterHomeworksByPeriod,
   formatSupervisorPeriodLabel,
@@ -35,6 +37,8 @@ export function SupervisorOvHomeworkWorkspace({
     Awaited<ReturnType<typeof fetchSupervisorOvHomeworkReport>>["students"]
   >([]);
   const [search, setSearch] = useState("");
+  const [typeFilter, setTypeFilter] = useState<"all" | "ОВ" | "ДЗНВ">("all");
+  const [headerMode, setHeaderMode] = useState<HomeworkHeaderMode>("short");
 
   const load = useCallback(async (silent = false) => {
     if (silent) {
@@ -78,6 +82,13 @@ export function SupervisorOvHomeworkWorkspace({
     );
   }, [search, students]);
 
+  const visibleHomeworkCount = useMemo(() => {
+    if (typeFilter === "all") {
+      return homeworks.length;
+    }
+    return homeworks.filter((homework) => homework.type === typeFilter).length;
+  }, [homeworks, typeFilter]);
+
   const periodLabel = formatSupervisorPeriodLabel(period);
   const fileName = `domashnie_${period.dateFrom}_${period.dateTo}.xlsx`;
 
@@ -103,7 +114,7 @@ export function SupervisorOvHomeworkWorkspace({
                   Ученики: <strong>{filteredStudents.length}</strong>
                 </span>
                 <span className={reportStyles.excelStudentCount}>
-                  Заданий: <strong>{homeworks.length}</strong>
+                  Заданий: <strong>{visibleHomeworkCount}</strong>
                 </span>
               </div>
             </div>
@@ -150,64 +161,82 @@ export function SupervisorOvHomeworkWorkspace({
 
       {!error ? (
         <>
-          <div className={ratingReportStyles.filtersRow}>
-            <input
-              type="search"
-              className={styles.searchInput}
-              placeholder="Поиск по ФИО…"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-            />
+          <div className={gridStyles.toolbar}>
+            <div className={gridStyles.toolbarLeft}>
+              <input
+                type="search"
+                className={gridStyles.searchInput}
+                placeholder="Поиск по ФИО…"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+              />
+
+              <label className={gridStyles.filterField}>
+                <span className={gridStyles.filterLabel}>Тип</span>
+                <select
+                  className={gridStyles.filterSelect}
+                  value={typeFilter}
+                  onChange={(event) =>
+                    setTypeFilter(event.target.value as "all" | "ОВ" | "ДЗНВ")
+                  }
+                >
+                  <option value="all">Все задания</option>
+                  <option value="ОВ">Только ОВ</option>
+                  <option value="ДЗНВ">Только ДЗНВ</option>
+                </select>
+              </label>
+
+              <label className={gridStyles.filterField}>
+                <span className={gridStyles.filterLabel}>Колонки</span>
+                <select
+                  className={gridStyles.filterSelect}
+                  value={headerMode}
+                  onChange={(event) =>
+                    setHeaderMode(event.target.value as HomeworkHeaderMode)
+                  }
+                >
+                  <option value="short">Краткие (#номер)</option>
+                  <option value="full">Полные названия</option>
+                </select>
+              </label>
+            </div>
+
+            <div className={gridStyles.legend} aria-label="Легенда статусов">
+              <span className={gridStyles.legendItem}>
+                <span className={`${gridStyles.legendSwatch} ${gridStyles.tonePending}`}>·</span>
+                Не начато
+              </span>
+              <span className={gridStyles.legendItem}>
+                <span className={`${gridStyles.legendSwatch} ${gridStyles.toneProgress}`}>…</span>
+                В процессе
+              </span>
+              <span className={gridStyles.legendItem}>
+                <span className={`${gridStyles.legendSwatch} ${gridStyles.toneOverdue}`}>!</span>
+                Просрочено
+              </span>
+              <span className={gridStyles.legendItem}>
+                <span className={`${gridStyles.legendSwatch} ${gridStyles.toneDone}`}>85</span>
+                Сдано
+              </span>
+            </div>
           </div>
 
+          <p className={gridStyles.hint}>
+            Наведите на ячейку или заголовок колонки — увидите полное название и статус.
+            Горизонтальная прокрутка для всех заданий, ФИО закреплено слева.
+          </p>
+
           {homeworks.length === 0 ? (
-            <div className={ratingReportStyles.emptyReport}>
+            <div className={gridStyles.emptyReport}>
               <p>За выбранный период домашних заданий не найдено.</p>
             </div>
           ) : (
-            <div className={ratingReportStyles.gridScroll}>
-              <table className={ratingReportStyles.gridTable}>
-                <thead>
-                  <tr>
-                    <th>ФИО</th>
-                    <th>Кл.</th>
-                    <th>Группа</th>
-                    {homeworks.map((homework) => (
-                      <th key={homework.id} title={homework.deadline ?? undefined}>
-                        {homework.name}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredStudents.map((student) => {
-                    const resultMap = new Map(
-                      student.results.map((result) => [result.homework_id, result]),
-                    );
-                    return (
-                      <tr key={student.id}>
-                        <td>{student.full_name}</td>
-                        <td>{student.class}</td>
-                        <td>{student.group_name ?? "—"}</td>
-                        {homeworks.map((homework) => {
-                          const result = resultMap.get(homework.id);
-                          if (!result) {
-                            return <td key={homework.id}>—</td>;
-                          }
-                          return (
-                            <td key={homework.id} title={result.status_text}>
-                              {result.result != null
-                                ? `${result.result}%`
-                                : result.status_text}
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+            <SupervisorOvHomeworkGrid
+              homeworks={homeworks}
+              students={filteredStudents}
+              headerMode={headerMode}
+              typeFilter={typeFilter}
+            />
           )}
         </>
       ) : null}
