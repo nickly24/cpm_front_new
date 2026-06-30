@@ -199,7 +199,7 @@ export function TestAttemptScreen({
   const runBackgroundSync = useCallback(
     async (current: TestAttempt) => {
       const bundle = await loadAttemptBundle(current.attemptId);
-      const pending = bundle?.pendingQuestionIds ?? pendingQuestionIds;
+      const pending = bundle?.pendingQuestionIds ?? [];
       if (pending.length === 0) {
         removeSyncedQueueItems([]);
         return;
@@ -244,7 +244,6 @@ export function TestAttemptScreen({
       applyAttempt,
       markQueueBeforeSend,
       markQueueFailed,
-      pendingQuestionIds,
       removeSyncedQueueItems,
     ],
   );
