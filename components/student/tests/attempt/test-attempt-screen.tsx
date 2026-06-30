@@ -500,9 +500,13 @@ export function TestAttemptScreen({
 
     setError(null);
     const stored = draftToStoredAnswer(currentQuestion.questionId, draft);
-    const next = upsertLocalAnswer(attempt, stored);
+    const bundle = await loadAttemptBundle(attempt.attemptId);
+    const sourceAttempt = bundle?.attempt ?? attempt;
+    const sourcePendingQuestionIds =
+      bundle?.pendingQuestionIds ?? pendingQuestionIds;
+    const next = upsertLocalAnswer(sourceAttempt, stored);
     const pending = addPendingQuestionId(
-      pendingQuestionIds,
+      sourcePendingQuestionIds,
       currentQuestion.questionId,
     );
     await applyAttempt(next, pending);

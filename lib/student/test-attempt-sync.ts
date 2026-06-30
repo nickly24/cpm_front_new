@@ -21,6 +21,19 @@ export type SyncResult = {
   hadErrors: boolean;
 };
 
+async function getCurrentBundleState(
+  attemptId: string,
+  fallbackAttempt: TestAttempt,
+  fallbackPendingQuestionIds: number[],
+): Promise<SyncResult> {
+  const current = await loadAttemptBundle(attemptId);
+  return {
+    attempt: current?.attempt ?? fallbackAttempt,
+    pendingQuestionIds: current?.pendingQuestionIds ?? fallbackPendingQuestionIds,
+    hadErrors: true,
+  };
+}
+
 export async function flushPendingAnswers(
   attemptId: string,
   localAttempt?: TestAttempt | null,
@@ -46,30 +59,26 @@ export async function flushPendingAnswers(
   );
 
   if (toSend.length === 0) {
-    return {
-      attempt: sourceAttempt,
-      pendingQuestionIds,
-      hadErrors: pendingQuestionIds.length > 0,
-    };
+    return getCurrentBundleState(attemptId, sourceAttempt, pendingQuestionIds);
   }
 
   try {
     const response = await syncTestAttemptAnswersBatch(attemptId, toSend);
     if (!response.attempt) {
-      return {
-        attempt: sourceAttempt,
-        pendingQuestionIds,
-        hadErrors: true,
-      };
+      return getCurrentBundleState(attemptId, sourceAttempt, pendingQuestionIds);
     }
 
-    const merged = mergeAttemptFromServer(sourceAttempt, response.attempt);
+    const latest = await loadAttemptBundle(attemptId);
+    const baseAttempt = latest?.attempt ?? sourceAttempt;
+    const latestPendingQuestionIds =
+      latest?.pendingQuestionIds ?? pendingQuestionIds;
+    let merged = mergeAttemptFromServer(baseAttempt, response.attempt);
     const syncedIds = [
       ...(response.syncedQuestionIds ?? []),
       ...(response.skippedQuestionIds ?? []),
     ];
     const afterSync = removePendingQuestionIds(
-      pendingQuestionIds,
+      latestPendingQuestionIds,
       syncedIds,
     );
 
@@ -79,6 +88,16 @@ export async function flushPendingAnswers(
     const nextPending = failedIds.length
       ? [...new Set([...afterSync, ...failedIds])]
       : afterSync;
+
+    const nextPendingSet = new Set(nextPending);
+    for (const answer of baseAttempt.answers) {
+      if (
+        nextPendingSet.has(answer.questionId) &&
+        !merged.answers.some((item) => item.questionId === answer.questionId)
+      ) {
+        merged = upsertLocalAnswer(merged, answer);
+      }
+    }
 
     await saveAttemptBundle({
       attempt: merged,
@@ -102,11 +121,7 @@ export async function flushPendingAnswers(
         };
       }
     }
-    return {
-      attempt: sourceAttempt,
-      pendingQuestionIds,
-      hadErrors: true,
-    };
+    return getCurrentBundleState(attemptId, sourceAttempt, pendingQuestionIds);
   }
 }
 
