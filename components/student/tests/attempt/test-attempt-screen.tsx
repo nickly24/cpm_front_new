@@ -40,12 +40,15 @@ import {
   toggleMultipleAnswer,
 } from "@/lib/student/test-attempt-utils";
 import {
+  AlertCircle,
   ArrowLeft,
   ArrowRight,
+  ChevronDown,
   CheckCircle2,
   Clock3,
   Cloud,
   CloudUpload,
+  RefreshCw,
   Send,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -60,6 +63,17 @@ interface TestAttemptScreenProps {
 }
 
 type ScreenPhase = "loading" | "active" | "submitting" | "done" | "fatal";
+type QueueStatus = "pending" | "syncing" | "failed";
+
+type QueueItem = {
+  questionId: number;
+  attempts: number;
+  status: QueueStatus;
+  lastError?: string;
+  nextRetryAt?: number;
+};
+
+const RETRY_DELAY_MS = 10000;
 
 export function TestAttemptScreen({
   testId,
@@ -84,6 +98,9 @@ export function TestAttemptScreen({
     timeSpentMinutes?: number;
   } | null>(null);
   const [pendingQuestionIds, setPendingQuestionIds] = useState<number[]>([]);
+  const [queueItems, setQueueItems] = useState<Record<number, QueueItem>>({});
+  const [queueOpen, setQueueOpen] = useState(false);
+  const [queueNow, setQueueNow] = useState(() => Date.now());
   const [syncing, setSyncing] = useState(false);
   const [submitDialog, setSubmitDialog] = useState<"confirm" | "error" | null>(
     null,
@@ -98,28 +115,138 @@ export function TestAttemptScreen({
       setAttempt(next);
       setRemainingSeconds(next.remainingSeconds);
       setPendingQuestionIds(pendingQuestionIds);
+      setQueueItems((current) => {
+        const pendingSet = new Set(pendingQuestionIds);
+        const nextQueue: Record<number, QueueItem> = {};
+
+        for (const questionId of pendingQuestionIds) {
+          nextQueue[questionId] =
+            current[questionId] ?? {
+              questionId,
+              attempts: 0,
+              status: "pending",
+            };
+        }
+
+        for (const item of Object.values(current)) {
+          if (pendingSet.has(item.questionId)) {
+            nextQueue[item.questionId] = item;
+          }
+        }
+
+        return nextQueue;
+      });
       await persistBundle(next, pendingQuestionIds);
     },
     [],
   );
 
+  const markQueueBeforeSend = useCallback((questionIds: number[]) => {
+    const now = Date.now();
+    setQueueItems((current) => {
+      const next = { ...current };
+      for (const questionId of questionIds) {
+        const item = next[questionId];
+        next[questionId] = {
+          questionId,
+          attempts: (item?.attempts ?? 0) + 1,
+          status: "syncing",
+          lastError: item?.lastError,
+          nextRetryAt: undefined,
+        };
+      }
+      return next;
+    });
+    setQueueNow(now);
+  }, []);
+
+  const markQueueFailed = useCallback(
+    (questionIds: number[], message: string) => {
+      const now = Date.now();
+      setQueueItems((current) => {
+        const next = { ...current };
+        for (const questionId of questionIds) {
+          const item = next[questionId];
+          next[questionId] = {
+            questionId,
+            attempts: item?.attempts ?? 0,
+            status: "failed",
+            lastError: message,
+            nextRetryAt: now + RETRY_DELAY_MS,
+          };
+        }
+        return next;
+      });
+      setQueueNow(now);
+      setQueueOpen(true);
+    },
+    [],
+  );
+
+  const removeSyncedQueueItems = useCallback((pending: number[]) => {
+    const pendingSet = new Set(pending);
+    setQueueItems((current) => {
+      const next: Record<number, QueueItem> = {};
+      for (const item of Object.values(current)) {
+        if (pendingSet.has(item.questionId)) {
+          next[item.questionId] = item;
+        }
+      }
+      return next;
+    });
+  }, []);
+
   const runBackgroundSync = useCallback(
     async (current: TestAttempt) => {
-      if (typeof navigator !== "undefined" && !navigator.onLine) {
+      const bundle = await loadAttemptBundle(current.attemptId);
+      const pending = bundle?.pendingQuestionIds ?? pendingQuestionIds;
+      if (pending.length === 0) {
+        removeSyncedQueueItems([]);
         return;
       }
 
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        markQueueBeforeSend(pending);
+        markQueueFailed(pending, "Нет сети. Переотправка через 10 секунд.");
+        return;
+      }
+
+      markQueueBeforeSend(pending);
       setSyncing(true);
       try {
         const result = await flushPendingAnswers(current.attemptId, current);
         if (result) {
           await applyAttempt(result.attempt, result.pendingQuestionIds);
+          removeSyncedQueueItems(result.pendingQuestionIds);
+          if (result.pendingQuestionIds.length > 0 || result.hadErrors) {
+            markQueueFailed(
+              result.pendingQuestionIds.length
+                ? result.pendingQuestionIds
+                : pending,
+              "Не удалось отправить. Переотправка через 10 секунд.",
+            );
+          }
+        } else {
+          markQueueFailed(pending, "Попытка не найдена. Переотправка через 10 секунд.");
         }
+      } catch (err) {
+        markQueueFailed(
+          pending,
+          err instanceof Error
+            ? err.message
+            : "Не удалось отправить. Переотправка через 10 секунд.",
+        );
       } finally {
         setSyncing(false);
       }
     },
-    [applyAttempt],
+    [
+      applyAttempt,
+      markQueueBeforeSend,
+      markQueueFailed,
+      pendingQuestionIds,
+      removeSyncedQueueItems,
+    ],
   );
 
   const loadAttempt = useCallback(async () => {
@@ -178,22 +305,29 @@ export function TestAttemptScreen({
   }, [applyAttempt, isPractice, resumeAttemptId, runBackgroundSync, testId]);
 
   useEffect(() => {
-    void loadAttempt();
+    const timeout = window.setTimeout(() => {
+      void loadAttempt();
+    }, 0);
+
+    return () => window.clearTimeout(timeout);
   }, [loadAttempt]);
 
   useEffect(() => {
+    let nextDraft: AnswerDraft | null;
     if (!currentQuestion || !attempt) {
-      setDraft(null);
-      return;
+      nextDraft = null;
+    } else {
+      const stored = getStoredAnswer(attempt, currentQuestion.questionId);
+      nextDraft = stored
+        ? draftFromStoredAnswer(stored)
+        : createEmptyDraft(currentQuestion);
     }
 
-    const stored = getStoredAnswer(attempt, currentQuestion.questionId);
-    if (stored) {
-      setDraft(draftFromStoredAnswer(stored));
-      return;
-    }
+    const timeout = window.setTimeout(() => {
+      setDraft(nextDraft);
+    }, 0);
 
-    setDraft(createEmptyDraft(currentQuestion));
+    return () => window.clearTimeout(timeout);
   }, [attempt, currentQuestion]);
 
   useEffect(() => {
@@ -273,6 +407,45 @@ export function TestAttemptScreen({
       window.removeEventListener("focus", handleFocus);
     };
   }, [attempt, applyAttempt, pendingQuestionIds, phase, runBackgroundSync]);
+
+  useEffect(() => {
+    if (phase !== "active") {
+      return;
+    }
+
+    const timer = window.setInterval(() => {
+      setQueueNow(Date.now());
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, [phase]);
+
+  useEffect(() => {
+    if (phase !== "active" || !attempt || pendingQuestionIds.length === 0) {
+      return;
+    }
+
+    const nextRetryAt = Object.values(queueItems)
+      .filter((item) => item.status === "failed" && item.nextRetryAt)
+      .reduce<number | null>((min, item) => {
+        const value = item.nextRetryAt ?? null;
+        if (value == null) {
+          return min;
+        }
+        return min == null ? value : Math.min(min, value);
+      }, null);
+
+    if (nextRetryAt == null) {
+      return;
+    }
+
+    const delay = Math.max(0, nextRetryAt - Date.now());
+    const timeout = window.setTimeout(() => {
+      void runBackgroundSync(attempt);
+    }, delay);
+
+    return () => window.clearTimeout(timeout);
+  }, [attempt, pendingQuestionIds.length, phase, queueItems, runBackgroundSync]);
 
   const timerClass = useMemo(() => {
     if (remainingSeconds <= 60) {
@@ -355,7 +528,7 @@ export function TestAttemptScreen({
     }
   };
 
-  const buildDraftPayload = () => {
+  const buildDraftPayload = useCallback(() => {
     if (!currentQuestion || !draft || timeExpired) {
       return null;
     }
@@ -364,7 +537,7 @@ export function TestAttemptScreen({
       draft,
       timeExpired,
     };
-  };
+  }, [currentQuestion, draft, timeExpired]);
 
   const performSubmit = useCallback(async () => {
     if (!attempt) {
@@ -408,7 +581,7 @@ export function TestAttemptScreen({
       );
       setSubmitStats(response.stats ?? null);
       setPhase("done");
-    } catch (err) {
+    } catch {
       setError(null);
       setSubmitDialog("error");
       setPhase("active");
@@ -418,10 +591,8 @@ export function TestAttemptScreen({
   }, [
     applyAttempt,
     attempt,
-    currentQuestion,
-    draft,
+    buildDraftPayload,
     pendingQuestionIds,
-    timeExpired,
   ]);
 
   const openSubmitConfirm = async () => {
@@ -608,6 +779,37 @@ export function TestAttemptScreen({
     pendingQuestionIds,
     syncing,
   );
+  const queueList = Object.values(queueItems).sort(
+    (a, b) => a.questionId - b.questionId,
+  );
+  const hasQueue = queueList.length > 0;
+  const failedQueueCount = queueList.filter(
+    (item) => item.status === "failed",
+  ).length;
+  const syncingQueueCount = queueList.filter(
+    (item) => item.status === "syncing",
+  ).length;
+
+  const getQuestionNumber = (questionId: number) => {
+    const index = questions.findIndex(
+      (question) => question.questionId === questionId,
+    );
+    return index >= 0 ? index + 1 : questionId;
+  };
+
+  const getQueueItemText = (item: QueueItem) => {
+    if (item.status === "syncing") {
+      return "Отправка...";
+    }
+    if (item.status === "failed") {
+      const seconds = Math.max(
+        0,
+        Math.ceil(((item.nextRetryAt ?? queueNow) - queueNow) / 1000),
+      );
+      return `Неудачно. Переотправка через ${seconds} сек.`;
+    }
+    return "Ждет отправки";
+  };
 
   const renderSyncStatusIcon = (state: ReturnType<typeof getQuestionSyncState>) => {
     if (state === "synced") {
@@ -765,6 +967,79 @@ export function TestAttemptScreen({
               );
             })}
           </div>
+
+          {hasQueue ? (
+            <section className={styles.attemptQueue}>
+              <button
+                type="button"
+                className={styles.attemptQueueToggle}
+                onClick={() => setQueueOpen((value) => !value)}
+                aria-expanded={queueOpen}
+              >
+                <span className={styles.attemptQueueToggleText}>
+                  Очередь запросов
+                  <span className={styles.attemptQueueCount}>
+                    {queueList.length}
+                  </span>
+                </span>
+                <ChevronDown
+                  size={16}
+                  className={`${styles.attemptQueueChevron} ${
+                    queueOpen ? styles.attemptQueueChevronOpen : ""
+                  }`.trim()}
+                />
+              </button>
+
+              <p className={styles.attemptQueueSummary}>
+                {failedQueueCount > 0
+                  ? `Неудачно: ${failedQueueCount}. Повтор каждые 10 сек.`
+                  : syncingQueueCount > 0
+                    ? `Отправка: ${syncingQueueCount}`
+                    : "Ответы ждут отправки"}
+              </p>
+
+              {queueOpen ? (
+                <ul className={styles.attemptQueueList}>
+                  {queueList.map((item) => (
+                    <li
+                      key={item.questionId}
+                      className={`${styles.attemptQueueItem} ${
+                        item.status === "failed"
+                          ? styles.attemptQueueItemFailed
+                          : item.status === "syncing"
+                            ? styles.attemptQueueItemSyncing
+                            : ""
+                      }`.trim()}
+                    >
+                      <div className={styles.attemptQueueItemTop}>
+                        <span className={styles.attemptQueueQuestion}>
+                          Вопрос {getQuestionNumber(item.questionId)}
+                        </span>
+                        <span className={styles.attemptQueueAttempts}>
+                          попытка {item.attempts}
+                        </span>
+                      </div>
+                      <p className={styles.attemptQueueStatus}>
+                        {item.status === "failed" ? (
+                          <AlertCircle size={13} />
+                        ) : item.status === "syncing" ? (
+                          <RefreshCw size={13} />
+                        ) : (
+                          <Cloud size={13} />
+                        )}
+                        {getQueueItemText(item)}
+                      </p>
+                      {item.lastError ? (
+                        <p className={styles.attemptQueueError}>
+                          {item.lastError}
+                        </p>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </section>
+          ) : null}
         </aside>
 
         <main className={styles.attemptMain}>

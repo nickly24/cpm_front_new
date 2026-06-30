@@ -190,6 +190,137 @@
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
+.attemptQueue {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 4px;
+  border-top: 1px solid var(--ds-border);
+}
+
+.attemptQueueToggle {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 0;
+  border: none;
+  background: transparent;
+  color: var(--ds-text);
+  cursor: pointer;
+}
+
+.attemptQueueToggleText {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: left;
+}
+
+.attemptQueueCount {
+  display: inline-flex;
+  min-width: 22px;
+  height: 22px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: rgba(245, 158, 11, 0.16);
+  color: #b45309;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.attemptQueueChevron {
+  flex-shrink: 0;
+  transition: transform 0.15s ease;
+}
+
+.attemptQueueChevronOpen {
+  transform: rotate(180deg);
+}
+
+.attemptQueueSummary {
+  margin: -4px 0 0;
+  color: var(--ds-text-muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.attemptQueueList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.attemptQueueItem {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 9px 10px;
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-sm);
+  background: var(--ds-surface-muted);
+}
+
+.attemptQueueItemFailed {
+  border-color: rgba(239, 68, 68, 0.4);
+  background: rgba(239, 68, 68, 0.08);
+}
+
+.attemptQueueItemSyncing {
+  border-color: rgba(245, 158, 11, 0.45);
+  background: rgba(245, 158, 11, 0.1);
+}
+
+.attemptQueueItemTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.attemptQueueQuestion {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ds-text);
+}
+
+.attemptQueueAttempts {
+  color: var(--ds-text-muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.attemptQueueStatus {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  color: var(--ds-text-secondary);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.attemptQueueItemSyncing .attemptQueueStatus svg {
+  animation: attemptSyncSpin 0.9s linear infinite;
+}
+
+.attemptQueueError {
+  margin: 0;
+  color: var(--ds-danger);
+  font-size: 11px;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
 .attemptQuestionPill {
   display: inline-flex;
   height: 36px;
