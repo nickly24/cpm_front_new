@@ -43,13 +43,13 @@ import {
   AlertCircle,
   ArrowLeft,
   ArrowRight,
-  ChevronDown,
   CheckCircle2,
   Clock3,
   Cloud,
   CloudUpload,
   RefreshCw,
   Send,
+  X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -475,8 +475,59 @@ export function TestAttemptScreen({
     }
   };
 
+  const getMaxAccessibleQuestionIndex = useCallback(
+    (nextAttempt: TestAttempt | null) => {
+      if (!nextAttempt) {
+        return 0;
+      }
+
+      const answeredQuestionIds = new Set(
+        nextAttempt.answers.map((answer) => answer.questionId),
+      );
+      const firstUnansweredIndex = nextAttempt.questions.findIndex(
+        (question) => !answeredQuestionIds.has(question.questionId),
+      );
+
+      return firstUnansweredIndex === -1
+        ? nextAttempt.questions.length - 1
+        : firstUnansweredIndex;
+    },
+    [],
+  );
+
+  const canOpenQuestion = useCallback(
+    (index: number) => {
+      if (!attempt || timeExpired) {
+        return true;
+      }
+
+      if (index === currentIndex) {
+        return true;
+      }
+
+      const question = attempt.questions[index];
+      const answered = question
+        ? attempt.answers.some(
+            (answer) => answer.questionId === question.questionId,
+          )
+        : false;
+
+      return answered || index <= getMaxAccessibleQuestionIndex(attempt);
+    },
+    [
+      attempt,
+      currentIndex,
+      getMaxAccessibleQuestionIndex,
+      timeExpired,
+    ],
+  );
+
   const goToQuestion = (index: number) => {
     if (index < 0 || index >= questions.length) {
+      return;
+    }
+
+    if (!canOpenQuestion(index)) {
       return;
     }
 
@@ -836,6 +887,147 @@ export function TestAttemptScreen({
           ? styles.attemptSyncStatusPending
           : "";
 
+  const renderQuestionNavigation = () => (
+    <section className={styles.attemptQuestionNav}>
+      <div className={styles.attemptQuestionNavHead}>
+        <div>
+          <p className={styles.attemptSidebarTitle}>Вопросы</p>
+          <p className={styles.attemptQuestionNavMeta}>
+            {currentIndex + 1} из {questions.length}
+          </p>
+        </div>
+
+        <ul className={styles.attemptSyncLegend} aria-label="Статусы ответов">
+          <li className={styles.attemptSyncLegendItem}>
+            <span
+              className={`${styles.attemptSyncLegendDot} ${styles.attemptSyncLegendDotPending}`.trim()}
+              aria-hidden
+            />
+            ждёт отправки
+          </li>
+          <li className={styles.attemptSyncLegendItem}>
+            <span
+              className={`${styles.attemptSyncLegendDot} ${styles.attemptSyncLegendDotSynced}`.trim()}
+              aria-hidden
+            />
+            на сервере
+          </li>
+        </ul>
+      </div>
+
+      <div className={styles.attemptQuestionGrid}>
+        {questions.map((question, index) => {
+          const isCurrent = index === currentIndex;
+          const accessible = canOpenQuestion(index);
+          const syncState = getQuestionSyncState(
+            question.questionId,
+            attempt,
+            pendingQuestionIds,
+            syncing,
+          );
+          const syncClass =
+            syncState === "synced"
+              ? styles.attemptQuestionPillSynced
+              : syncState === "syncing"
+                ? `${styles.attemptQuestionPillPending} ${styles.attemptQuestionPillSyncing}`
+                : syncState === "pending"
+                  ? styles.attemptQuestionPillPending
+                  : "";
+
+          return (
+            <button
+              key={question.questionId}
+              type="button"
+              title={
+                accessible
+                  ? questionSyncStateLabel(syncState)
+                  : "Сначала ответьте на предыдущий вопрос"
+              }
+              className={`${styles.attemptQuestionPill} ${
+                isCurrent ? styles.attemptQuestionPillCurrent : ""
+              } ${syncClass}`.trim()}
+              disabled={!accessible}
+              onClick={() => goToQuestion(index)}
+            >
+              {index + 1}
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
+
+  const renderQueuePanel = () => (
+    <aside
+      className={`${styles.attemptQueueDrawer} ${
+        queueOpen ? styles.attemptQueueDrawerOpen : ""
+      }`.trim()}
+      aria-hidden={!queueOpen}
+    >
+      <div className={styles.attemptQueueDrawerHead}>
+        <div>
+          <p className={styles.attemptSidebarTitle}>Очередь запросов</p>
+          <p className={styles.attemptQueueSummary}>
+            {failedQueueCount > 0
+              ? `Неудачно: ${failedQueueCount}. Повтор каждые 10 сек.`
+              : syncingQueueCount > 0
+                ? `Отправка: ${syncingQueueCount}`
+                : hasQueue
+                  ? "Ответы ждут отправки"
+                  : "Очередь пустая"}
+          </p>
+        </div>
+        <button
+          type="button"
+          className={styles.attemptQueueClose}
+          onClick={() => setQueueOpen(false)}
+          aria-label="Закрыть очередь"
+        >
+          <X size={18} />
+        </button>
+      </div>
+
+      {hasQueue ? (
+        <ul className={styles.attemptQueueList}>
+          {queueList.map((item) => (
+            <li
+              key={item.questionId}
+              className={`${styles.attemptQueueItem} ${
+                item.status === "failed"
+                  ? styles.attemptQueueItemFailed
+                  : item.status === "syncing"
+                    ? styles.attemptQueueItemSyncing
+                    : ""
+              }`.trim()}
+            >
+              <div className={styles.attemptQueueItemTop}>
+                <span className={styles.attemptQueueQuestion}>
+                  Вопрос {getQuestionNumber(item.questionId)}
+                </span>
+                <span className={styles.attemptQueueAttempts}>
+                  попытка {item.attempts}
+                </span>
+              </div>
+              <p className={styles.attemptQueueStatus}>
+                {item.status === "failed" ? (
+                  <AlertCircle size={13} />
+                ) : item.status === "syncing" ? (
+                  <RefreshCw size={13} />
+                ) : (
+                  <Cloud size={13} />
+                )}
+                {getQueueItemText(item)}
+              </p>
+              {item.lastError ? (
+                <p className={styles.attemptQueueError}>{item.lastError}</p>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </aside>
+  );
+
   return (
     <div className={styles.attemptOverlay}>
       <header className={styles.attemptHeader}>
@@ -881,6 +1073,21 @@ export function TestAttemptScreen({
 
           <button
             type="button"
+            className={styles.attemptQueueMenuBtn}
+            onClick={() => setQueueOpen(true)}
+            disabled={!hasQueue}
+          >
+            <Cloud size={16} />
+            <span>Очередь</span>
+            {hasQueue ? (
+              <span className={styles.attemptQueueCount}>
+                {queueList.length}
+              </span>
+            ) : null}
+          </button>
+
+          <button
+            type="button"
             className={styles.attemptSubmitBtn}
             disabled={
               busy ||
@@ -919,132 +1126,6 @@ export function TestAttemptScreen({
       {error ? <div className={styles.attemptAlert}>{error}</div> : null}
 
       <div className={styles.attemptBody}>
-        <aside className={styles.attemptSidebar}>
-          <p className={styles.attemptSidebarTitle}>Вопросы</p>
-          <ul className={styles.attemptSyncLegend} aria-label="Статусы ответов">
-            <li className={styles.attemptSyncLegendItem}>
-              <span
-                className={`${styles.attemptSyncLegendDot} ${styles.attemptSyncLegendDotPending}`.trim()}
-                aria-hidden
-              />
-              ждёт отправки
-            </li>
-            <li className={styles.attemptSyncLegendItem}>
-              <span
-                className={`${styles.attemptSyncLegendDot} ${styles.attemptSyncLegendDotSynced}`.trim()}
-                aria-hidden
-              />
-              на сервере
-            </li>
-          </ul>
-          <div className={styles.attemptQuestionGrid}>
-            {questions.map((question, index) => {
-              const isCurrent = index === currentIndex;
-              const syncState = getQuestionSyncState(
-                question.questionId,
-                attempt,
-                pendingQuestionIds,
-                syncing,
-              );
-              const syncClass =
-                syncState === "synced"
-                  ? styles.attemptQuestionPillSynced
-                  : syncState === "syncing"
-                    ? `${styles.attemptQuestionPillPending} ${styles.attemptQuestionPillSyncing}`
-                    : syncState === "pending"
-                      ? styles.attemptQuestionPillPending
-                      : "";
-
-              return (
-                <button
-                  key={question.questionId}
-                  type="button"
-                  title={questionSyncStateLabel(syncState)}
-                  className={`${styles.attemptQuestionPill} ${
-                    isCurrent ? styles.attemptQuestionPillCurrent : ""
-                  } ${syncClass}`.trim()}
-                  onClick={() => goToQuestion(index)}
-                >
-                  {index + 1}
-                </button>
-              );
-            })}
-          </div>
-
-          {hasQueue ? (
-            <section className={styles.attemptQueue}>
-              <button
-                type="button"
-                className={styles.attemptQueueToggle}
-                onClick={() => setQueueOpen((value) => !value)}
-                aria-expanded={queueOpen}
-              >
-                <span className={styles.attemptQueueToggleText}>
-                  Очередь запросов
-                  <span className={styles.attemptQueueCount}>
-                    {queueList.length}
-                  </span>
-                </span>
-                <ChevronDown
-                  size={16}
-                  className={`${styles.attemptQueueChevron} ${
-                    queueOpen ? styles.attemptQueueChevronOpen : ""
-                  }`.trim()}
-                />
-              </button>
-
-              <p className={styles.attemptQueueSummary}>
-                {failedQueueCount > 0
-                  ? `Неудачно: ${failedQueueCount}. Повтор каждые 10 сек.`
-                  : syncingQueueCount > 0
-                    ? `Отправка: ${syncingQueueCount}`
-                    : "Ответы ждут отправки"}
-              </p>
-
-              {queueOpen ? (
-                <ul className={styles.attemptQueueList}>
-                  {queueList.map((item) => (
-                    <li
-                      key={item.questionId}
-                      className={`${styles.attemptQueueItem} ${
-                        item.status === "failed"
-                          ? styles.attemptQueueItemFailed
-                          : item.status === "syncing"
-                            ? styles.attemptQueueItemSyncing
-                            : ""
-                      }`.trim()}
-                    >
-                      <div className={styles.attemptQueueItemTop}>
-                        <span className={styles.attemptQueueQuestion}>
-                          Вопрос {getQuestionNumber(item.questionId)}
-                        </span>
-                        <span className={styles.attemptQueueAttempts}>
-                          попытка {item.attempts}
-                        </span>
-                      </div>
-                      <p className={styles.attemptQueueStatus}>
-                        {item.status === "failed" ? (
-                          <AlertCircle size={13} />
-                        ) : item.status === "syncing" ? (
-                          <RefreshCw size={13} />
-                        ) : (
-                          <Cloud size={13} />
-                        )}
-                        {getQueueItemText(item)}
-                      </p>
-                      {item.lastError ? (
-                        <p className={styles.attemptQueueError}>
-                          {item.lastError}
-                        </p>
-                      ) : null}
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
-            </section>
-          ) : null}
-        </aside>
-
         <main className={styles.attemptMain}>
           <article className={styles.attemptQuestionCard}>
             <div className={styles.attemptQuestionHead}>
@@ -1122,7 +1203,20 @@ export function TestAttemptScreen({
             )}
           </footer>
         </main>
+
+        {renderQuestionNavigation()}
       </div>
+
+      {queueOpen ? (
+        <button
+          type="button"
+          className={styles.attemptQueueBackdrop}
+          onClick={() => setQueueOpen(false)}
+          aria-label="Закрыть очередь"
+        />
+      ) : null}
+
+      {queueOpen ? renderQueuePanel() : null}
 
       {submitDialog ? (
         <TestAttemptSubmitDialog
