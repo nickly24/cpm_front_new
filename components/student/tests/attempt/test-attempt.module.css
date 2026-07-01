@@ -574,6 +574,7 @@
 
 .attemptMain {
   display: flex;
+  flex: 1;
   min-height: 0;
   flex-direction: column;
   padding: 24px;
@@ -1020,6 +1021,7 @@
   }
 
   .attemptQuestionNav {
+    flex-shrink: 0;
     gap: 0;
     padding: 0;
   }
