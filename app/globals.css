@@ -355,118 +355,14 @@ input {
   position: relative;
   display: flex;
   flex-direction: column;
+  align-items: center;
+  justify-content: center;
   min-height: 100vh;
   min-height: 100dvh;
 }
 
-@media (min-width: 1024px) {
-  .login-page {
-    display: grid;
-    grid-template-columns: 1.05fr 1fr;
-  }
-}
-
-.login-brand {
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  overflow: hidden;
-  padding: 64px 48px;
-  background-color: #4a7fd4;
-  background-image: url("/arts/login-brand.png");
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
-  color: #fff;
-}
-
-@media (min-width: 1024px) {
-  .login-brand {
-    position: relative;
-    inset: auto;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-  }
-}
-
-.login-brand::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background:
-    linear-gradient(
-      145deg,
-      rgba(96, 165, 250, 0.72) 0%,
-      rgba(59, 130, 246, 0.45) 38%,
-      rgba(37, 99, 235, 0.55) 100%
-    ),
-    linear-gradient(
-      to bottom,
-      rgba(255, 255, 255, 0.08) 0%,
-      transparent 42%,
-      rgba(30, 64, 175, 0.12) 100%
-    );
-  pointer-events: none;
-}
-
-html.dark .login-brand {
-  background-color: #070f1f;
-}
-
-html.dark .login-brand::before {
-  background:
-    linear-gradient(
-      145deg,
-      rgba(4, 8, 20, 0.94) 0%,
-      rgba(8, 14, 32, 0.9) 40%,
-      rgba(2, 6, 18, 0.96) 100%
-    ),
-    linear-gradient(
-      to bottom,
-      rgba(0, 0, 0, 0.55) 0%,
-      rgba(0, 0, 0, 0.35) 45%,
-      rgba(0, 0, 0, 0.65) 100%
-    );
-}
-
-.login-brand > * {
-  position: relative;
-  z-index: 1;
-}
-
-.login-brand-content {
-  display: none;
-  max-width: 460px;
-}
-
-@media (min-width: 1024px) {
-  .login-brand-content {
-    display: block;
-  }
-}
-
-.login-brand-heading {
-  max-width: 420px;
-  margin: 48px 0 0;
-  font-size: 40px;
-  line-height: 1.15;
-  font-weight: 700;
-  text-shadow: 0 1px 24px rgba(15, 40, 100, 0.18);
-}
-
-.login-brand-text {
-  max-width: 420px;
-  margin-top: 16px;
-  font-size: 16px;
-  line-height: 1.6;
-  color: rgba(255, 255, 255, 0.88);
-  text-shadow: 0 1px 16px rgba(15, 40, 100, 0.12);
-}
-
 .login-panel {
   position: relative;
-  z-index: 1;
   display: flex;
   flex: 1;
   align-items: center;
@@ -474,16 +370,7 @@ html.dark .login-brand::before {
   min-height: 100vh;
   min-height: 100dvh;
   padding: 24px 20px;
-  background: transparent;
-}
-
-@media (min-width: 1024px) {
-  .login-panel {
-    flex: unset;
-    min-height: auto;
-    padding: 40px 24px;
-    background: var(--ds-bg);
-  }
+  background: var(--ds-bg);
 }
 
 .login-panel-inner {

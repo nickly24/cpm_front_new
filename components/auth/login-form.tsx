@@ -7,10 +7,8 @@ import { Input } from "@/components/ui/input";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { useAuth } from "@/contexts/AuthContext";
 import { getCabinetPath } from "@/lib/auth/roles";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
-import styles from "./login-form.module.css";
 
 export function LoginForm() {
   const { user, loading, login } = useAuth();
@@ -48,26 +46,6 @@ export function LoginForm() {
 
   return (
     <div className="login-page">
-      <section className="login-brand">
-        <div className="login-brand-content">
-          <div className={styles.logoCard}>
-            <Image src="/logo.svg" alt="CPM" width={56} height={56} />
-            <div>
-              <p className={styles.logoTitle}>CPM Platform</p>
-              <p className={styles.logoSubtitle}>Образовательная платформа</p>
-            </div>
-          </div>
-
-          <h1 className="login-brand-heading">
-            Управляйте обучением в одном месте
-          </h1>
-          <p className="login-brand-text">
-            Кабинеты для учеников, прокторов, администраторов и других ролей —
-            с единым входом и понятной навигацией.
-          </p>
-        </div>
-      </section>
-
       <section className="login-panel">
         <div className="login-panel-inner">
           <Card>

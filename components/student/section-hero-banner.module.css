@@ -123,8 +123,8 @@
 
 @media (max-width: 768px) {
   .heroBg {
-    background-size: 118% auto;
-    background-position: 4% center;
+    background-size: 100% auto;
+    background-position: center center;
   }
 
   .heroOverlay {
@@ -143,13 +143,13 @@
 
 @media (max-width: 640px) {
   .hero {
-    min-height: 176px;
+    min-height: clamp(132px, 33vw, 176px);
     padding: 20px 18px;
   }
 
   .heroBg {
-    background-size: 138% auto;
-    background-position: -12% center;
+    background-size: 100% auto;
+    background-position: center center;
   }
 
   .heroOverlay {
@@ -185,8 +185,8 @@
 
 @media (max-width: 400px) {
   .heroBg {
-    background-size: 152% auto;
-    background-position: -18% center;
+    background-size: 100% auto;
+    background-position: center center;
   }
 
   .heroContent {
