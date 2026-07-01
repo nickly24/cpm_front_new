@@ -102,6 +102,7 @@ export function TestAttemptScreen({
   const [queueOpen, setQueueOpen] = useState(false);
   const [queueNow, setQueueNow] = useState(() => Date.now());
   const [syncing, setSyncing] = useState(false);
+  const [textAnswerFocused, setTextAnswerFocused] = useState(false);
   const [submitDialog, setSubmitDialog] = useState<"confirm" | "error" | null>(
     null,
   );
@@ -686,6 +687,13 @@ export function TestAttemptScreen({
     void openSubmitConfirm();
   };
 
+  const handleTextAnswerFocus = (target: HTMLTextAreaElement) => {
+    setTextAnswerFocused(true);
+    window.setTimeout(() => {
+      target.scrollIntoView({ block: "center", behavior: "smooth" });
+    }, 180);
+  };
+
   const renderQuestionBody = (
     question: AttemptQuestion,
     currentDraft: AnswerDraft,
@@ -699,6 +707,8 @@ export function TestAttemptScreen({
           onChange={(event) =>
             setDraft({ type: "text", textAnswer: event.target.value })
           }
+          onFocus={(event) => handleTextAnswerFocus(event.currentTarget)}
+          onBlur={() => setTextAnswerFocused(false)}
           disabled={readOnly || busy || timeExpired}
           placeholder="Введите ответ..."
         />
@@ -888,6 +898,9 @@ export function TestAttemptScreen({
         : currentSyncState === "pending"
           ? styles.attemptSyncStatusPending
           : "";
+  const overlayClass = `${styles.attemptOverlay} ${
+    textAnswerFocused ? styles.attemptTextEntryMode : ""
+  }`.trim();
 
   const renderQuestionNavigation = () => (
     <section className={styles.attemptQuestionNav}>
@@ -1031,7 +1044,7 @@ export function TestAttemptScreen({
   );
 
   return (
-    <div className={styles.attemptOverlay}>
+    <div className={overlayClass}>
       <header className={styles.attemptHeader}>
         <div className={styles.attemptHeaderLeft}>
           <button

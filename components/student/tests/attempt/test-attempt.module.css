@@ -1057,6 +1057,41 @@
     justify-content: center;
     min-height: 48px;
   }
+
+  .attemptTextEntryMode .attemptHeader,
+  .attemptTextEntryMode .attemptQuestionNav,
+  .attemptTextEntryMode .attemptFooter {
+    display: none;
+  }
+
+  .attemptTextEntryMode .attemptMain {
+    padding-top: 10px;
+    padding-bottom: calc(10px + env(safe-area-inset-bottom));
+  }
+
+  .attemptTextEntryMode .attemptQuestionCard {
+    gap: 10px;
+  }
+
+  .attemptTextEntryMode .attemptQuestionHead {
+    align-items: center;
+  }
+
+  .attemptTextEntryMode .attemptQuestionText {
+    font-size: 17px;
+    line-height: 1.3;
+  }
+
+  .attemptTextEntryMode .attemptSyncStatus,
+  .attemptTextEntryMode .attemptLockedNote {
+    display: none;
+  }
+
+  .attemptTextEntryMode .attemptTextInput {
+    min-height: min(42vh, 260px);
+    max-height: 48vh;
+    resize: none;
+  }
 }
 
 @media (max-width: 640px) {
