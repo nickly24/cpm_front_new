@@ -178,7 +178,6 @@ export function TestAttemptScreen({
         return next;
       });
       setQueueNow(now);
-      setQueueOpen(true);
     },
     [],
   );
