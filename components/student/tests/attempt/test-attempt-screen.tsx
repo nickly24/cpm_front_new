@@ -52,6 +52,7 @@ import {
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { TouchEvent } from "react";
 
 interface TestAttemptScreenProps {
   testId: string;
@@ -74,6 +75,23 @@ type QueueItem = {
 };
 
 const RETRY_DELAY_MS = 10000;
+const SWIPE_NEXT_MIN_DISTANCE = 72;
+const SWIPE_NEXT_MAX_VERTICAL_DISTANCE = 56;
+
+type SwipeStart = {
+  x: number;
+  y: number;
+};
+
+const isSwipeIgnoredTarget = (target: EventTarget | null) => {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+
+  return Boolean(
+    target.closest("button, a, input, textarea, select, [role='button']"),
+  );
+};
 
 export function TestAttemptScreen({
   testId,
@@ -108,6 +126,7 @@ export function TestAttemptScreen({
     null,
   );
   const attemptMainRef = useRef<HTMLElement>(null);
+  const swipeStartRef = useRef<SwipeStart | null>(null);
   const pendingCount = pendingQuestionIds.length;
 
   const questions = attempt?.questions ?? [];
@@ -584,7 +603,51 @@ export function TestAttemptScreen({
     }
 
     if (currentIndex < questions.length - 1) {
-      goToQuestion(currentIndex + 1);
+      setCurrentIndex(currentIndex + 1);
+      setQuestionNavOpen(false);
+      setError(null);
+      attemptMainRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  };
+
+  const handleQuestionSwipeStart = (event: TouchEvent<HTMLElement>) => {
+    if (event.touches.length !== 1 || isSwipeIgnoredTarget(event.target)) {
+      swipeStartRef.current = null;
+      return;
+    }
+
+    const touch = event.touches[0];
+    swipeStartRef.current = {
+      x: touch.clientX,
+      y: touch.clientY,
+    };
+  };
+
+  const handleQuestionSwipeEnd = (event: TouchEvent<HTMLElement>) => {
+    const start = swipeStartRef.current;
+    swipeStartRef.current = null;
+
+    if (
+      !start ||
+      event.changedTouches.length !== 1 ||
+      busy ||
+      isLastQuestion ||
+      questionNavOpen ||
+      queueOpen
+    ) {
+      return;
+    }
+
+    const touch = event.changedTouches[0];
+    const deltaX = touch.clientX - start.x;
+    const deltaY = touch.clientY - start.y;
+    const horizontalEnough = Math.abs(deltaX) >= SWIPE_NEXT_MIN_DISTANCE;
+    const verticalSmallEnough =
+      Math.abs(deltaY) <= SWIPE_NEXT_MAX_VERTICAL_DISTANCE;
+    const mostlyHorizontal = Math.abs(deltaX) > Math.abs(deltaY) * 1.4;
+
+    if (deltaX < 0 && horizontalEnough && verticalSmallEnough && mostlyHorizontal) {
+      void handleNext();
     }
   };
 
@@ -1190,7 +1253,12 @@ export function TestAttemptScreen({
       {error ? <div className={styles.attemptAlert}>{error}</div> : null}
 
       <div className={styles.attemptBody}>
-        <main className={styles.attemptMain} ref={attemptMainRef}>
+        <main
+          className={styles.attemptMain}
+          ref={attemptMainRef}
+          onTouchStart={handleQuestionSwipeStart}
+          onTouchEnd={handleQuestionSwipeEnd}
+        >
           <article className={styles.attemptQuestionCard}>
             <div className={styles.attemptQuestionHead}>
               <span className={styles.attemptQuestionIndex}>
