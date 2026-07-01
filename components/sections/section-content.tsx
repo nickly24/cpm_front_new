@@ -12,6 +12,7 @@ import { AdminTestResultsSection } from "@/components/admin/test-results/admin-t
 import { AdminScheduleSection } from "@/components/admin/schedule/admin-schedule-section";
 import { AdminSchoolsSection } from "@/components/admin/schools/admin-schools-section";
 import { AdminTestsSection } from "@/components/admin/tests/admin-tests-section";
+import { AdminTelegramBotSection } from "@/components/admin/telegram-bot/admin-telegram-bot-section";
 import { AdminUploadSection } from "@/components/admin/upload/admin-upload-section";
 import { AdminUsersSection } from "@/components/admin/users/admin-users-section";
 import { StudentAttendanceSection } from "@/components/student/attendance/student-attendance-section";
@@ -98,6 +99,10 @@ export function SectionContent({ role, section }: SectionContentProps) {
 
   if (role === "admin" && section === "schedule") {
     return <AdminScheduleSection />;
+  }
+
+  if (role === "admin" && section === "telegram-bot") {
+    return <AdminTelegramBotSection />;
   }
 
   if (role === "admin" && section === "ratings") {

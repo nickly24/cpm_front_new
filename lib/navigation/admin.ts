@@ -9,6 +9,7 @@ import {
   GraduationCap,
   LayoutDashboard,
   NotebookPen,
+  Send,
   Trophy,
   Upload,
   Users,
@@ -26,6 +27,7 @@ export const adminNavigation: RoleNavigation = {
         { id: "schools", label: "Школы", icon: Building2 },
         { id: "upload", label: "Загрузка", icon: Upload },
         { id: "schedule", label: "Расписание", icon: BookOpen },
+        { id: "telegram-bot", label: "Telegram-бот", icon: Send },
       ],
     },
     {
