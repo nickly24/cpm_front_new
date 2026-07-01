@@ -51,7 +51,7 @@ import {
   Send,
   X,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 interface TestAttemptScreenProps {
   testId: string;
@@ -100,12 +100,14 @@ export function TestAttemptScreen({
   const [pendingQuestionIds, setPendingQuestionIds] = useState<number[]>([]);
   const [queueItems, setQueueItems] = useState<Record<number, QueueItem>>({});
   const [queueOpen, setQueueOpen] = useState(false);
+  const [questionNavOpen, setQuestionNavOpen] = useState(false);
   const [queueNow, setQueueNow] = useState(() => Date.now());
   const [syncing, setSyncing] = useState(false);
   const [textAnswerFocused, setTextAnswerFocused] = useState(false);
   const [submitDialog, setSubmitDialog] = useState<"confirm" | "error" | null>(
     null,
   );
+  const attemptMainRef = useRef<HTMLElement>(null);
   const pendingCount = pendingQuestionIds.length;
 
   const questions = attempt?.questions ?? [];
@@ -532,6 +534,7 @@ export function TestAttemptScreen({
     }
 
     setCurrentIndex(index);
+    setQuestionNavOpen(false);
     setError(null);
   };
 
@@ -689,9 +692,13 @@ export function TestAttemptScreen({
 
   const handleTextAnswerFocus = (target: HTMLTextAreaElement) => {
     setTextAnswerFocused(true);
+    target.focus();
     window.setTimeout(() => {
-      target.scrollIntoView({ block: "center", behavior: "smooth" });
-    }, 180);
+      attemptMainRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+    }, 80);
+    window.setTimeout(() => {
+      attemptMainRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+    }, 320);
   };
 
   const renderQuestionBody = (
@@ -903,13 +910,55 @@ export function TestAttemptScreen({
   }`.trim();
 
   const renderQuestionNavigation = () => (
-    <section className={styles.attemptQuestionNav}>
-      <div className={styles.attemptQuestionNavHead}>
-        <div>
-          <p className={styles.attemptSidebarTitle}>Вопросы</p>
-          <p className={styles.attemptQuestionNavMeta}>
-            {currentIndex + 1} из {questions.length}
-          </p>
+    <section
+      className={`${styles.attemptQuestionNav} ${
+        questionNavOpen ? styles.attemptQuestionNavOpen : ""
+      }`.trim()}
+    >
+      <div className={styles.attemptQuestionNavBar}>
+        <button
+          type="button"
+          className={styles.attemptQuestionNavToggle}
+          onClick={() => setQuestionNavOpen((value) => !value)}
+          aria-expanded={questionNavOpen}
+        >
+          <span>Вопросы</span>
+          <strong>
+            {currentIndex + 1}/{questions.length}
+          </strong>
+        </button>
+
+        <button
+          type="button"
+          className={styles.attemptQueueMenuBtn}
+          onClick={() => setQueueOpen(true)}
+          disabled={!hasQueue}
+          aria-label="Открыть очередь запросов"
+        >
+          <Cloud size={16} />
+          {hasQueue ? (
+            <span className={styles.attemptQueueCount}>{queueList.length}</span>
+          ) : null}
+        </button>
+      </div>
+
+      <div className={styles.attemptQuestionNavPanel}>
+        <div className={styles.attemptQuestionNavHead}>
+          <div>
+            <p className={styles.attemptSidebarTitle}>Вопросы</p>
+            <p className={styles.attemptQuestionNavMeta}>
+              {currentIndex + 1} из {questions.length}
+            </p>
+          </div>
+
+          <button
+            type="button"
+            className={styles.attemptQuestionNavClose}
+            onClick={() => setQuestionNavOpen(false)}
+            aria-label="Закрыть список вопросов"
+          >
+            <X size={16} />
+          </button>
         </div>
 
         <ul className={styles.attemptSyncLegend} aria-label="Статусы ответов">
@@ -928,46 +977,46 @@ export function TestAttemptScreen({
             на сервере
           </li>
         </ul>
-      </div>
 
-      <div className={styles.attemptQuestionGrid}>
-        {questions.map((question, index) => {
-          const isCurrent = index === currentIndex;
-          const accessible = canOpenQuestion(index);
-          const syncState = getQuestionSyncState(
-            question.questionId,
-            attempt,
-            pendingQuestionIds,
-            syncing,
-          );
-          const syncClass =
-            syncState === "synced"
-              ? styles.attemptQuestionPillSynced
-              : syncState === "syncing"
-                ? `${styles.attemptQuestionPillPending} ${styles.attemptQuestionPillSyncing}`
-                : syncState === "pending"
-                  ? styles.attemptQuestionPillPending
-                  : "";
+        <div className={styles.attemptQuestionGrid}>
+          {questions.map((question, index) => {
+            const isCurrent = index === currentIndex;
+            const accessible = canOpenQuestion(index);
+            const syncState = getQuestionSyncState(
+              question.questionId,
+              attempt,
+              pendingQuestionIds,
+              syncing,
+            );
+            const syncClass =
+              syncState === "synced"
+                ? styles.attemptQuestionPillSynced
+                : syncState === "syncing"
+                  ? `${styles.attemptQuestionPillPending} ${styles.attemptQuestionPillSyncing}`
+                  : syncState === "pending"
+                    ? styles.attemptQuestionPillPending
+                    : "";
 
-          return (
-            <button
-              key={question.questionId}
-              type="button"
-              title={
-                accessible
-                  ? questionSyncStateLabel(syncState)
-                  : "Сначала ответьте на предыдущий вопрос"
-              }
-              className={`${styles.attemptQuestionPill} ${
-                isCurrent ? styles.attemptQuestionPillCurrent : ""
-              } ${syncClass}`.trim()}
-              disabled={!accessible}
-              onClick={() => goToQuestion(index)}
-            >
-              {index + 1}
-            </button>
-          );
-        })}
+            return (
+              <button
+                key={question.questionId}
+                type="button"
+                title={
+                  accessible
+                    ? questionSyncStateLabel(syncState)
+                    : "Сначала ответьте на предыдущий вопрос"
+                }
+                className={`${styles.attemptQuestionPill} ${
+                  isCurrent ? styles.attemptQuestionPillCurrent : ""
+                } ${syncClass}`.trim()}
+                disabled={!accessible}
+                onClick={() => goToQuestion(index)}
+              >
+                {index + 1}
+              </button>
+            );
+          })}
+        </div>
       </div>
     </section>
   );
@@ -1141,7 +1190,7 @@ export function TestAttemptScreen({
       {error ? <div className={styles.attemptAlert}>{error}</div> : null}
 
       <div className={styles.attemptBody}>
-        <main className={styles.attemptMain}>
+        <main className={styles.attemptMain} ref={attemptMainRef}>
           <article className={styles.attemptQuestionCard}>
             <div className={styles.attemptQuestionHead}>
               <span className={styles.attemptQuestionIndex}>

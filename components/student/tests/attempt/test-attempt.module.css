@@ -176,11 +176,25 @@
   box-shadow: 0 -8px 24px rgba(16, 24, 40, 0.06);
 }
 
+.attemptQuestionNavBar {
+  display: none;
+}
+
+.attemptQuestionNavPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
 .attemptQuestionNavHead {
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
   gap: 16px;
+}
+
+.attemptQuestionNavClose {
+  display: none;
 }
 
 .attemptQuestionNavMeta {
@@ -922,79 +936,176 @@
 
 @media (max-width: 768px) {
   .attemptHeader {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 10px;
-    padding: 12px 14px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 6px 10px;
+    padding: 8px 10px;
   }
 
   .attemptHeaderLeft {
-    flex-wrap: wrap;
+    min-width: 0;
+    flex-wrap: nowrap;
     gap: 8px;
   }
 
+  .attemptBackBtn {
+    width: 40px;
+    height: 40px;
+    flex-shrink: 0;
+    justify-content: center;
+    padding: 0;
+  }
+
   .attemptTitleWrap {
-    flex: 1 1 160px;
+    flex: 1 1 auto;
     min-width: 0;
+    gap: 0;
+  }
+
+  .attemptEyebrow {
+    font-size: 10px;
+    letter-spacing: 0.04em;
   }
 
   .attemptTitle {
-    font-size: 15px;
+    overflow: hidden;
+    font-size: 14px;
+    line-height: 1.2;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .attemptPracticeBadge {
-    width: 100%;
+    grid-column: 1 / -1;
+    height: 22px;
+    padding: 0 8px;
     justify-content: center;
+    border-radius: var(--ds-radius-sm);
+    font-size: 10px;
   }
 
   .attemptHeaderRight {
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-columns: 1fr;
     align-items: center;
-    gap: 8px;
+    justify-items: end;
+    gap: 3px;
   }
 
   .attemptProgressMeta {
-    order: 3;
-    grid-column: 1 / -1;
-    font-size: 12px;
+    font-size: 11px;
+    line-height: 1.2;
+    text-align: right;
   }
 
-  .attemptQueueMenuBtn {
-    justify-self: end;
+  .attemptSyncPending {
+    display: none;
   }
 
+  .attemptHeaderRight .attemptQueueMenuBtn,
   .attemptHeaderRight .attemptSubmitBtn {
     display: none;
   }
 
   .attemptTimer {
-    font-size: 16px;
-    padding: 8px 10px;
+    gap: 6px;
+    padding: 6px 8px;
+    font-size: 14px;
+  }
+
+  .attemptTimer svg {
+    width: 16px;
+    height: 16px;
   }
 
   .attemptQuestionNav {
-    padding: 12px 14px calc(12px + env(safe-area-inset-bottom));
+    gap: 0;
+    padding: 0;
+  }
+
+  .attemptQuestionNavBar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px calc(8px + env(safe-area-inset-bottom));
+  }
+
+  .attemptQuestionNavToggle {
+    display: flex;
+    min-width: 0;
+    height: 44px;
+    flex: 1;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 0 12px;
+    border: 1px solid var(--ds-border);
+    border-radius: var(--ds-radius-md);
+    background: var(--ds-surface-muted);
+    color: var(--ds-text);
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .attemptQuestionNavToggle strong {
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .attemptQuestionNavBar .attemptQueueMenuBtn {
+    width: 44px;
+    height: 44px;
+    flex-shrink: 0;
+    justify-content: center;
+    padding: 0;
+  }
+
+  .attemptQuestionNavPanel {
+    display: none;
+    max-height: min(46vh, 360px);
+    flex-direction: column;
+    gap: 10px;
+    overflow: auto;
+    padding: 10px 10px 12px;
+    border-top: 1px solid var(--ds-border);
+  }
+
+  .attemptQuestionNavOpen .attemptQuestionNavPanel {
+    display: flex;
   }
 
   .attemptQuestionNavHead {
-    align-items: flex-start;
-    flex-direction: column;
+    align-items: center;
+    flex-direction: row;
     gap: 8px;
+  }
+
+  .attemptQuestionNavClose {
+    display: inline-flex;
+    width: 34px;
+    height: 34px;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--ds-border);
+    border-radius: var(--ds-radius-md);
+    background: var(--ds-surface-muted);
+    color: var(--ds-text);
+    cursor: pointer;
+  }
+
+  .attemptSyncLegend {
+    justify-content: flex-start;
   }
 
   .attemptQuestionGrid {
     display: flex;
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
     gap: 8px;
-    overflow-x: auto;
-    padding-bottom: 4px;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-  }
-
-  .attemptQuestionGrid::-webkit-scrollbar {
-    display: none;
+    overflow-x: visible;
+    padding-bottom: 0;
   }
 
   .attemptQuestionPill {
@@ -1058,15 +1169,10 @@
     min-height: 48px;
   }
 
-  .attemptTextEntryMode .attemptHeader,
-  .attemptTextEntryMode .attemptQuestionNav,
-  .attemptTextEntryMode .attemptFooter {
-    display: none;
-  }
-
   .attemptTextEntryMode .attemptMain {
     padding-top: 10px;
     padding-bottom: calc(10px + env(safe-area-inset-bottom));
+    scroll-padding-top: 10px;
   }
 
   .attemptTextEntryMode .attemptQuestionCard {
@@ -1084,12 +1190,12 @@
 
   .attemptTextEntryMode .attemptSyncStatus,
   .attemptTextEntryMode .attemptLockedNote {
-    display: none;
+    margin-block: -2px 0;
   }
 
   .attemptTextEntryMode .attemptTextInput {
-    min-height: min(42vh, 260px);
-    max-height: 48vh;
+    min-height: min(38vh, 240px);
+    max-height: 45vh;
     resize: none;
   }
 }
