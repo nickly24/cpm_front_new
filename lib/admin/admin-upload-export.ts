@@ -1,13 +1,13 @@
 import type { UserImportReportRow } from "@/lib/admin/admin-upload-types";
 import * as XLSX from "xlsx";
 
-const TEMPLATE_HEADERS = ["ФИО", "Класс", "Школа", "Проктор"];
+const TEMPLATE_HEADERS = ["ФИО", "Класс", "Школа", "Проктор", "Telegram"];
 
 export function downloadUserImportTemplate(): void {
   const sheet = XLSX.utils.aoa_to_sheet([
     TEMPLATE_HEADERS,
-    ["Иванов Иван Петрович", 10, "Лицей №1", "Сидорова Анна Ивановна"],
-    ["Петрова Мария", 9, "Лицей №1", "Сидорова Анна Ивановна"],
+    ["Иванов Иван Петрович", 10, "Лицей №1", "Сидорова Анна Ивановна", "@ivanov"],
+    ["Петрова Мария", 7, "Лицей №1", "Сидорова Анна Ивановна", "@petrova"],
   ]);
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, sheet, "Ученики");
@@ -28,6 +28,7 @@ export function exportUserImportReportExcel(
     "ФИО",
     "Класс",
     "Школа",
+    "Telegram",
     "Проктор",
     "Группа",
     "Логин",
@@ -41,6 +42,7 @@ export function exportUserImportReportExcel(
     row.full_name,
     row.class ?? "",
     row.school_name ?? "",
+    row.tg_name ?? "",
     row.proctor_name ?? "",
     row.group_name ?? (row.message === "Без группы" ? "Без группы" : ""),
     row.login ?? "",

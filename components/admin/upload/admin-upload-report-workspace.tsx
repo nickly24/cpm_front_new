@@ -57,7 +57,9 @@ export function AdminUploadReportWorkspace({
   }, [jobId]);
 
   useEffect(() => {
-    void load();
+    queueMicrotask(() => {
+      void load();
+    });
   }, [load]);
 
   const filteredRows = useMemo(() => {
@@ -71,7 +73,8 @@ export function AdminUploadReportWorkspace({
         row.full_name.toLowerCase().includes(query) ||
         (row.login ?? "").toLowerCase().includes(query) ||
         (row.group_name ?? "").toLowerCase().includes(query) ||
-        (row.proctor_name ?? "").toLowerCase().includes(query)
+        (row.proctor_name ?? "").toLowerCase().includes(query) ||
+        (row.tg_name ?? "").toLowerCase().includes(query)
       );
     });
   }, [report?.rows, search]);
@@ -148,6 +151,7 @@ export function AdminUploadReportWorkspace({
               <th>ФИО</th>
               <th>Класс</th>
               <th>Школа</th>
+              <th>Telegram</th>
               <th>Проктор</th>
               <th>Группа</th>
               <th>Логин</th>
@@ -165,6 +169,7 @@ export function AdminUploadReportWorkspace({
                 <td>{row.full_name}</td>
                 <td>{row.class ?? "—"}</td>
                 <td>{row.school_name ?? "—"}</td>
+                <td>{row.tg_name ?? "—"}</td>
                 <td>{row.proctor_name ?? "—"}</td>
                 <td>{row.group_name ?? (row.message === "Без группы" ? "Без группы" : "—")}</td>
                 <td>{row.login ?? "—"}</td>

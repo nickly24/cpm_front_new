@@ -16,7 +16,12 @@ interface AdminUploadPreviewProps {
   committing?: boolean;
   onStudentChange: (
     row: number,
-    patch: Partial<Pick<UserImportPreviewStudent, "full_name" | "class" | "school_name" | "proctor_name">>,
+    patch: Partial<
+      Pick<
+        UserImportPreviewStudent,
+        "full_name" | "class" | "school_name" | "proctor_name" | "tg_name"
+      >
+    >,
   ) => void;
   onCommit: () => void;
   onReset: () => void;
@@ -145,6 +150,7 @@ export function AdminUploadPreview({
               <th>ФИО</th>
               <th>Класс</th>
               <th>Школа</th>
+              <th>Telegram</th>
               <th>Проктор</th>
               <th>Действие</th>
             </tr>
@@ -188,6 +194,15 @@ export function AdminUploadPreview({
                     value={student.school_name ?? ""}
                     onChange={(event) =>
                       onStudentChange(student.row, { school_name: event.target.value })
+                    }
+                  />
+                </td>
+                <td>
+                  <input
+                    className={styles.previewInput}
+                    value={student.tg_name ?? ""}
+                    onChange={(event) =>
+                      onStudentChange(student.row, { tg_name: event.target.value })
                     }
                   />
                 </td>

@@ -3,12 +3,12 @@
 import styles from "@/components/admin/tests/admin-tests.module.css";
 import userStyles from "@/components/admin/users/admin-users.module.css";
 import { Button } from "@/components/ui/button";
-import { LoadingState } from "@/components/ui/loading-state";
 import {
   addAdminStudent,
   editAdminStudent,
 } from "@/lib/admin/admin-users-api";
 import type { AdminGroupItem, AdminStudent } from "@/lib/admin/admin-users-types";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 
 interface AdminStudentPanelProps {
@@ -54,13 +54,18 @@ export function AdminStudentPanel({
       setError("Укажите ФИО");
       return;
     }
+    const parsedClass = Number(classNumber);
+    if (!Number.isInteger(parsedClass) || parsedClass <= 0) {
+      setError("Класс должен быть положительным целым числом");
+      return;
+    }
 
     setSubmitting(true);
     try {
       if (mode === "add") {
         const res = await addAdminStudent({
           full_name: fullName.trim(),
-          class: Number(classNumber),
+          class: parsedClass,
           tg_name: tgName.trim() || undefined,
         });
         if (!res.status || !res.student_data) {
@@ -88,8 +93,8 @@ export function AdminStudentPanel({
       if (fullName.trim() !== student.full_name) {
         payload.full_name = fullName.trim();
       }
-      if (Number(classNumber) !== student.class) {
-        payload.class = Number(classNumber);
+      if (parsedClass !== student.class) {
+        payload.class = parsedClass;
       }
       const nextGroup =
         groupId === "none" ? null : Number(groupId);
@@ -129,9 +134,9 @@ export function AdminStudentPanel({
           <p className={userStyles.hint}>
             Школа: {student.school_name ?? `#${student.school_id}`}. Изменить привязку
             можно в разделе{" "}
-            <a href="/cabinet/admin/schools" className={userStyles.hintLink}>
+            <Link href="/cabinet/admin/schools" className={userStyles.hintLink}>
               Школы
-            </a>
+            </Link>
             .
           </p>
         ) : null}
@@ -149,15 +154,15 @@ export function AdminStudentPanel({
 
           <label className={userStyles.field}>
             <span className={userStyles.fieldLabel}>Класс</span>
-            <select
-              className={userStyles.fieldSelect}
+            <input
+              type="number"
+              min="1"
+              step="1"
+              className={userStyles.fieldInput}
               value={classNumber}
               onChange={(e) => setClassNumber(e.target.value)}
-            >
-              <option value="9">9</option>
-              <option value="10">10</option>
-              <option value="11">11</option>
-            </select>
+              required
+            />
           </label>
 
           {mode === "edit" ? (

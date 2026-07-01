@@ -109,7 +109,10 @@ export function AdminUploadSection() {
   const handleStudentChange = (
     row: number,
     patch: Partial<
-      Pick<UserImportPreviewStudent, "full_name" | "class" | "school_name" | "proctor_name">
+      Pick<
+        UserImportPreviewStudent,
+        "full_name" | "class" | "school_name" | "proctor_name" | "tg_name"
+      >
     >,
   ) => {
     if (!preview) {
@@ -125,6 +128,7 @@ export function AdminUploadSection() {
         ...patch,
         school_name: patch.school_name !== undefined ? patch.school_name || null : student.school_name,
         proctor_name: patch.proctor_name !== undefined ? patch.proctor_name || null : student.proctor_name,
+        tg_name: patch.tg_name !== undefined ? patch.tg_name : student.tg_name,
       };
     });
 

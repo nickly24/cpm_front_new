@@ -14,11 +14,11 @@ export const ADMIN_UPLOAD_TYPES: AdminUploadType[] = [
     id: "users",
     label: "Пользовательские данные",
     description:
-      "Ученики из Excel: ФИО, класс, школа, проктор. Группы создаются по прокторам.",
+      "Ученики из Excel: ФИО, класс, школа, проктор, Telegram. Группы создаются по прокторам.",
     acceptedLabel: ".xlsx",
     status: "ready",
     instructions: [
-      "Подготовьте Excel с колонками: ФИО, Класс, Школа, Проктор (первая строка — заголовки).",
+      "Подготовьте Excel с колонками: ФИО, Класс, Школа, Проктор, Telegram (первая строка — заголовки).",
       "В колонке «Проктор» повторяйте одно и то же ФИО для всех учеников группы.",
       "Пустой проктор — ученик будет создан без группы.",
       "Проверьте предпросмотр и исправьте строки с ошибками.",
@@ -65,6 +65,7 @@ export interface UserImportPreviewStudent {
   class: number | null;
   school_key: string | null;
   school_name: string | null;
+  tg_name: string;
   proctor_key: string | null;
   proctor_name: string | null;
   group_key: string | null;
@@ -143,6 +144,7 @@ export interface UserImportReportRow {
   full_name: string;
   class: number | null;
   school_name?: string | null;
+  tg_name?: string | null;
   proctor_name?: string | null;
   group_name?: string | null;
   login?: string | null;

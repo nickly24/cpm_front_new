@@ -37,9 +37,9 @@ export function AdminStudentsTab() {
   const [panelMode, setPanelMode] = useState<"add" | "edit" | null>(null);
   const [editing, setEditing] = useState<AdminStudent | null>(null);
 
-  const groupsMap = useMemo(
-    () => new Map(groups.map((g) => [g.group_id, g.group_name])),
-    [groups],
+  const classOptions = useMemo(
+    () => Array.from(new Set(students.map((student) => student.class))).sort((a, b) => a - b),
+    [students],
   );
 
   const load = useCallback(async () => {
@@ -61,12 +61,10 @@ export function AdminStudentsTab() {
   }, []);
 
   useEffect(() => {
-    load();
+    queueMicrotask(() => {
+      void load();
+    });
   }, [load]);
-
-  useEffect(() => {
-    setPage(1);
-  }, [debouncedSearch, groupFilter, classFilter]);
 
   const filtered = useMemo(() => {
     return students.filter((student) => {
@@ -154,7 +152,10 @@ export function AdminStudentsTab() {
           className={styles.searchInput}
           placeholder="Поиск по ФИО или ID…"
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            setPage(1);
+          }}
         />
         <div className={styles.dateRow}>
           <label className={styles.dateField}>
@@ -162,7 +163,10 @@ export function AdminStudentsTab() {
             <select
               className={userStyles.fieldSelect}
               value={groupFilter}
-              onChange={(e) => setGroupFilter(e.target.value)}
+              onChange={(e) => {
+                setGroupFilter(e.target.value);
+                setPage(1);
+              }}
             >
               <option value="all">Все группы</option>
               <option value="none">Без группы</option>
@@ -178,12 +182,17 @@ export function AdminStudentsTab() {
             <select
               className={userStyles.fieldSelect}
               value={classFilter}
-              onChange={(e) => setClassFilter(e.target.value)}
+              onChange={(e) => {
+                setClassFilter(e.target.value);
+                setPage(1);
+              }}
             >
               <option value="all">Все</option>
-              <option value="9">9</option>
-              <option value="10">10</option>
-              <option value="11">11</option>
+              {classOptions.map((classNumber) => (
+                <option key={classNumber} value={classNumber}>
+                  {classNumber}
+                </option>
+              ))}
             </select>
           </label>
           <Button type="button" onClick={() => setPanelMode("add")}>
