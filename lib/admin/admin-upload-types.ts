@@ -25,10 +25,27 @@ export const ADMIN_UPLOAD_TYPES: AdminUploadType[] = [
       "Запустите загрузку — при сбое все новые данные этого импорта будут отменены.",
     ],
   },
+  {
+    id: "tests",
+    label: "Тесты",
+    description:
+      "Импорт одного внутреннего теста из JSON: вопросы, варианты, баллы и настройки видимости.",
+    acceptedLabel: ".json",
+    status: "ready",
+    instructions: [
+      "Скачайте пример JSON и замените данные на свои.",
+      "Укажите существующее направление в поле direction.",
+      "Добавьте вопросы типов single, multiple или text по правилам ниже.",
+      "Загрузите файл и проверьте предпросмотр с ошибками.",
+      "Создайте тест только после успешной валидации.",
+    ],
+  },
 ];
 
 export const ADMIN_UPLOAD_ACCEPT =
   ".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+
+export const ADMIN_TEST_IMPORT_ACCEPT = ".json,application/json";
 
 export type UserImportStudentAction = "create" | "skip" | "error";
 
@@ -166,6 +183,62 @@ export interface UserImportReport {
 }
 
 export type AdminUploadTab = "upload" | "jobs";
+
+export type AdminUploadTypeId = "users" | "tests";
+
+export interface TestImportError {
+  path: string;
+  message: string;
+}
+
+export interface TestImportAnswer {
+  id: string;
+  text: string;
+  isCorrect: boolean;
+}
+
+export type TestImportQuestionType = "single" | "multiple" | "text";
+
+export interface TestImportQuestion {
+  questionId: number;
+  type: TestImportQuestionType;
+  text: string;
+  points: number;
+  answers?: TestImportAnswer[];
+  correctAnswers?: string[];
+}
+
+export interface TestImportPreview {
+  title: string;
+  direction: string;
+  startDate: string;
+  endDate: string;
+  timeLimitMinutes: number;
+  published: boolean;
+  visible: boolean;
+  questions: TestImportQuestion[];
+}
+
+export interface TestImportSummary {
+  questionsTotal: number;
+  totalPoints: number;
+  singleCount: number;
+  multipleCount: number;
+  textCount: number;
+  errorsCount: number;
+}
+
+export interface TestImportPreviewResponse {
+  status: boolean;
+  preview: TestImportPreview;
+  summary: TestImportSummary;
+  errors: TestImportError[];
+  error?: string;
+}
+
+export interface TestImportCommitResponse extends TestImportPreviewResponse {
+  testId?: string;
+}
 
 export function formatUploadFileSize(bytes: number): string {
   if (bytes < 1024) {

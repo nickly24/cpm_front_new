@@ -4,6 +4,8 @@ import type {
   UserImportPreview,
   UserImportReport,
   UserImportSession,
+  TestImportCommitResponse,
+  TestImportPreviewResponse,
 } from "@/lib/admin/admin-upload-types";
 
 export async function parseUserImportFile(
@@ -62,4 +64,22 @@ export async function fetchUserImportReport(jobId: number): Promise<{
   report: UserImportReport;
 }> {
   return apiRequest(`/api/user-import/jobs/${jobId}/report`);
+}
+
+export async function previewTestImport(
+  payload: unknown,
+): Promise<TestImportPreviewResponse> {
+  return apiRequest("/api/test-import/preview", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function commitTestImport(
+  payload: unknown,
+): Promise<TestImportCommitResponse> {
+  return apiRequest("/api/test-import/commit", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
 }

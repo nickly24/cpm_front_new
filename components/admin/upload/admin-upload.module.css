@@ -76,6 +76,18 @@
   list-style: none;
 }
 
+.typeListHorizontal {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--ds-space-3);
+}
+
+@media (max-width: 760px) {
+  .typeListHorizontal {
+    grid-template-columns: 1fr;
+  }
+}
+
 .typeCard {
   display: flex;
   flex-direction: column;
@@ -89,6 +101,10 @@
   text-align: left;
   cursor: pointer;
   transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+}
+
+.typeListHorizontal .typeCard {
+  min-height: 112px;
 }
 
 .typeCard:hover {
@@ -220,6 +236,76 @@
 
 .instructionsList li + li {
   margin-top: 6px;
+}
+
+.mappingTableWrap {
+  overflow: auto;
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-md);
+}
+
+.mappingTableWrap code,
+.errorList code {
+  padding: 2px 5px;
+  border-radius: var(--ds-radius-sm);
+  background: var(--ds-surface-muted);
+  font-size: 12px;
+}
+
+.exampleGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--ds-space-3);
+}
+
+@media (max-width: 1100px) {
+  .exampleGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.exampleCard {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--ds-space-2);
+  padding: var(--ds-space-4);
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-md);
+  background: var(--ds-surface-muted);
+}
+
+.exampleHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ds-accent);
+}
+
+.exampleHead h3 {
+  margin: 0;
+  font-size: 15px;
+  color: var(--ds-text);
+}
+
+.exampleCard p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--ds-text-secondary);
+}
+
+.codeBlock {
+  overflow-x: auto;
+  margin: 0;
+  padding: var(--ds-space-3);
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-sm);
+  background: var(--ds-surface);
+  color: var(--ds-text);
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre;
 }
 
 .instructionsPlaceholder {
@@ -431,6 +517,42 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--ds-space-2);
+}
+
+.testMetaGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--ds-space-2);
+  padding: var(--ds-space-4);
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-md);
+  background: var(--ds-surface-muted);
+  font-size: 13px;
+  color: var(--ds-text-secondary);
+}
+
+@media (max-width: 760px) {
+  .testMetaGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.errorList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-2);
+  padding: var(--ds-space-4);
+  border: 1px solid color-mix(in srgb, #c0392b 32%, var(--ds-border));
+  border-radius: var(--ds-radius-md);
+  background: color-mix(in srgb, #c0392b 7%, var(--ds-surface));
+}
+
+.errorList ul {
+  margin: 0;
+  padding-left: 1.2rem;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--ds-text-secondary);
 }
 
 .statPill {

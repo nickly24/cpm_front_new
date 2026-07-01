@@ -3,6 +3,7 @@
 import { AdminUploadJobsTab } from "@/components/admin/upload/admin-upload-jobs-tab";
 import { AdminUploadPreview } from "@/components/admin/upload/admin-upload-preview";
 import { AdminUploadReportWorkspace } from "@/components/admin/upload/admin-upload-report-workspace";
+import { AdminTestUploadPanel } from "@/components/admin/upload/admin-test-upload-panel";
 import styles from "@/components/admin/upload/admin-upload.module.css";
 import testStyles from "@/components/admin/tests/admin-tests.module.css";
 import { Button } from "@/components/ui/button";
@@ -18,6 +19,7 @@ import {
   ADMIN_UPLOAD_TYPES,
   formatUploadFileSize,
   type AdminUploadTab,
+  type AdminUploadTypeId,
   type UserImportPreview,
   type UserImportPreviewStudent,
 } from "@/lib/admin/admin-upload-types";
@@ -40,7 +42,10 @@ const TABS: { id: AdminUploadTab; label: string }[] = [
 ];
 
 export function AdminUploadSection() {
-  const uploadType = ADMIN_UPLOAD_TYPES[0];
+  const [uploadTypeId, setUploadTypeId] = useState<AdminUploadTypeId>("users");
+  const uploadType =
+    ADMIN_UPLOAD_TYPES.find((item) => item.id === uploadTypeId) ??
+    ADMIN_UPLOAD_TYPES[0];
   const [tab, setTab] = useState<AdminUploadTab>("upload");
   const [file, setFile] = useState<File | null>(null);
   const [parsing, setParsing] = useState(false);
@@ -62,6 +67,12 @@ export function AdminUploadSection() {
     setSourceFilename(null);
     setPreview(null);
     setError(null);
+  };
+
+  const handleUploadTypeChange = (nextType: AdminUploadTypeId) => {
+    setUploadTypeId(nextType);
+    setTab("upload");
+    resetUpload();
   };
 
   const handleParse = async (nextFile: File) => {
@@ -191,31 +202,59 @@ export function AdminUploadSection() {
         <div>
           <h1 className={styles.pageTitle}>Загрузка</h1>
           <p className={styles.hint}>
-            Массовый импорт учеников, школ, групп и прокторов из Excel с предпросмотром и
-            отчётом с логинами.
+            Массовый импорт данных: пользователи из Excel и внутренние тесты из JSON.
           </p>
         </div>
       </header>
 
-      <div className={styles.sectionTabs}>
-        {TABS.map((item) => (
+      <div className={styles.typeListHorizontal}>
+        {ADMIN_UPLOAD_TYPES.map((item) => (
           <button
             key={item.id}
             type="button"
-            className={`${testStyles.directionTab} ${tab === item.id ? testStyles.directionTabActive : ""}`}
-            onClick={() => setTab(item.id)}
+            className={`${styles.typeCard} ${
+              uploadTypeId === item.id ? styles.typeCardActive : ""
+            }`.trim()}
+            onClick={() => handleUploadTypeChange(item.id as AdminUploadTypeId)}
           >
-            {item.label}
-            {item.id === "jobs" && hasActiveJob ? (
-              <span className={styles.tabDot} aria-hidden />
-            ) : null}
+            <span className={styles.typeCardHead}>
+              <span className={styles.typeCardLabel}>{item.label}</span>
+              <span
+                className={`${styles.badge} ${
+                  item.status === "ready" ? styles.badgeReady : styles.badgeSoon
+                }`.trim()}
+              >
+                {item.acceptedLabel}
+              </span>
+            </span>
+            <span className={styles.typeCardDesc}>{item.description}</span>
           </button>
         ))}
       </div>
 
+      {uploadTypeId === "users" ? (
+        <div className={styles.sectionTabs}>
+          {TABS.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              className={`${testStyles.directionTab} ${tab === item.id ? testStyles.directionTabActive : ""}`}
+              onClick={() => setTab(item.id)}
+            >
+              {item.label}
+              {item.id === "jobs" && hasActiveJob ? (
+                <span className={styles.tabDot} aria-hidden />
+              ) : null}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
       {error ? <div className={testStyles.stateBox}>{error}</div> : null}
 
-      {tab === "jobs" ? (
+      {uploadTypeId === "tests" ? (
+        <AdminTestUploadPanel />
+      ) : tab === "jobs" ? (
         <AdminUploadJobsTab
           refreshToken={jobsRefreshToken}
           onActiveChange={setHasActiveJob}
