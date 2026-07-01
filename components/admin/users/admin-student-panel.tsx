@@ -29,6 +29,8 @@ export function AdminStudentPanel({
   const [fullName, setFullName] = useState(student?.full_name ?? "");
   const [classNumber, setClassNumber] = useState(String(student?.class ?? 9));
   const [tgName, setTgName] = useState(student?.tg_name ?? "");
+  const [login, setLogin] = useState(student?.login ?? "");
+  const [password, setPassword] = useState(student?.password ?? "");
   const [groupId, setGroupId] = useState(
     student?.group_id != null ? String(student.group_id) : "none",
   );
@@ -81,6 +83,10 @@ export function AdminStudentPanel({
       if (!student) {
         return;
       }
+      if (!login.trim()) {
+        setError("Логин не может быть пустым");
+        return;
+      }
 
       const payload: {
         student_id: number;
@@ -88,6 +94,8 @@ export function AdminStudentPanel({
         class?: number;
         group_id?: number | null;
         tg_name?: string | null;
+        login?: string;
+        password?: string;
       } = { student_id: student.id };
 
       if (fullName.trim() !== student.full_name) {
@@ -104,6 +112,19 @@ export function AdminStudentPanel({
       const nextTg = tgName.trim() || null;
       if (nextTg !== (student.tg_name ?? null)) {
         payload.tg_name = nextTg;
+      }
+      const nextLogin = login.trim();
+      if (nextLogin && nextLogin !== (student.login ?? "")) {
+        payload.login = nextLogin;
+      }
+      const nextPassword = password.trim();
+      if (nextPassword && nextPassword !== (student.password ?? "")) {
+        payload.password = nextPassword;
+      }
+
+      if (Object.keys(payload).length === 1) {
+        await onSaved();
+        return;
       }
 
       const res = await editAdminStudent(payload);
@@ -191,6 +212,33 @@ export function AdminStudentPanel({
               onChange={(e) => setTgName(e.target.value)}
             />
           </label>
+
+          {mode === "edit" ? (
+            <>
+              <label className={userStyles.field}>
+                <span className={userStyles.fieldLabel}>Логин</span>
+                <input
+                  className={userStyles.fieldInput}
+                  value={login}
+                  onChange={(e) => setLogin(e.target.value)}
+                />
+              </label>
+
+              <label className={userStyles.field}>
+                <span className={userStyles.fieldLabel}>Пароль</span>
+                <input
+                  className={userStyles.fieldInput}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+                {student?.password_hidden && !student.password ? (
+                  <span className={userStyles.memberMeta}>
+                    Старый пароль сохранён только хэшем. Введите новый, чтобы он был виден администратору.
+                  </span>
+                ) : null}
+              </label>
+            </>
+          ) : null}
 
           {error ? <p className={styles.errorText}>{error}</p> : null}
 

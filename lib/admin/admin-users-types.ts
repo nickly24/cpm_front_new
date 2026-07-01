@@ -12,6 +12,9 @@ export interface AdminStudent {
   school_name?: string | null;
   school_short_name?: string | null;
   tg_name?: string | null;
+  login?: string | null;
+  password?: string | null;
+  password_hidden?: boolean;
 }
 
 export interface AdminStaffUser {

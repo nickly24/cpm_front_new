@@ -68,7 +68,7 @@ export function AdminStudentsTab() {
 
   const filtered = useMemo(() => {
     return students.filter((student) => {
-      if (!matchesStudentSearch(student.full_name, student.id, debouncedSearch)) {
+      if (!matchesStudentSearch(student.full_name, student.id, debouncedSearch, student.login)) {
         return false;
       }
       if (groupFilter === "none" && student.group_id != null) {
@@ -215,6 +215,8 @@ export function AdminStudentsTab() {
                 <tr>
                   <th>ФИО</th>
                   <th>Класс</th>
+                  <th>Логин</th>
+                  <th>Пароль</th>
                   <th>Группа</th>
                   <th>Школа</th>
                   <th>Действия</th>
@@ -228,6 +230,22 @@ export function AdminStudentsTab() {
                       <div className={userStyles.memberMeta}>ID {student.id}</div>
                     </td>
                     <td>{student.class}</td>
+                    <td>
+                      {student.login ? (
+                        <span className={userStyles.credentialCode}>{student.login}</span>
+                      ) : (
+                        <span className={userStyles.memberMeta}>Не задан</span>
+                      )}
+                    </td>
+                    <td>
+                      {student.password ? (
+                        <span className={userStyles.credentialCode}>{student.password}</span>
+                      ) : student.password_hidden ? (
+                        <span className={userStyles.memberMeta}>Задайте новый</span>
+                      ) : (
+                        <span className={userStyles.memberMeta}>Не задан</span>
+                      )}
+                    </td>
                     <td>
                       <select
                         className={userStyles.fieldSelect}

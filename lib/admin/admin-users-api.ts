@@ -48,6 +48,9 @@ export async function fetchAdminStudents(): Promise<AdminStudent[]> {
     school_name: row.school_name ?? null,
     school_short_name: row.school_short_name ?? null,
     tg_name: row.tg_name ?? null,
+    login: row.login ?? null,
+    password: row.password ?? null,
+    password_hidden: row.password_hidden ?? false,
   }));
 }
 
@@ -154,6 +157,8 @@ export async function editAdminStudent(payload: {
   class?: number;
   group_id?: number | null;
   tg_name?: string | null;
+  login?: string;
+  password?: string;
 }): Promise<{ status: boolean; student_data?: AdminStudent; error?: string }> {
   return apiRequest("/api/edit-student", {
     method: "PUT",

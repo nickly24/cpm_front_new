@@ -24,12 +24,17 @@ export function matchesStudentSearch(
   fullName: string,
   id: number,
   query: string,
+  login?: string | null,
 ): boolean {
   const q = normalizeSearch(query);
   if (!q) {
     return true;
   }
-  return fullName.toLowerCase().includes(q) || String(id).includes(q);
+  return (
+    fullName.toLowerCase().includes(q) ||
+    String(id).includes(q) ||
+    (login?.toLowerCase().includes(q) ?? false)
+  );
 }
 
 export function groupLabel(
