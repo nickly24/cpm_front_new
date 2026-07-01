@@ -555,7 +555,10 @@ export function TestAttemptScreen({
     const sourceAttempt = bundle?.attempt ?? attempt;
     const sourcePendingQuestionIds =
       bundle?.pendingQuestionIds ?? pendingQuestionIds;
-    const next = upsertLocalAnswer(sourceAttempt, stored);
+    const next = {
+      ...upsertLocalAnswer(sourceAttempt, stored),
+      remainingSeconds,
+    };
     const pending = addPendingQuestionId(
       sourcePendingQuestionIds,
       currentQuestion.questionId,
