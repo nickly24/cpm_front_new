@@ -60,7 +60,7 @@ export const ADMIN_UPLOAD_TYPES: AdminUploadType[] = [
 export const ADMIN_UPLOAD_ACCEPT =
   ".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
-export const ADMIN_TEST_IMPORT_ACCEPT = ".json,application/json";
+export const ADMIN_TEST_IMPORT_ACCEPT = ".json,.js,application/json,text/javascript,application/javascript";
 
 export const ADMIN_EXTERNAL_TEST_RESULTS_ACCEPT = ADMIN_UPLOAD_ACCEPT;
 
@@ -326,6 +326,9 @@ export interface TestImportPreviewResponse {
   preview: TestImportPreview;
   summary: TestImportSummary;
   errors: TestImportError[];
+  source?: "json" | "online_test_pad" | string;
+  sourceTitle?: string;
+  warnings?: string[];
   error?: string;
 }
 

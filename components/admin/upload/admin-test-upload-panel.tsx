@@ -9,6 +9,7 @@ import {
   previewTestImport,
 } from "@/lib/admin/admin-upload-api";
 import { fetchAdminDirections } from "@/lib/admin/admin-tests-api";
+import type { Direction } from "@/lib/admin/admin-tests-types";
 import { downloadTestImportSample } from "@/lib/admin/admin-upload-export";
 import {
   ADMIN_TEST_IMPORT_ACCEPT,
@@ -81,12 +82,113 @@ const TYPE_EXAMPLES = [
   },
 ];
 
-function isJsonFile(file: File): boolean {
-  return file.name.toLowerCase().endsWith(".json") || file.type === "application/json";
+type ImportKind = "json" | "online_test_pad";
+
+interface TestImportMetadata {
+  title: string;
+  direction: string;
+  startDate: string;
+  endDate: string;
+  timeLimitMinutes: number;
+  published: boolean;
+  visible: boolean;
+}
+
+interface TestImportSource {
+  kind: ImportKind;
+  payload?: unknown;
+  sourceText?: string;
+}
+
+function isSupportedFile(file: File): boolean {
+  const name = file.name.toLowerCase();
+  return name.endsWith(".json") || name.endsWith(".js") || file.type === "application/json";
 }
 
 function formatBoolean(value: boolean): string {
   return value ? "да" : "нет";
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
+function parseDateInput(value: unknown): string {
+  return typeof value === "string" ? value.slice(0, 16) : "";
+}
+
+function parseTimeLimit(value: unknown, fallback = 30): number {
+  return typeof value === "number" && Number.isFinite(value) && value > 0
+    ? Math.round(value)
+    : fallback;
+}
+
+function metadataFromPayload(payload: unknown, fallbackDirection: string): TestImportMetadata {
+  if (!isRecord(payload)) {
+    return {
+      title: "",
+      direction: fallbackDirection,
+      startDate: "",
+      endDate: "",
+      timeLimitMinutes: 30,
+      published: false,
+      visible: false,
+    };
+  }
+
+  return {
+    title: typeof payload.title === "string" ? payload.title : "",
+    direction: typeof payload.direction === "string" ? payload.direction : fallbackDirection,
+    startDate: parseDateInput(payload.startDate),
+    endDate: parseDateInput(payload.endDate),
+    timeLimitMinutes: parseTimeLimit(payload.timeLimitMinutes),
+    published: typeof payload.published === "boolean" ? payload.published : false,
+    visible: typeof payload.visible === "boolean" ? payload.visible : false,
+  };
+}
+
+function extractOnlineTestPadTitle(sourceText: string): string {
+  const match = sourceText.match(/"Name"\s*:\s*"((?:\\.|[^"\\])*)"/);
+  if (!match) {
+    return "";
+  }
+  try {
+    return JSON.parse(`"${match[1]}"`) as string;
+  } catch {
+    return match[1];
+  }
+}
+
+function extractOnlineTestPadTimeLimit(sourceText: string): number {
+  if (!/"timelimited"\s*:\s*true/.test(sourceText)) {
+    return 30;
+  }
+  const match = sourceText.match(/"timelimitminutes"\s*:\s*(\d+)/);
+  return match ? parseTimeLimit(Number(match[1])) : 30;
+}
+
+function applyMetadataToJsonPayload(payload: unknown, metadata: TestImportMetadata): unknown {
+  return {
+    ...(isRecord(payload) ? payload : {}),
+    ...metadata,
+  };
+}
+
+function buildImportPayload(
+  source: TestImportSource | null,
+  metadata: TestImportMetadata | null,
+): unknown | null {
+  if (!source || !metadata) {
+    return null;
+  }
+  if (source.kind === "online_test_pad") {
+    return {
+      importFormat: "online_test_pad",
+      sourceText: source.sourceText ?? "",
+      metadata,
+    };
+  }
+  return applyMetadataToJsonPayload(source.payload, metadata);
 }
 
 interface AdminTestUploadPanelProps {
@@ -96,19 +198,25 @@ interface AdminTestUploadPanelProps {
 export function AdminTestUploadPanel({ onImported }: AdminTestUploadPanelProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
-  const [rawPayload, setRawPayload] = useState<unknown | null>(null);
+  const [source, setSource] = useState<TestImportSource | null>(null);
+  const [metadata, setMetadata] = useState<TestImportMetadata | null>(null);
   const [preview, setPreview] = useState<TestImportPreviewResponse | null>(null);
+  const [previewStale, setPreviewStale] = useState(false);
   const [parsing, setParsing] = useState(false);
   const [committing, setCommitting] = useState(false);
   const [createdTestId, setCreatedTestId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [sampleDirection, setSampleDirection] = useState("Python");
+  const [directions, setDirections] = useState<Direction[]>([]);
 
   useEffect(() => {
     let active = true;
     fetchAdminDirections()
       .then((directions) => {
         const firstDirection = directions.find((direction) => direction.name)?.name;
+        if (active) {
+          setDirections(directions);
+        }
         if (active && firstDirection) {
           setSampleDirection(firstDirection);
         }
@@ -123,8 +231,10 @@ export function AdminTestUploadPanel({ onImported }: AdminTestUploadPanelProps) 
 
   const reset = () => {
     setFile(null);
-    setRawPayload(null);
+    setSource(null);
+    setMetadata(null);
     setPreview(null);
+    setPreviewStale(false);
     setError(null);
     setCreatedTestId(null);
     if (inputRef.current) {
@@ -132,9 +242,28 @@ export function AdminTestUploadPanel({ onImported }: AdminTestUploadPanelProps) 
     }
   };
 
+  const runPreview = async (
+    nextSource = source,
+    nextMetadata = metadata,
+  ) => {
+    const payload = buildImportPayload(nextSource, nextMetadata);
+    if (!payload) {
+      return;
+    }
+    setError(null);
+    try {
+      const response = await previewTestImport(payload);
+      setPreview(response);
+      setPreviewStale(false);
+    } catch (err) {
+      setPreview(null);
+      setError(err instanceof Error ? err.message : "Не удалось проверить файл");
+    }
+  };
+
   const handleFile = async (nextFile: File) => {
-    if (!isJsonFile(nextFile)) {
-      window.alert("Выберите файл .json");
+    if (!isSupportedFile(nextFile)) {
+      window.alert("Выберите файл .json или test.js");
       return;
     }
 
@@ -143,21 +272,36 @@ export function AdminTestUploadPanel({ onImported }: AdminTestUploadPanelProps) 
     setCreatedTestId(null);
     try {
       const text = await nextFile.text();
-      const payload = JSON.parse(text) as unknown;
-      const response = await previewTestImport(payload);
+      const isOnlineTestPad = /(^|\s)var\s+test\s*=/.test(text);
+      const nextSource: TestImportSource = isOnlineTestPad
+        ? { kind: "online_test_pad", sourceText: text }
+        : { kind: "json", payload: JSON.parse(text) as unknown };
+      const nextMetadata = isOnlineTestPad
+        ? {
+            title: extractOnlineTestPadTitle(text),
+            direction: sampleDirection,
+            startDate: "",
+            endDate: "",
+            timeLimitMinutes: extractOnlineTestPadTimeLimit(text),
+            published: false,
+            visible: false,
+          }
+        : metadataFromPayload(nextSource.payload, sampleDirection);
       setFile(nextFile);
-      setRawPayload(payload);
-      setPreview(response);
+      setSource(nextSource);
+      setMetadata(nextMetadata);
+      await runPreview(nextSource, nextMetadata);
     } catch (err) {
       setFile(null);
-      setRawPayload(null);
+      setSource(null);
+      setMetadata(null);
       setPreview(null);
       setError(
         err instanceof SyntaxError
-          ? "JSON не распознан. Проверьте синтаксис файла."
+          ? "Файл не распознан. Для JSON проверьте синтаксис, для Online Test Pad выберите test.js."
           : err instanceof Error
             ? err.message
-            : "Не удалось разобрать JSON",
+            : "Не удалось разобрать файл",
       );
     } finally {
       setParsing(false);
@@ -165,14 +309,15 @@ export function AdminTestUploadPanel({ onImported }: AdminTestUploadPanelProps) 
   };
 
   const handleCommit = async () => {
-    if (!rawPayload || !preview || preview.errors.length > 0) {
+    const payload = buildImportPayload(source, metadata);
+    if (!payload || !preview || preview.errors.length > 0 || previewStale) {
       return;
     }
 
     setCommitting(true);
     setError(null);
     try {
-      const response = await commitTestImport(rawPayload);
+      const response = await commitTestImport(payload);
       if (!response.status || !response.testId) {
         throw new Error(response.error ?? "Не удалось создать тест");
       }
@@ -185,7 +330,23 @@ export function AdminTestUploadPanel({ onImported }: AdminTestUploadPanelProps) 
     }
   };
 
-  const canCommit = Boolean(preview && preview.errors.length === 0 && rawPayload && !committing);
+  const handleMetadataChange = <K extends keyof TestImportMetadata>(
+    key: K,
+    value: TestImportMetadata[K],
+  ) => {
+    setMetadata((prev) => (prev ? { ...prev, [key]: value } : prev));
+    setPreviewStale(true);
+    setCreatedTestId(null);
+  };
+
+  const canCommit = Boolean(
+    preview &&
+      preview.errors.length === 0 &&
+      source &&
+      metadata &&
+      !previewStale &&
+      !committing,
+  );
 
   return (
     <div className={styles.main}>
@@ -193,7 +354,7 @@ export function AdminTestUploadPanel({ onImported }: AdminTestUploadPanelProps) 
         <div>
           <h2 className={styles.mainTitle}>Тесты из JSON</h2>
           <p className={styles.mainDesc}>
-            Импорт одного внутреннего теста CPM с предпросмотром и строгой проверкой структуры.
+            Импорт одного внутреннего теста CPM из JSON или test.js Online Test Pad.
           </p>
         </div>
         <Button
@@ -211,8 +372,9 @@ export function AdminTestUploadPanel({ onImported }: AdminTestUploadPanelProps) 
           Инструкция по мапингу
         </h3>
         <ol className={styles.instructionsList}>
-          <li>Скачайте пример JSON и оставьте корневой объект теста без оберток.</li>
-          <li>Замените title, direction, даты и настройки видимости.</li>
+          <li>Для CPM JSON оставьте корневой объект теста без оберток.</li>
+          <li>Для Online Test Pad выберите файл test.js из экспортированной папки.</li>
+          <li>Проверьте title, direction, даты и настройки видимости в форме метаданных.</li>
           <li>Для каждого вопроса задайте questionId, type, text, points и ответы.</li>
           <li>Для числового ответа используйте type=text и correctAnswers со строковым значением 42.</li>
           <li>После загрузки проверьте preview. Тест создается только если ошибок нет.</li>
@@ -302,12 +464,103 @@ export function AdminTestUploadPanel({ onImported }: AdminTestUploadPanelProps) 
           <span className={styles.dropzoneIcon}>
             <Upload size={24} aria-hidden />
           </span>
-          <p className={styles.dropzoneTitle}>Перетащите .json или выберите файл</p>
+          <p className={styles.dropzoneTitle}>Перетащите .json / test.js или выберите файл</p>
           <p className={styles.dropzoneText}>
             Один файл должен содержать один тест со всеми вопросами.
           </p>
         </div>
       )}
+
+      {metadata ? (
+        <section className={styles.metaEditor} aria-labelledby="test-import-meta">
+          <div className={styles.previewHeader}>
+            <div>
+              <h3 id="test-import-meta" className={styles.blockTitle}>
+                Метаданные теста
+              </h3>
+              <p className={styles.mainDesc}>
+                Эти поля попадут в тест CPM перед созданием.
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => void runPreview()}
+              disabled={parsing || committing}
+            >
+              {previewStale ? "Обновить preview" : "Проверить ещё раз"}
+            </Button>
+          </div>
+
+          <div className={styles.metaGrid}>
+            <label className={styles.metaField}>
+              <span>Название</span>
+              <input
+                type="text"
+                value={metadata.title}
+                onChange={(event) => handleMetadataChange("title", event.target.value)}
+              />
+            </label>
+            <label className={styles.metaField}>
+              <span>Направление</span>
+              <select
+                value={metadata.direction}
+                onChange={(event) => handleMetadataChange("direction", event.target.value)}
+              >
+                <option value="">Выберите направление</option>
+                {directions.map((direction) => (
+                  <option key={direction.id ?? direction.name} value={direction.name}>
+                    {direction.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className={styles.metaField}>
+              <span>Начало</span>
+              <input
+                type="datetime-local"
+                value={metadata.startDate}
+                onChange={(event) => handleMetadataChange("startDate", event.target.value)}
+              />
+            </label>
+            <label className={styles.metaField}>
+              <span>Окончание</span>
+              <input
+                type="datetime-local"
+                value={metadata.endDate}
+                onChange={(event) => handleMetadataChange("endDate", event.target.value)}
+              />
+            </label>
+            <label className={styles.metaField}>
+              <span>Время, мин</span>
+              <input
+                type="number"
+                min={1}
+                value={metadata.timeLimitMinutes}
+                onChange={(event) =>
+                  handleMetadataChange("timeLimitMinutes", parseTimeLimit(Number(event.target.value)))
+                }
+              />
+            </label>
+            <label className={styles.metaCheck}>
+              <input
+                type="checkbox"
+                checked={metadata.published}
+                onChange={(event) => handleMetadataChange("published", event.target.checked)}
+              />
+              <span>Показать студентам</span>
+            </label>
+            <label className={styles.metaCheck}>
+              <input
+                type="checkbox"
+                checked={metadata.visible}
+                onChange={(event) => handleMetadataChange("visible", event.target.checked)}
+              />
+              <span>Показывать ответы после сдачи</span>
+            </label>
+          </div>
+        </section>
+      ) : null}
 
       {preview ? (
         <section className={styles.previewWrap}>
@@ -315,6 +568,7 @@ export function AdminTestUploadPanel({ onImported }: AdminTestUploadPanelProps) 
             <div>
               <h2 className={styles.mainTitle}>Предпросмотр теста</h2>
               <p className={styles.mainDesc}>
+                {preview.source === "online_test_pad" ? "Online Test Pad" : "CPM JSON"} ·{" "}
                 {preview.preview.title || "Без названия"} · {preview.preview.direction || "без направления"}
               </p>
             </div>
@@ -323,7 +577,7 @@ export function AdminTestUploadPanel({ onImported }: AdminTestUploadPanelProps) 
                 Сбросить
               </Button>
               <Button type="button" disabled={!canCommit} onClick={() => void handleCommit()}>
-                {committing ? "Создание…" : "Создать тест"}
+                {committing ? "Создание…" : previewStale ? "Обновите preview" : "Создать тест"}
               </Button>
             </div>
           </div>
@@ -350,6 +604,24 @@ export function AdminTestUploadPanel({ onImported }: AdminTestUploadPanelProps) 
               </span>
             ) : null}
           </div>
+
+          {preview.warnings && preview.warnings.length > 0 ? (
+            <div className={styles.warningList}>
+              <h3 className={styles.blockTitle}>Предупреждения импорта</h3>
+              <ul>
+                {preview.warnings.map((item, index) => (
+                  <li key={`${item}-${index}`}>{item}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
+          {previewStale ? (
+            <div className={styles.notice}>
+              <FileJson size={18} aria-hidden />
+              <strong>Метаданные изменены.</strong> Обновите preview перед созданием теста.
+            </div>
+          ) : null}
 
           <div className={styles.testMetaGrid}>
             <span>Начало: {preview.preview.startDate || "—"}</span>
