@@ -1,6 +1,7 @@
 import { apiRequest } from "@/lib/api/client";
 import type { Direction } from "@/lib/admin/admin-tests-types";
 import type {
+  AdminExternalTestFormData,
   AdminTestDetail,
   AdminTestFormData,
   AdminTestListItem,
@@ -31,6 +32,18 @@ export async function createAdminTest(
     method: "POST",
     body: JSON.stringify(payload),
   });
+}
+
+export async function createExternalAdminTest(
+  payload: AdminExternalTestFormData,
+): Promise<{ success: boolean; test: AdminTestListItem }> {
+  return apiRequest<{ success: boolean; test: AdminTestListItem }>(
+    "/external-tests",
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+  );
 }
 
 export async function updateAdminTest(

@@ -25,6 +25,17 @@
   box-shadow: var(--ds-shadow-sm);
 }
 
+.headerActions,
+.emptyActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ds-space-2);
+}
+
+.emptyActions {
+  justify-content: center;
+}
+
 .directionTabs {
   display: flex;
   flex-wrap: wrap;

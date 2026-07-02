@@ -1,5 +1,6 @@
 "use client";
 
+import { AdminExternalTestForm } from "@/components/admin/tests/admin-external-test-form";
 import { AdminTestForm } from "@/components/admin/tests/admin-test-form";
 import { AdminTestWorkspace } from "@/components/admin/tests/admin-test-workspace";
 import styles from "@/components/admin/tests/admin-tests.module.css";
@@ -37,6 +38,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 const IMMERSIVE_VIEWS: AdminTestsView[] = [
   "create",
+  "createExternal",
   "edit",
   "view",
   "workspace",
@@ -276,19 +278,49 @@ export function AdminTestsSection() {
     );
   }
 
+  if (view === "createExternal") {
+    return (
+      <AdminExternalTestForm
+        directions={directions}
+        defaultDirection={directionName}
+        onBack={() => setView("list")}
+        onSaved={(savedDirectionName) => {
+          setView("list");
+          if (savedDirectionName && savedDirectionName !== directionName) {
+            setDirectionName(savedDirectionName);
+          } else {
+            loadTests(directionName);
+          }
+        }}
+      />
+    );
+  }
+
   return (
     <div className={styles.page}>
       <header className={styles.pageHeader}>
         <h1 className={styles.pageTitle}>Управление тестами</h1>
-        <Button
-          type="button"
-          onClick={() => {
-            setEditingTest(null);
-            setView("create");
-          }}
-        >
-          + Создать тест
-        </Button>
+        <div className={styles.headerActions}>
+          <Button
+            type="button"
+            onClick={() => {
+              setEditingTest(null);
+              setView("create");
+            }}
+          >
+            + Создать тест
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => {
+              setEditingTest(null);
+              setView("createExternal");
+            }}
+          >
+            + Создать вне системы
+          </Button>
+        </div>
       </header>
 
       {loadingDirections ? (
@@ -368,6 +400,7 @@ export function AdminTestsSection() {
               ["active", "Активные"],
               ["upcoming", "Скоро"],
               ["ended", "Завершённые"],
+              ["external", "Вне системы"],
             ] as const
           ).map(([key, label]) => (
             <button
@@ -399,9 +432,18 @@ export function AdminTestsSection() {
         <div className={styles.stateBox}>
           <p>{tests.length === 0 ? "Тестов пока нет" : "По фильтрам ничего не найдено"}</p>
           {tests.length === 0 ? (
-            <Button type="button" onClick={() => setView("create")}>
-              Создать первый тест
-            </Button>
+            <div className={styles.emptyActions}>
+              <Button type="button" onClick={() => setView("create")}>
+                Создать первый тест
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setView("createExternal")}
+              >
+                Создать вне системы
+              </Button>
+            </div>
           ) : (
             <button type="button" className={styles.clearBtn} onClick={clearFilters}>
               Сбросить фильтры

@@ -49,6 +49,12 @@ export interface AdminTestFormData {
   published: boolean;
 }
 
+export interface AdminExternalTestFormData {
+  name: string;
+  direction_id: number;
+  date: string;
+}
+
 export interface AdminTestDetail extends AdminTestFormData {
   _id: string;
   createdAt?: string;
@@ -58,6 +64,7 @@ export interface AdminTestDetail extends AdminTestFormData {
 export type AdminTestsView =
   | "list"
   | "create"
+  | "createExternal"
   | "edit"
   | "view"
   | "workspace";
