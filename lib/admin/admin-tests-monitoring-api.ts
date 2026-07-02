@@ -73,3 +73,11 @@ export async function deleteAdminAttempt(
 ): Promise<{ success: boolean; message?: string }> {
   return apiRequest(`/test-attempt/${attemptId}`, { method: "DELETE" });
 }
+
+export async function forceSubmitAdminAttempt(
+  attemptId: string,
+): Promise<{ success: boolean; message?: string; sessionId?: string; score?: number }> {
+  return apiRequest(`/test-attempt/${attemptId}/admin/submit`, {
+    method: "POST",
+  });
+}

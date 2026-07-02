@@ -12,6 +12,7 @@ import {
   deleteAdminAttempt,
   fetchAdminAttemptDetail,
   fetchAdminTestAttempts,
+  forceSubmitAdminAttempt,
 } from "@/lib/admin/admin-tests-monitoring-api";
 import type {
   AdminAttemptDetailResponse,
@@ -112,6 +113,28 @@ export function AdminTestAttemptsPanel({ testId }: AdminTestAttemptsPanelProps) 
     }
   };
 
+  const handleForceSubmit = async (attemptId: string) => {
+    if (
+      !window.confirm(
+        "Принудительно завершить попытку? Будут засчитаны только ответы, которые уже есть на сервере. Локальная очередь студента с этого устройства не подтянется.",
+      )
+    ) {
+      return;
+    }
+
+    try {
+      await forceSubmitAdminAttempt(attemptId);
+      setDetail(null);
+      await load();
+    } catch (err) {
+      window.alert(
+        err instanceof Error
+          ? err.message
+          : "Не удалось принудительно завершить попытку",
+      );
+    }
+  };
+
   return (
     <div className={styles.panel}>
       <div className={styles.panelToolbar}>
@@ -169,6 +192,13 @@ export function AdminTestAttemptsPanel({ testId }: AdminTestAttemptsPanelProps) 
                     </button>
                     <button
                       type="button"
+                      className={styles.linkBtn}
+                      onClick={() => handleForceSubmit(row.attemptId)}
+                    >
+                      Завершить
+                    </button>
+                    <button
+                      type="button"
                       className={styles.linkBtnDanger}
                       onClick={() => handleDelete(row.attemptId)}
                     >
@@ -214,20 +244,36 @@ export function AdminTestAttemptsPanel({ testId }: AdminTestAttemptsPanelProps) 
           </p>
           <h4 className={styles.detailSectionTitle}>Ответы по вопросам</h4>
           <AdminAnswerItemsList items={attemptItemsToRows(detail.items)} />
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() =>
-              handleDelete(
-                String(
-                  (detail.attempt as { attemptId?: string }).attemptId ?? "",
-                ),
-              )
-            }
-          >
-            Удалить попытку
-          </Button>
+          <div className={styles.detailCardActions}>
+            <Button
+              type="button"
+              variant="primary"
+              size="sm"
+              onClick={() =>
+                handleForceSubmit(
+                  String(
+                    (detail.attempt as { attemptId?: string }).attemptId ?? "",
+                  ),
+                )
+              }
+            >
+              Завершить попытку
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() =>
+                handleDelete(
+                  String(
+                    (detail.attempt as { attemptId?: string }).attemptId ?? "",
+                  ),
+                )
+              }
+            >
+              Удалить попытку
+            </Button>
+          </div>
         </div>
       ) : null}
     </div>
