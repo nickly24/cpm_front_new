@@ -105,6 +105,10 @@ export function getAttemptErrorMessage(code: string): string {
     test_not_completed: "Сначала нужно официально сдать этот тест",
     answers_required: "Нет ответов для синхронизации",
     answers_batch_too_large: "Слишком много ответов в одном запросе",
+    answers_not_synced:
+      "Ответы сохранены на устройстве, но не все дошли до сервера. Подключитесь к сети и повторите отправку.",
+    empty_attempt_answers:
+      "Сервер ещё не получил сохранённые ответы. Подключитесь к сети и повторите отправку.",
   };
 
   return messages[code] ?? code;

@@ -125,6 +125,9 @@ export function TestAttemptScreen({
   const [submitDialog, setSubmitDialog] = useState<"confirm" | "error" | null>(
     null,
   );
+  const [submitErrorDescription, setSubmitErrorDescription] = useState<
+    string | null
+  >(null);
   const attemptMainRef = useRef<HTMLElement>(null);
   const swipeStartRef = useRef<SwipeStart | null>(null);
   const pendingCount = pendingQuestionIds.length;
@@ -691,6 +694,7 @@ export function TestAttemptScreen({
 
     setBusy(true);
     setError(null);
+    setSubmitErrorDescription(null);
 
     try {
       const resolved = await resolveAttemptBundleState(
@@ -708,7 +712,7 @@ export function TestAttemptScreen({
       await applyAttempt(flush.attempt, flush.pendingQuestionIds);
 
       if (flush.hadErrors || flush.pendingQuestionIds.length > 0) {
-        throw new Error("sync_incomplete");
+        throw new Error("answers_not_synced");
       }
 
       const response = await submitTestAttempt(flush.attempt.attemptId);
@@ -726,8 +730,15 @@ export function TestAttemptScreen({
       );
       setSubmitStats(response.stats ?? null);
       setPhase("done");
-    } catch {
+    } catch (err) {
       setError(null);
+      setSubmitErrorDescription(
+        err instanceof ApiError
+          ? getAttemptErrorMessage(err.message)
+          : err instanceof Error
+            ? getAttemptErrorMessage(err.message)
+            : getAttemptErrorMessage("answers_not_synced"),
+      );
       setSubmitDialog("error");
       setPhase("active");
     } finally {
@@ -757,6 +768,7 @@ export function TestAttemptScreen({
     }
 
     setError(null);
+    setSubmitErrorDescription(null);
 
     try {
       const resolved = await resolveAttemptBundleState(
@@ -1378,9 +1390,11 @@ export function TestAttemptScreen({
           isPractice={isPractice}
           timeExpired={timeExpired}
           loading={busy}
+          errorDescription={submitErrorDescription}
           onCancel={() => {
             if (!busy) {
               setSubmitDialog(null);
+              setSubmitErrorDescription(null);
             }
           }}
           onConfirm={() => void performSubmit()}

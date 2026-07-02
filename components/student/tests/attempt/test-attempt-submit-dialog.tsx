@@ -10,6 +10,7 @@ interface TestAttemptSubmitDialogProps {
   isPractice: boolean;
   timeExpired: boolean;
   loading?: boolean;
+  errorDescription?: string | null;
   onCancel: () => void;
   onConfirm: () => void;
   onRetry: () => void;
@@ -20,6 +21,7 @@ export function TestAttemptSubmitDialog({
   isPractice,
   timeExpired,
   loading = false,
+  errorDescription,
   onCancel,
   onConfirm,
   onRetry,
@@ -40,7 +42,8 @@ export function TestAttemptSubmitDialog({
       : timeExpired
         ? "Новые ответы добавить уже нельзя. На проверку уйдут ответы, сохранённые на устройстве и на сервере."
         : "После отправки изменить ответы будет нельзя. Сначала все ответы синхронизируются с сервером."
-    : "Попытка сохранена на устройстве. Очередь ответов переотправляется автоматически каждые 10 секунд; детали видны под списком вопросов. Отвечать заново не нужно.";
+    : errorDescription ||
+      "Попытка сохранена на устройстве. Очередь ответов переотправляется автоматически каждые 10 секунд; детали видны под списком вопросов. Отвечать заново не нужно.";
 
   return (
     <div

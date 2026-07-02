@@ -21,6 +21,16 @@ export type SyncResult = {
   hadErrors: boolean;
 };
 
+const ANSWER_SYNC_CHUNK_SIZE = 50;
+
+function chunkAnswers<T>(items: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let index = 0; index < items.length; index += size) {
+    chunks.push(items.slice(index, index + size));
+  }
+  return chunks;
+}
+
 async function getCurrentBundleState(
   attemptId: string,
   fallbackAttempt: TestAttempt,
@@ -62,55 +72,70 @@ export async function flushPendingAnswers(
     return getCurrentBundleState(attemptId, sourceAttempt, pendingQuestionIds);
   }
 
+  let workingAttempt = sourceAttempt;
+  let workingPendingQuestionIds = pendingQuestionIds;
+  let hadErrors = false;
+
   try {
-    const response = await syncTestAttemptAnswersBatch(attemptId, toSend);
-    if (!response.attempt) {
-      return getCurrentBundleState(attemptId, sourceAttempt, pendingQuestionIds);
-    }
-
-    const latest = await loadAttemptBundle(attemptId);
-    const baseAttempt = latest?.attempt ?? sourceAttempt;
-    const latestPendingQuestionIds =
-      latest?.pendingQuestionIds ?? pendingQuestionIds;
-    const syncedIds = [
-      ...(response.syncedQuestionIds ?? []),
-      ...(response.skippedQuestionIds ?? []),
-    ];
-    const afterSync = removePendingQuestionIds(
-      latestPendingQuestionIds,
-      syncedIds,
-    );
-
-    const failedIds = (response.errors ?? [])
-      .map((item) => item.questionId)
-      .filter((id): id is number => id != null);
-    const nextPending = failedIds.length
-      ? [...new Set([...afterSync, ...failedIds])]
-      : afterSync;
-    let merged = mergeAttemptFromServer(baseAttempt, response.attempt, {
-      preserveQuestionIds: nextPending,
-    });
-
-    const nextPendingSet = new Set(nextPending);
-    for (const answer of baseAttempt.answers) {
-      if (
-        nextPendingSet.has(answer.questionId) &&
-        !merged.answers.some((item) => item.questionId === answer.questionId)
-      ) {
-        merged = upsertLocalAnswer(merged, answer);
+    for (const chunk of chunkAnswers(toSend, ANSWER_SYNC_CHUNK_SIZE)) {
+      const response = await syncTestAttemptAnswersBatch(attemptId, chunk);
+      if (!response.attempt) {
+        return getCurrentBundleState(
+          attemptId,
+          workingAttempt,
+          workingPendingQuestionIds,
+        );
       }
-    }
 
-    await saveAttemptBundle({
-      attempt: merged,
-      pendingQuestionIds: nextPending,
-      updatedAt: Date.now(),
-    });
+      const latest = await loadAttemptBundle(attemptId);
+      const baseAttempt = latest?.attempt ?? workingAttempt;
+      const latestPendingQuestionIds =
+        latest?.pendingQuestionIds ?? workingPendingQuestionIds;
+      const syncedIds = [
+        ...(response.syncedQuestionIds ?? []),
+        ...(response.skippedQuestionIds ?? []),
+      ];
+      const afterSync = removePendingQuestionIds(
+        latestPendingQuestionIds,
+        syncedIds,
+      );
+
+      const failedIds = (response.errors ?? [])
+        .map((item) => item.questionId)
+        .filter((id): id is number => id != null);
+      const nextPending = failedIds.length
+        ? [...new Set([...afterSync, ...failedIds])]
+        : afterSync;
+      let merged = mergeAttemptFromServer(baseAttempt, response.attempt, {
+        preserveQuestionIds: nextPending,
+      });
+
+      const nextPendingSet = new Set(nextPending);
+      for (const answer of baseAttempt.answers) {
+        if (
+          nextPendingSet.has(answer.questionId) &&
+          !merged.answers.some((item) => item.questionId === answer.questionId)
+        ) {
+          merged = upsertLocalAnswer(merged, answer);
+        }
+      }
+
+      await saveAttemptBundle({
+        attempt: merged,
+        pendingQuestionIds: nextPending,
+        updatedAt: Date.now(),
+      });
+
+      workingAttempt = merged;
+      workingPendingQuestionIds = nextPending;
+      hadErrors =
+        hadErrors || Boolean(response.errors?.length) || !response.success;
+    }
 
     return {
-      attempt: merged,
-      pendingQuestionIds: nextPending,
-      hadErrors: Boolean(response.errors?.length) || !response.success,
+      attempt: workingAttempt,
+      pendingQuestionIds: workingPendingQuestionIds,
+      hadErrors,
     };
   } catch (err) {
     if (err instanceof ApiError && err.status === 403) {
