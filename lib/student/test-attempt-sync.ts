@@ -72,7 +72,6 @@ export async function flushPendingAnswers(
     const baseAttempt = latest?.attempt ?? sourceAttempt;
     const latestPendingQuestionIds =
       latest?.pendingQuestionIds ?? pendingQuestionIds;
-    let merged = mergeAttemptFromServer(baseAttempt, response.attempt);
     const syncedIds = [
       ...(response.syncedQuestionIds ?? []),
       ...(response.skippedQuestionIds ?? []),
@@ -88,6 +87,9 @@ export async function flushPendingAnswers(
     const nextPending = failedIds.length
       ? [...new Set([...afterSync, ...failedIds])]
       : afterSync;
+    let merged = mergeAttemptFromServer(baseAttempt, response.attempt, {
+      preserveQuestionIds: nextPending,
+    });
 
     const nextPendingSet = new Set(nextPending);
     for (const answer of baseAttempt.answers) {
@@ -115,7 +117,9 @@ export async function flushPendingAnswers(
       const refreshed = await loadAttemptBundle(attemptId);
       if (refreshed?.attempt) {
         return {
-          attempt: mergeAttemptFromServer(sourceAttempt, refreshed.attempt),
+          attempt: mergeAttemptFromServer(sourceAttempt, refreshed.attempt, {
+            preserveQuestionIds: refreshed.pendingQuestionIds,
+          }),
           pendingQuestionIds: refreshed.pendingQuestionIds,
           hadErrors: true,
         };

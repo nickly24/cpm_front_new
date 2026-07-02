@@ -131,6 +131,10 @@ export function TestAttemptScreen({
 
   const questions = attempt?.questions ?? [];
   const currentQuestion = questions[currentIndex] ?? null;
+  const timeExpired =
+    remainingSeconds <= 0 ||
+    Boolean(attempt?.timeExpired) ||
+    attempt?.status === "expired";
 
   const applyAttempt = useCallback(
     async (next: TestAttempt, pendingQuestionIds: number[]) => {
@@ -290,8 +294,10 @@ export function TestAttemptScreen({
       if (resumeAttemptId) {
         const cached = await loadAttemptBundle(resumeAttemptId);
         if (cached?.attempt?.questions?.length) {
-          nextAttempt = mergeAttemptFromServer(cached.attempt, nextAttempt);
           pending = cached.pendingQuestionIds;
+          nextAttempt = mergeAttemptFromServer(cached.attempt, nextAttempt, {
+            preserveQuestionIds: pending,
+          });
           for (const answer of cached.attempt.answers) {
             if (
               !nextAttempt.answers.some(
@@ -350,6 +356,17 @@ export function TestAttemptScreen({
     return () => window.clearTimeout(timeout);
   }, [attempt, currentQuestion]);
 
+  const buildDraftPayload = useCallback(() => {
+    if (!currentQuestion || !draft || timeExpired) {
+      return null;
+    }
+    return {
+      questionId: currentQuestion.questionId,
+      draft,
+      timeExpired,
+    };
+  }, [currentQuestion, draft, timeExpired]);
+
   useEffect(() => {
     if (phase !== "active") {
       return;
@@ -381,7 +398,9 @@ export function TestAttemptScreen({
     void fetchTestAttempt(attempt.attemptId)
       .then((response) => {
         if (response.success && response.attempt) {
-          const merged = mergeAttemptFromServer(attempt, response.attempt);
+          const merged = mergeAttemptFromServer(attempt, response.attempt, {
+            preserveQuestionIds: pendingQuestionIds,
+          });
           void applyAttempt(merged, pendingQuestionIds);
         }
       })
@@ -404,15 +423,27 @@ export function TestAttemptScreen({
     };
 
     const handleFocus = () => {
-      void fetchTestAttempt(attempt.attemptId)
-        .then((response) => {
-          if (response.success && response.attempt) {
-            const merged = mergeAttemptFromServer(attempt, response.attempt);
-            void applyAttempt(merged, pendingQuestionIds).then(() => {
-              void runBackgroundSync(merged);
-            });
-          }
-        })
+      void resolveAttemptBundleState(
+        attempt.attemptId,
+        { attempt, pendingQuestionIds },
+        buildDraftPayload(),
+      )
+        .then((resolved) =>
+          fetchTestAttempt(attempt.attemptId).then((response) => {
+            if (response.success && response.attempt) {
+              const merged = mergeAttemptFromServer(
+                resolved.attempt,
+                response.attempt,
+                {
+                  preserveQuestionIds: resolved.pendingQuestionIds,
+                },
+              );
+              void applyAttempt(merged, resolved.pendingQuestionIds).then(() => {
+                void runBackgroundSync(merged);
+              });
+            }
+          }),
+        )
         .catch(() => {
           void runBackgroundSync(attempt);
         });
@@ -426,7 +457,14 @@ export function TestAttemptScreen({
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("focus", handleFocus);
     };
-  }, [attempt, applyAttempt, pendingQuestionIds, phase, runBackgroundSync]);
+  }, [
+    attempt,
+    applyAttempt,
+    buildDraftPayload,
+    pendingQuestionIds,
+    phase,
+    runBackgroundSync,
+  ]);
 
   useEffect(() => {
     if (phase !== "active") {
@@ -478,11 +516,6 @@ export function TestAttemptScreen({
 
     return styles.attemptTimer;
   }, [remainingSeconds]);
-
-  const timeExpired =
-    remainingSeconds <= 0 ||
-    Boolean(attempt?.timeExpired) ||
-    attempt?.status === "expired";
 
   const handleExit = () => {
     const confirmed = window.confirm(
@@ -650,17 +683,6 @@ export function TestAttemptScreen({
       void handleNext();
     }
   };
-
-  const buildDraftPayload = useCallback(() => {
-    if (!currentQuestion || !draft || timeExpired) {
-      return null;
-    }
-    return {
-      questionId: currentQuestion.questionId,
-      draft,
-      timeExpired,
-    };
-  }, [currentQuestion, draft, timeExpired]);
 
   const performSubmit = useCallback(async () => {
     if (!attempt) {

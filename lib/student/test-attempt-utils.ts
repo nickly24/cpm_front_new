@@ -138,9 +138,20 @@ export function draftToStoredAnswer(
 export function mergeAttemptFromServer(
   local: TestAttempt,
   server: TestAttempt,
+  options?: { preserveQuestionIds?: number[] },
 ): TestAttempt {
-  const answeredIds = new Set(
+  const preserveQuestionIds = new Set(options?.preserveQuestionIds ?? []);
+  const serverAnswerIds = new Set(
     server.answers.map((answer) => answer.questionId),
+  );
+  const preservedLocalAnswers = local.answers.filter(
+    (answer) =>
+      preserveQuestionIds.has(answer.questionId) &&
+      !serverAnswerIds.has(answer.questionId),
+  );
+  const answers = [...server.answers, ...preservedLocalAnswers];
+  const answeredIds = new Set(
+    answers.map((answer) => answer.questionId),
   );
   const questions = local.questions.map((question) => ({
     ...question,
@@ -153,8 +164,8 @@ export function mergeAttemptFromServer(
     expiresAt: server.expiresAt,
     remainingSeconds: server.remainingSeconds,
     timeExpired: server.timeExpired,
-    answers: server.answers,
-    answeredCount: server.answeredCount,
+    answers,
+    answeredCount: answers.length,
     totalQuestions: server.totalQuestions,
     questionOrder: server.questionOrder,
     questions,
