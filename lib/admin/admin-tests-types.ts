@@ -67,7 +67,8 @@ export type AdminTestsView =
   | "createExternal"
   | "edit"
   | "view"
-  | "workspace";
+  | "workspace"
+  | "draftEditor";
 
 export interface TestsDateFilter {
   startDate: string;

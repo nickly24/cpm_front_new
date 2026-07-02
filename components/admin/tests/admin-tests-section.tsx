@@ -1,6 +1,7 @@
 "use client";
 
 import { AdminExternalTestForm } from "@/components/admin/tests/admin-external-test-form";
+import { AdminTestDraftEditor } from "@/components/admin/tests/admin-test-draft-editor";
 import { AdminTestForm } from "@/components/admin/tests/admin-test-form";
 import { AdminTestWorkspace } from "@/components/admin/tests/admin-test-workspace";
 import styles from "@/components/admin/tests/admin-tests.module.css";
@@ -18,6 +19,12 @@ import {
   isAdminExternalTest,
   patchAdminTestFields,
 } from "@/lib/admin/admin-tests-api";
+import {
+  createAdminTestDraft,
+  createAdminTestDraftFromTest,
+  fetchAdminTestDrafts,
+} from "@/lib/admin/admin-test-drafts-api";
+import type { AdminTestDraft } from "@/lib/admin/admin-test-drafts-types";
 import type {
   AdminTestDetail,
   AdminTestListItem,
@@ -42,6 +49,7 @@ const IMMERSIVE_VIEWS: AdminTestsView[] = [
   "edit",
   "view",
   "workspace",
+  "draftEditor",
 ];
 
 const PAGE_SIZE = 6;
@@ -57,8 +65,10 @@ export function AdminTestsSection() {
   const [directions, setDirections] = useState<Direction[]>([]);
   const [directionName, setDirectionName] = useState("");
   const [tests, setTests] = useState<AdminTestListItem[]>([]);
+  const [drafts, setDrafts] = useState<AdminTestDraft[]>([]);
   const [loadingDirections, setLoadingDirections] = useState(true);
   const [loadingTests, setLoadingTests] = useState(false);
+  const [loadingDrafts, setLoadingDrafts] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState<AdminTestsView>("list");
   const [editingTest, setEditingTest] = useState<AdminTestDetail | null>(null);
@@ -71,6 +81,7 @@ export function AdminTestsSection() {
   const [currentPage, setCurrentPage] = useState(1);
   const [toggleBusy, setToggleBusy] = useState<string | null>(null);
   const [workspaceTestId, setWorkspaceTestId] = useState<string | null>(null);
+  const [editingDraft, setEditingDraft] = useState<AdminTestDraft | null>(null);
   const { setImmersive } = useCabinetChrome();
 
   const loadTests = useCallback(async (direction: string) => {
@@ -92,6 +103,18 @@ export function AdminTestsSection() {
       );
     } finally {
       setLoadingTests(false);
+    }
+  }, []);
+
+  const loadDrafts = useCallback(async () => {
+    setLoadingDrafts(true);
+    try {
+      const data = await fetchAdminTestDrafts("active");
+      setDrafts(Array.isArray(data) ? data : []);
+    } catch {
+      setDrafts([]);
+    } finally {
+      setLoadingDrafts(false);
     }
   }, []);
 
@@ -123,10 +146,14 @@ export function AdminTestsSection() {
     }
 
     loadDirections();
+    const draftTimer = window.setTimeout(() => {
+      loadDrafts();
+    }, 0);
     return () => {
       cancelled = true;
+      window.clearTimeout(draftTimer);
     };
-  }, []);
+  }, [loadDrafts]);
 
   useEffect(() => {
     if (directionName) {
@@ -160,6 +187,34 @@ export function AdminTestsSection() {
   const openWorkspace = (testId: string) => {
     setWorkspaceTestId(testId);
     setView("workspace");
+  };
+
+  const openNewDraft = async () => {
+    try {
+      const draft = await createAdminTestDraft({
+        direction: directionName,
+      });
+      setEditingDraft(draft);
+      setView("draftEditor");
+      await loadDrafts();
+    } catch (err) {
+      window.alert(
+        err instanceof Error ? err.message : "Не удалось создать драфт",
+      );
+    }
+  };
+
+  const openDraftFromTest = async (testId: string) => {
+    try {
+      const draft = await createAdminTestDraftFromTest(testId);
+      setEditingDraft(draft);
+      setView("draftEditor");
+      await loadDrafts();
+    } catch (err) {
+      window.alert(
+        err instanceof Error ? err.message : "Не удалось создать драфт из теста",
+      );
+    }
   };
 
   const openTest = async (testId: string, mode: "edit") => {
@@ -258,6 +313,27 @@ export function AdminTestsSection() {
     );
   }
 
+  if (view === "draftEditor" && editingDraft) {
+    return (
+      <AdminTestDraftEditor
+        draft={editingDraft}
+        directions={directions}
+        onBack={() => {
+          setView("list");
+          setEditingDraft(null);
+          loadDrafts();
+        }}
+        onPublished={(testId) => {
+          setView("list");
+          setEditingDraft(null);
+          loadDrafts();
+          loadTests(directionName);
+          openWorkspace(testId);
+        }}
+      />
+    );
+  }
+
   if (view === "create" || view === "edit" || view === "view") {
     return (
       <AdminTestForm
@@ -310,6 +386,9 @@ export function AdminTestsSection() {
           >
             + Создать тест
           </Button>
+          <Button type="button" variant="secondary" onClick={openNewDraft}>
+            Попробовать новый интерфейс
+          </Button>
           <Button
             type="button"
             variant="ghost"
@@ -322,6 +401,43 @@ export function AdminTestsSection() {
           </Button>
         </div>
       </header>
+
+      <section className={styles.draftsPanel}>
+        <div className={styles.draftsPanelHead}>
+          <div>
+            <h2>Драфты нового редактора</h2>
+            <p>Общие наброски тестов с автосохранением</p>
+          </div>
+          <Button type="button" variant="ghost" size="sm" onClick={loadDrafts}>
+            Обновить
+          </Button>
+        </div>
+        {loadingDrafts ? (
+          <p className={styles.panelHint}>Загрузка драфтов...</p>
+        ) : drafts.length === 0 ? (
+          <p className={styles.panelHint}>Активных драфтов пока нет</p>
+        ) : (
+          <div className={styles.draftsList}>
+            {drafts.map((draft) => (
+              <button
+                key={draft.id}
+                type="button"
+                className={styles.draftItem}
+                onClick={() => {
+                  setEditingDraft(draft);
+                  setView("draftEditor");
+                }}
+              >
+                <strong>{draft.title || "Без названия"}</strong>
+                <span>
+                  {draft.canvas?.questions?.length ?? 0} вопросов ·{" "}
+                  {draft.direction || "направление не выбрано"}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+      </section>
 
       {loadingDirections ? (
         <LoadingState
@@ -549,6 +665,13 @@ export function AdminTestsSection() {
                           onClick={() => openTest(testId, "edit")}
                         >
                           Редактировать
+                        </button>
+                        <button
+                          type="button"
+                          className={styles.actionBtn}
+                          onClick={() => openDraftFromTest(testId)}
+                        >
+                          Драфт в новом редакторе
                         </button>
                         <button
                           type="button"

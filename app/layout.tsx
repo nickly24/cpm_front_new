@@ -1,6 +1,7 @@
 import { Providers } from "@/components/Providers";
 import type { Metadata } from "next";
 import Script from "next/script";
+import "@xyflow/react/dist/style.css";
 import "./globals.css";
 
 export const metadata: Metadata = {

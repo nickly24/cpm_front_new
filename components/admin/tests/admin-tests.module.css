@@ -79,6 +79,65 @@
   background: var(--ds-surface);
 }
 
+.draftsPanel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-4);
+  padding: var(--ds-space-5);
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-lg);
+  background: var(--ds-surface);
+  box-shadow: var(--ds-shadow-sm);
+}
+
+.draftsPanelHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--ds-space-4);
+}
+
+.draftsPanelHead h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.draftsPanelHead p {
+  margin: 4px 0 0;
+  color: var(--ds-text-secondary);
+  font-size: 13px;
+}
+
+.draftsList {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--ds-space-3);
+}
+
+.draftItem {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: var(--ds-space-4);
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-md);
+  background: var(--ds-surface-muted);
+  color: var(--ds-text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.draftItem:hover {
+  border-color: var(--ds-accent);
+}
+
+.draftItem span {
+  color: var(--ds-text-secondary);
+  font-size: 12px;
+}
+
 .searchInput {
   width: 100%;
   max-width: 360px;
