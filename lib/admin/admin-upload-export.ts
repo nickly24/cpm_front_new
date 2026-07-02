@@ -1,4 +1,8 @@
-import type { UserImportReportRow } from "@/lib/admin/admin-upload-types";
+import type {
+  ExternalTestResultImportReportRow,
+  UserImportReport,
+  UserImportReportRow,
+} from "@/lib/admin/admin-upload-types";
 import * as XLSX from "xlsx";
 
 const TEMPLATE_HEADERS = ["ФИО", "Класс", "Школа", "Проктор", "Telegram"];
@@ -114,4 +118,55 @@ export function exportUserImportReportExcel(
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, sheet, "Импорт");
   XLSX.writeFile(workbook, `import_users_job_${jobId}.xlsx`);
+}
+
+function exportExternalTestResultsReportExcel(
+  rows: ExternalTestResultImportReportRow[],
+  jobId: number,
+): void {
+  const header = [
+    "Строка файла",
+    "ФИО из файла",
+    "Студент CPM",
+    "ID студента",
+    "ID теста",
+    "Тест",
+    "Процент",
+    "Верных ответов",
+    "Дата завершения",
+    "Логин",
+    "Статус",
+    "Комментарий",
+  ];
+
+  const body = rows.map((row) => [
+    row.row,
+    row.full_name,
+    row.student_full_name ?? "",
+    row.student_id ?? "",
+    row.test_id ?? "",
+    row.test_name ?? "",
+    row.percent ?? "",
+    row.correct_count ?? "",
+    row.completed_at ?? "",
+    row.login ?? "",
+    row.status === "imported" ? "Загружен" : row.status,
+    row.message ?? "",
+  ]);
+
+  const sheet = XLSX.utils.aoa_to_sheet([header, ...body]);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, sheet, "Результаты");
+  XLSX.writeFile(workbook, `import_external_test_results_job_${jobId}.xlsx`);
+}
+
+export function exportImportReportExcel(report: UserImportReport): void {
+  if (report.import_type === "external_test_results") {
+    exportExternalTestResultsReportExcel(
+      report.rows as ExternalTestResultImportReportRow[],
+      report.job_id,
+    );
+    return;
+  }
+  exportUserImportReportExcel(report.rows as UserImportReportRow[], report.job_id);
 }

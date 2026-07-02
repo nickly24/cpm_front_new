@@ -17,6 +17,11 @@ const STATUS_LABEL: Record<UserImportJobStatus, string> = {
   failed: "Ошибка",
 };
 
+const IMPORT_TYPE_LABEL: Record<string, string> = {
+  users: "Пользователи",
+  external_test_results: "Результаты тестов",
+};
+
 function statusClass(status: UserImportJobStatus): string {
   if (status === "queued") return ratingStyles.statusQueued;
   if (status === "running" || status === "rolling_back") return ratingStyles.statusRunning;
@@ -35,6 +40,10 @@ function formatDateTime(value: string | null | undefined): string {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+function jobTypeLabel(job: UserImportJob): string {
+  return IMPORT_TYPE_LABEL[job.import_type] ?? job.import_type ?? "Импорт";
 }
 
 interface AdminUploadJobsTabProps {
@@ -71,7 +80,9 @@ export function AdminUploadJobsTab({
   }, [onActiveChange]);
 
   useEffect(() => {
-    void load();
+    queueMicrotask(() => {
+      void load();
+    });
   }, [load, refreshToken]);
 
   useEffect(() => {
@@ -112,7 +123,9 @@ export function AdminUploadJobsTab({
         <article key={job.id} className={ratingStyles.jobCard}>
           <div className={ratingStyles.jobHeader}>
             <div>
-              <h3 className={ratingStyles.jobTitle}>Импорт #{job.id}</h3>
+              <h3 className={ratingStyles.jobTitle}>
+                Импорт #{job.id} · {jobTypeLabel(job)}
+              </h3>
               <p className={ratingStyles.jobMeta}>
                 {job.created_by_name ? job.created_by_name : "Администратор"}
               </p>
@@ -145,7 +158,10 @@ export function AdminUploadJobsTab({
             ) : null}
             {job.status === "completed" || job.status === "failed" ? (
               <>
-                <span>Создано: {job.successful}</span>
+                <span>
+                  {job.import_type === "external_test_results" ? "Загружено" : "Создано"}:{" "}
+                  {job.successful}
+                </span>
                 {job.skipped > 0 ? <span>Пропущено: {job.skipped}</span> : null}
               </>
             ) : null}
@@ -153,7 +169,7 @@ export function AdminUploadJobsTab({
 
           {job.message ? <p className={ratingStyles.jobMessage}>{job.message}</p> : null}
 
-          {job.status === "completed" && job.has_report ? (
+          {(job.status === "completed" || job.status === "failed") && job.has_report ? (
             <div className={styles.jobCardActions}>
               <Button type="button" size="sm" onClick={() => onOpenReport?.(job.id)}>
                 Открыть отчёт

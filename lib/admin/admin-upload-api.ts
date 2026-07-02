@@ -1,5 +1,8 @@
 import { apiFormRequest, apiRequest } from "@/lib/api/client";
 import type {
+  ExternalTestOption,
+  ExternalTestResultsImportPreview,
+  ExternalTestResultsImportSession,
   UserImportJob,
   UserImportPreview,
   UserImportReport,
@@ -64,6 +67,51 @@ export async function fetchUserImportReport(jobId: number): Promise<{
   report: UserImportReport;
 }> {
   return apiRequest(`/api/user-import/jobs/${jobId}/report`);
+}
+
+export async function fetchExternalTests(): Promise<ExternalTestOption[]> {
+  return apiRequest("/external-tests");
+}
+
+export async function parseExternalTestResultsFile(
+  file: File,
+  testId: string | number,
+): Promise<{
+  status: boolean;
+  session_id: number;
+  preview: ExternalTestResultsImportPreview;
+}> {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("test_id", String(testId));
+  return apiFormRequest("/api/external-test-results-import/parse", formData);
+}
+
+export async function fetchExternalTestResultsSession(
+  sessionId: number,
+): Promise<ExternalTestResultsImportSession> {
+  return apiRequest(`/api/external-test-results-import/sessions/${sessionId}`);
+}
+
+export async function updateExternalTestResultsSession(
+  sessionId: number,
+  preview: ExternalTestResultsImportPreview,
+): Promise<ExternalTestResultsImportSession> {
+  return apiRequest(`/api/external-test-results-import/sessions/${sessionId}`, {
+    method: "PUT",
+    body: JSON.stringify({ preview }),
+  });
+}
+
+export async function commitExternalTestResultsSession(sessionId: number): Promise<{
+  status: boolean;
+  message?: string;
+  job: UserImportJob;
+}> {
+  return apiRequest(`/api/external-test-results-import/sessions/${sessionId}/commit`, {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
 }
 
 export async function previewTestImport(

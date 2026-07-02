@@ -40,12 +40,29 @@ export const ADMIN_UPLOAD_TYPES: AdminUploadType[] = [
       "Создайте тест только после успешной валидации.",
     ],
   },
+  {
+    id: "externalResults",
+    label: "Результаты тестов",
+    description:
+      "Импорт результатов внешних тестов из Excel: выбор теста, сопоставление учеников и запись процента.",
+    acceptedLabel: ".xlsx",
+    status: "ready",
+    instructions: [
+      "Выберите внешний тест CPM-LMS, к которому относятся результаты.",
+      "Загрузите Excel с колонками: ФИО и Процент правильных ответов (%).",
+      "Дополнительные колонки попадут в отчёт: Количество правильных ответов, Дата завершения, Логин, IP.",
+      "Дубли ФИО, неизвестные ученики и уже существующие результаты блокируют запуск.",
+      "Запустите загрузку только после preview без ошибок.",
+    ],
+  },
 ];
 
 export const ADMIN_UPLOAD_ACCEPT =
   ".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
 export const ADMIN_TEST_IMPORT_ACCEPT = ".json,application/json";
+
+export const ADMIN_EXTERNAL_TEST_RESULTS_ACCEPT = ADMIN_UPLOAD_ACCEPT;
 
 export type UserImportStudentAction = "create" | "skip" | "error";
 
@@ -127,6 +144,64 @@ export interface UserImportSession {
   expires_at?: string | null;
 }
 
+export interface ExternalTestOption {
+  id: string;
+  numeric_id?: number;
+  name: string;
+  direction_id?: string | number | null;
+  direction_name?: string | null;
+  date?: string | null;
+}
+
+export type ExternalTestResultImportAction = "import" | "error";
+
+export interface ExternalTestResultImportRow {
+  row: number;
+  source_number?: string | number | null;
+  platform_user?: string | null;
+  ip?: string | null;
+  completed_at?: string | null;
+  time_spent?: string | null;
+  login?: string | null;
+  full_name: string;
+  person_key?: string | null;
+  correct_count?: number | string | null;
+  percent?: number | string | null;
+  student_id?: number | null;
+  student_full_name?: string | null;
+  action: ExternalTestResultImportAction;
+  errors: string[];
+}
+
+export interface ExternalTestResultsImportSummary {
+  total_rows: number;
+  import_rows: number;
+  row_errors: number;
+  matched_students: number;
+  duplicate_rows: number;
+  existing_results: number;
+}
+
+export interface ExternalTestResultsImportPreview {
+  test_id?: number | null;
+  test_name?: string | null;
+  test_direction_name?: string | null;
+  source_sheet?: string | null;
+  header_row?: number | null;
+  rows: ExternalTestResultImportRow[];
+  summary: ExternalTestResultsImportSummary;
+  errors?: string[];
+}
+
+export interface ExternalTestResultsImportSession {
+  session_id: number;
+  import_type: string;
+  source_filename?: string | null;
+  preview: ExternalTestResultsImportPreview;
+  created_at?: string | null;
+  expires_at?: string | null;
+}
+
 export type UserImportJobStatus =
   | "queued"
   | "running"
@@ -151,7 +226,7 @@ export interface UserImportJob {
   message?: string | null;
   progress_percent: number;
   has_report: boolean;
-  summary?: UserImportPreviewSummary | null;
+  summary?: UserImportPreviewSummary | ExternalTestResultsImportSummary | null;
 }
 
 export type UserImportReportRowStatus = "created" | "skipped";
@@ -175,16 +250,34 @@ export interface UserImportReportRow {
 export interface UserImportReport {
   job_id: number;
   status: string;
-  summary?: UserImportPreviewSummary | null;
+  import_type?: string | null;
+  summary?: UserImportPreviewSummary | ExternalTestResultsImportSummary | null;
   successful: number;
   skipped: number;
   failed: number;
-  rows: UserImportReportRow[];
+  rows: UserImportReportRow[] | ExternalTestResultImportReportRow[];
 }
 
 export type AdminUploadTab = "upload" | "jobs";
 
-export type AdminUploadTypeId = "users" | "tests";
+export type AdminUploadTypeId = "users" | "tests" | "externalResults";
+
+export type ExternalTestResultReportStatus = "imported" | "error" | string;
+
+export interface ExternalTestResultImportReportRow {
+  row: number;
+  full_name: string;
+  student_id?: number | null;
+  student_full_name?: string | null;
+  test_id?: number | string | null;
+  test_name?: string | null;
+  percent?: number | string | null;
+  correct_count?: number | string | null;
+  completed_at?: string | null;
+  login?: string | null;
+  status: ExternalTestResultReportStatus;
+  message?: string | null;
+}
 
 export interface TestImportError {
   path: string;

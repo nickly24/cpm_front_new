@@ -6,8 +6,12 @@ import testStyles from "@/components/admin/tests/admin-tests.module.css";
 import { Button } from "@/components/ui/button";
 import { LoadingState } from "@/components/ui/loading-state";
 import { fetchUserImportReport } from "@/lib/admin/admin-upload-api";
-import { exportUserImportReportExcel } from "@/lib/admin/admin-upload-export";
-import type { UserImportReport, UserImportReportRow } from "@/lib/admin/admin-upload-types";
+import { exportImportReportExcel } from "@/lib/admin/admin-upload-export";
+import type {
+  ExternalTestResultImportReportRow,
+  UserImportReport,
+  UserImportReportRow,
+} from "@/lib/admin/admin-upload-types";
 import { useCabinetChrome } from "@/contexts/cabinet-chrome-context";
 import { ArrowLeft, Download } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -25,6 +29,23 @@ function statusLabel(row: UserImportReportRow): string {
     return "Пропущен";
   }
   return row.status;
+}
+
+function externalResultStatusLabel(row: ExternalTestResultImportReportRow): string {
+  if (row.status === "imported") {
+    return "Загружен";
+  }
+  if (row.status === "error") {
+    return "Ошибка";
+  }
+  return row.status;
+}
+
+function rowText(row: UserImportReportRow | ExternalTestResultImportReportRow): string {
+  return Object.values(row)
+    .filter((value) => value !== null && value !== undefined)
+    .join(" ")
+    .toLowerCase();
 }
 
 export function AdminUploadReportWorkspace({
@@ -68,15 +89,7 @@ export function AdminUploadReportWorkspace({
     if (!query) {
       return rows;
     }
-    return rows.filter((row) => {
-      return (
-        row.full_name.toLowerCase().includes(query) ||
-        (row.login ?? "").toLowerCase().includes(query) ||
-        (row.group_name ?? "").toLowerCase().includes(query) ||
-        (row.proctor_name ?? "").toLowerCase().includes(query) ||
-        (row.tg_name ?? "").toLowerCase().includes(query)
-      );
-    });
+    return rows.filter((row) => rowText(row).includes(query));
   }, [report?.rows, search]);
 
   if (loading) {
@@ -96,6 +109,10 @@ export function AdminUploadReportWorkspace({
     );
   }
 
+  const isExternalResults = report.import_type === "external_test_results";
+  const userRows = filteredRows as UserImportReportRow[];
+  const externalRows = filteredRows as ExternalTestResultImportReportRow[];
+
   return (
     <div className={styles.reportPage}>
       <header className={reportStyles.excelRibbon} aria-label="Отчёт импорта">
@@ -105,9 +122,13 @@ export function AdminUploadReportWorkspace({
             <div className={reportStyles.excelZoneInfoRow}>
               <div className={reportStyles.excelZoneBody}>
                 <div className={reportStyles.excelDocBlock}>
-                  <p className={reportStyles.excelDocTitle}>Импорт пользователей #{jobId}</p>
+                  <p className={reportStyles.excelDocTitle}>
+                    {isExternalResults ? "Импорт результатов тестов" : "Импорт пользователей"} #{jobId}
+                  </p>
                   <p className={reportStyles.excelDocPeriod}>
-                    Создано: {report.successful} · Пропущено: {report.skipped}
+                    {isExternalResults ? "Загружено" : "Создано"}: {report.successful}
+                    {report.skipped > 0 ? ` · Пропущено: ${report.skipped}` : ""}
+                    {report.failed > 0 ? ` · Ошибок: ${report.failed}` : ""}
                   </p>
                 </div>
               </div>
@@ -123,7 +144,7 @@ export function AdminUploadReportWorkspace({
               </Button>
               <Button
                 type="button"
-                onClick={() => exportUserImportReportExcel(report.rows, jobId)}
+                onClick={() => exportImportReportExcel(report)}
               >
                 <Download size={16} aria-hidden />
                 Excel
@@ -137,7 +158,11 @@ export function AdminUploadReportWorkspace({
         <input
           type="search"
           className={testStyles.searchInput}
-          placeholder="Поиск по ФИО, логину, группе…"
+          placeholder={
+            isExternalResults
+              ? "Поиск по ФИО, студенту, тесту…"
+              : "Поиск по ФИО, логину, группе…"
+          }
           value={search}
           onChange={(event) => setSearch(event.target.value)}
         />
@@ -146,21 +171,59 @@ export function AdminUploadReportWorkspace({
       <div className={styles.reportTableWrap}>
         <table className={styles.reportTable}>
           <thead>
-            <tr>
-              <th>Строка</th>
-              <th>ФИО</th>
-              <th>Класс</th>
-              <th>Школа</th>
-              <th>Telegram</th>
-              <th>Проктор</th>
-              <th>Группа</th>
-              <th>Логин</th>
-              <th>Пароль</th>
-              <th>Статус</th>
-            </tr>
+            {isExternalResults ? (
+              <tr>
+                <th>Строка</th>
+                <th>ФИО из файла</th>
+                <th>Студент CPM</th>
+                <th>ID студента</th>
+                <th>ID теста</th>
+                <th>Тест</th>
+                <th>Процент</th>
+                <th>Верных</th>
+                <th>Дата завершения</th>
+                <th>Логин</th>
+                <th>Статус</th>
+                <th>Комментарий</th>
+              </tr>
+            ) : (
+              <tr>
+                <th>Строка</th>
+                <th>ФИО</th>
+                <th>Класс</th>
+                <th>Школа</th>
+                <th>Telegram</th>
+                <th>Проктор</th>
+                <th>Группа</th>
+                <th>Логин</th>
+                <th>Пароль</th>
+                <th>Статус</th>
+              </tr>
+            )}
           </thead>
           <tbody>
-            {filteredRows.map((row) => (
+            {isExternalResults ? (
+              externalRows.map((row) => (
+                <tr
+                  key={`${row.row}-${row.full_name}`}
+                  className={row.status === "error" ? styles.previewRowError : undefined}
+                >
+                  <td>{row.row}</td>
+                  <td>{row.full_name}</td>
+                  <td>{row.student_full_name ?? "—"}</td>
+                  <td>{row.student_id ?? "—"}</td>
+                  <td>{row.test_id ?? "—"}</td>
+                  <td>{row.test_name ?? "—"}</td>
+                  <td>{row.percent ?? "—"}</td>
+                  <td>{row.correct_count ?? "—"}</td>
+                  <td>{row.completed_at ?? "—"}</td>
+                  <td>{row.login ?? "—"}</td>
+                  <td>{externalResultStatusLabel(row)}</td>
+                  <td>{row.message ?? "—"}</td>
+                </tr>
+              ))
+            ) : (
+            userRows.map((row) => (
               <tr
                 key={`${row.row}-${row.full_name}`}
                 className={row.status === "skipped" ? styles.previewRowSkip : undefined}
@@ -176,7 +239,8 @@ export function AdminUploadReportWorkspace({
                 <td>{row.password ?? "—"}</td>
                 <td>{statusLabel(row)}</td>
               </tr>
-            ))}
+            ))
+            )}
           </tbody>
         </table>
       </div>

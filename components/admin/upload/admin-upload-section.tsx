@@ -3,6 +3,7 @@
 import { AdminUploadJobsTab } from "@/components/admin/upload/admin-upload-jobs-tab";
 import { AdminUploadPreview } from "@/components/admin/upload/admin-upload-preview";
 import { AdminUploadReportWorkspace } from "@/components/admin/upload/admin-upload-report-workspace";
+import { AdminExternalResultsUploadPanel } from "@/components/admin/upload/admin-external-results-upload-panel";
 import { AdminTestUploadPanel } from "@/components/admin/upload/admin-test-upload-panel";
 import styles from "@/components/admin/upload/admin-upload.module.css";
 import testStyles from "@/components/admin/tests/admin-tests.module.css";
@@ -60,6 +61,7 @@ export function AdminUploadSection() {
   const [reportJobId, setReportJobId] = useState<number | null>(null);
   const saveTimerRef = useRef<number | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const showJournalTabs = uploadTypeId === "users" || uploadTypeId === "externalResults";
 
   const resetUpload = () => {
     setFile(null);
@@ -202,7 +204,7 @@ export function AdminUploadSection() {
         <div>
           <h1 className={styles.pageTitle}>Загрузка</h1>
           <p className={styles.hint}>
-            Массовый импорт данных: пользователи из Excel и внутренние тесты из JSON.
+            Массовый импорт данных: пользователи из Excel, внутренние тесты из JSON и результаты внешних тестов.
           </p>
         </div>
       </header>
@@ -232,7 +234,7 @@ export function AdminUploadSection() {
         ))}
       </div>
 
-      {uploadTypeId === "users" ? (
+      {showJournalTabs ? (
         <div className={styles.sectionTabs}>
           {TABS.map((item) => (
             <button
@@ -254,6 +256,22 @@ export function AdminUploadSection() {
 
       {uploadTypeId === "tests" ? (
         <AdminTestUploadPanel />
+      ) : uploadTypeId === "externalResults" ? (
+        tab === "jobs" ? (
+          <AdminUploadJobsTab
+            refreshToken={jobsRefreshToken}
+            onActiveChange={setHasActiveJob}
+            onOpenReport={(jobId) => setReportJobId(jobId)}
+          />
+        ) : (
+          <AdminExternalResultsUploadPanel
+            onCommitted={() => {
+              setJobsRefreshToken((value) => value + 1);
+              setTab("jobs");
+              setHasActiveJob(true);
+            }}
+          />
+        )
       ) : tab === "jobs" ? (
         <AdminUploadJobsTab
           refreshToken={jobsRefreshToken}
