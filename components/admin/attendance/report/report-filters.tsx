@@ -4,6 +4,7 @@ import attendanceStyles from "@/components/admin/attendance/admin-attendance.mod
 import reportStyles from "@/components/admin/attendance/report/report.module.css";
 import { OptionSelect } from "@/components/ui/option-select";
 import { uniqueFilterOptions } from "@/lib/attendance/attendance-report-utils";
+import { REPORT_GROUP_FILTER_EXCEPT_PIP_OPTION } from "@/lib/reports/report-group-filter";
 import type { AttendanceReportStudent } from "@/lib/attendance/attendance-report-types";
 import { Filter, GraduationCap, School, Users } from "lucide-react";
 import { useMemo } from "react";
@@ -69,6 +70,10 @@ export function ReportFilters({
   const groupOptions = useMemo(
     () => [
       ALL_OPTION,
+      {
+        ...REPORT_GROUP_FILTER_EXCEPT_PIP_OPTION,
+        icon: Users,
+      },
       ...groups.map((item) => ({
         value: item.value,
         label: item.label,

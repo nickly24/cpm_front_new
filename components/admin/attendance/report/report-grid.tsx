@@ -14,6 +14,7 @@ import type {
   ReportTool,
 } from "@/lib/attendance/attendance-report-types";
 import { cellMapKey } from "@/lib/attendance/attendance-report-utils";
+import { buildReportGroupFilterOptions } from "@/lib/reports/report-group-filter";
 import { WEEKDAY_SHORT } from "@/lib/attendance/attendance-utils";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { ArrowDown, ArrowUp, ArrowUpDown, X } from "lucide-react";
@@ -151,10 +152,7 @@ export function ReportGrid({
     { value: "all", label: "Все" },
     ...(filterOptions?.schools ?? []),
   ];
-  const groupOptions = [
-    { value: "all", label: "Все" },
-    ...(filterOptions?.groups ?? []),
-  ];
+  const groupOptions = buildReportGroupFilterOptions(filterOptions?.groups ?? []);
 
   if (classDays.length === 0) {
     return (

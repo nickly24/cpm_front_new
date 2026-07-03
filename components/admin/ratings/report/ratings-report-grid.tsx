@@ -13,6 +13,7 @@ import {
   formatScore,
   valueMapKey,
 } from "@/lib/admin/ratings-report-utils";
+import { buildReportGroupFilterOptions } from "@/lib/reports/report-group-filter";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { ArrowDown, ArrowUp, ArrowUpDown, X } from "lucide-react";
 import { useMemo, useRef } from "react";
@@ -168,10 +169,7 @@ export function RatingsReportGrid({
     { value: "all", label: "Все" },
     ...(filterOptions?.schools ?? []),
   ];
-  const groupOptions = [
-    { value: "all", label: "Все" },
-    ...(filterOptions?.groups ?? []),
-  ];
+  const groupOptions = buildReportGroupFilterOptions(filterOptions?.groups ?? []);
 
   const fixedColSpan = 4;
   const colSpan = fixedColSpan + columns.length;

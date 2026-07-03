@@ -590,6 +590,8 @@
 
 .formTopBar {
   display: flex;
+  gap: var(--ds-space-3);
+  justify-content: flex-end;
 }
 
 .backBtn {

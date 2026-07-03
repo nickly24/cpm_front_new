@@ -100,12 +100,13 @@ export function AdminHomeworkForm({
         <h2 className={styles.formSectionTitle}>{title}</h2>
       )}
 
-      {error ? <p className={styles.errorText}>{error}</p> : null}
+      <div className={embedded ? undefined : styles.fullscreenBody}>
+        {error ? <p className={styles.errorText}>{error}</p> : null}
 
-      <form
-        className={embedded ? styles.formEmbedded : styles.formWrap}
-        onSubmit={handleSubmit}
-      >
+        <form
+          className={embedded ? styles.formEmbedded : styles.form}
+          onSubmit={handleSubmit}
+        >
         <section className={styles.formSection}>
           <h3 className={styles.formSectionTitle}>Параметры</h3>
 
@@ -185,7 +186,8 @@ export function AdminHomeworkForm({
             </Button>
           </div>
         ) : null}
-      </form>
+        </form>
+      </div>
     </div>
   );
 }

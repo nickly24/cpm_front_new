@@ -6,6 +6,7 @@ import type {
   ReportSortDir,
   ReportSortKey,
 } from "./attendance-report-types";
+import { matchesReportGroupFilter } from "@/lib/reports/report-group-filter";
 
 const PALETTE_CLASS: Record<
   ReturnType<typeof getAttendancePalette>,
@@ -122,10 +123,7 @@ export function filterReportStudents(
     ) {
       return false;
     }
-    if (
-      groupFilter !== "all" &&
-      String(student.group_id ?? "") !== groupFilter
-    ) {
+    if (!matchesReportGroupFilter(student, groupFilter)) {
       return false;
     }
     return true;

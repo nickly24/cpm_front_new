@@ -3,11 +3,18 @@ import type {
   AdminHomeworkStatusFilter,
 } from "@/lib/admin/admin-homework-types";
 
+export function defaultHomeworkDeadlineInputValue(): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  return `${year}-${month}-01`;
+}
+
 export function emptyAdminHomeworkForm() {
   return {
     name: "",
     type: "ДЗНВ" as const,
-    deadline: "",
+    deadline: defaultHomeworkDeadlineInputValue(),
     published: true,
   };
 }

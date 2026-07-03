@@ -4,6 +4,7 @@ import type {
   RatingsReportStudent,
   RatingsReportValue,
 } from "@/lib/admin/ratings-report-types";
+import { matchesReportGroupFilter } from "@/lib/reports/report-group-filter";
 
 export function valueMapKey(studentId: number, columnKey: string): string {
   return `${studentId}:${columnKey}`;
@@ -74,10 +75,7 @@ export function filterReportStudents(
     ) {
       return false;
     }
-    if (
-      groupFilter !== "all" &&
-      String(student.group_id ?? student.group_name ?? "") !== groupFilter
-    ) {
+    if (!matchesReportGroupFilter(student, groupFilter)) {
       return false;
     }
     if (!query) {

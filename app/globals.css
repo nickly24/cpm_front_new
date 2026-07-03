@@ -15,6 +15,47 @@
   --ds-surface: #ffffff;
   --ds-surface-muted: #f8f9fc;
   --ds-border: #e5e7eb;
+  --ds-report-grid-line-width: 2px;
+  --ds-report-grid-line-color: #a8b4c4;
+  --ds-report-cell-empty: #f4f5f8;
+  --ds-report-summary-bg: #f8fafc;
+  --ds-report-ribbon-bg: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+  --ds-report-ribbon-border: #cbd5e1;
+  --ds-report-ribbon-divider: #cbd5e1;
+  --ds-report-ribbon-zone-border: #e2e8f0;
+  --ds-report-ribbon-inset: rgba(255, 255, 255, 0.8);
+  --ds-report-chip-border: rgba(15, 23, 42, 0.08);
+  --ds-report-score-zero-bg: #f8fafc;
+  --ds-report-score-zero-fg: #94a3b8;
+  --ds-report-score-positive-bg: #f0fdf4;
+  --ds-report-score-positive-fg: #166534;
+  --ds-report-score-summary-bg: #fff7ed;
+  --ds-report-score-summary-fg: #9a3412;
+  --ds-report-score-final-bg: #ffedd5;
+  --ds-report-score-final-fg: #c2410c;
+  --ds-report-section-hw-bg: #eff6ff;
+  --ds-report-section-hw-fg: #1d4ed8;
+  --ds-report-section-exam-bg: #f5f3ff;
+  --ds-report-section-exam-fg: #6d28d9;
+  --ds-report-section-test-bg: #ecfdf5;
+  --ds-report-section-test-fg: #047857;
+  --ds-report-section-summary-bg: #fff7ed;
+  --ds-report-section-summary-fg: #c2410c;
+  --ds-report-section-muted-bg: #f8fafc;
+  --ds-report-section-muted-fg: #64748b;
+  --ds-report-tone-empty-bg: #fafafa;
+  --ds-report-tone-empty-fg: #cbd5e1;
+  --ds-report-tone-pending-bg: #f8fafc;
+  --ds-report-tone-pending-fg: #94a3b8;
+  --ds-report-tone-progress-bg: #fffbeb;
+  --ds-report-tone-progress-fg: #ca8a04;
+  --ds-report-tone-overdue-bg: #fef2f2;
+  --ds-report-tone-overdue-fg: #dc2626;
+  --ds-report-tone-done-bg: #f0fdf4;
+  --ds-report-tone-done-fg: #166534;
+  --ds-report-tone-failed-bg: #fef2f2;
+  --ds-report-tone-failed-fg: #b91c1c;
+  --ds-report-sticky-shadow: 4px 0 8px rgba(15, 23, 42, 0.08);
 
   --ds-text: #1a1d26;
   --ds-text-secondary: #6b7280;
@@ -74,6 +115,46 @@ html.dark {
   --ds-surface-muted: #2c2d2e;
   --ds-surface-hover: #363738;
   --ds-border: rgba(255, 255, 255, 0.06);
+  --ds-report-grid-line-color: rgba(255, 255, 255, 0.22);
+  --ds-report-cell-empty: #2a2b2d;
+  --ds-report-summary-bg: #2c2d2e;
+  --ds-report-ribbon-bg: linear-gradient(180deg, #2c2d2e 0%, #232425 100%);
+  --ds-report-ribbon-border: rgba(255, 255, 255, 0.12);
+  --ds-report-ribbon-divider: rgba(255, 255, 255, 0.1);
+  --ds-report-ribbon-zone-border: rgba(255, 255, 255, 0.08);
+  --ds-report-ribbon-inset: rgba(255, 255, 255, 0.04);
+  --ds-report-chip-border: rgba(255, 255, 255, 0.1);
+  --ds-report-score-zero-bg: #2a2b2d;
+  --ds-report-score-zero-fg: #76787a;
+  --ds-report-score-positive-bg: rgba(34, 197, 94, 0.14);
+  --ds-report-score-positive-fg: #86efac;
+  --ds-report-score-summary-bg: rgba(251, 146, 60, 0.14);
+  --ds-report-score-summary-fg: #fdba74;
+  --ds-report-score-final-bg: rgba(249, 115, 22, 0.18);
+  --ds-report-score-final-fg: #fb923c;
+  --ds-report-section-hw-bg: rgba(59, 130, 246, 0.16);
+  --ds-report-section-hw-fg: #93c5fd;
+  --ds-report-section-exam-bg: rgba(139, 92, 246, 0.16);
+  --ds-report-section-exam-fg: #c4b5fd;
+  --ds-report-section-test-bg: rgba(34, 197, 94, 0.14);
+  --ds-report-section-test-fg: #86efac;
+  --ds-report-section-summary-bg: rgba(249, 115, 22, 0.14);
+  --ds-report-section-summary-fg: #fdba74;
+  --ds-report-section-muted-bg: #2c2d2e;
+  --ds-report-section-muted-fg: #939393;
+  --ds-report-tone-empty-bg: #2a2b2d;
+  --ds-report-tone-empty-fg: #5c5e60;
+  --ds-report-tone-pending-bg: #2c2d2e;
+  --ds-report-tone-pending-fg: #76787a;
+  --ds-report-tone-progress-bg: rgba(234, 179, 8, 0.14);
+  --ds-report-tone-progress-fg: #facc15;
+  --ds-report-tone-overdue-bg: rgba(239, 68, 68, 0.14);
+  --ds-report-tone-overdue-fg: #f87171;
+  --ds-report-tone-done-bg: rgba(34, 197, 94, 0.14);
+  --ds-report-tone-done-fg: #86efac;
+  --ds-report-tone-failed-bg: rgba(239, 68, 68, 0.16);
+  --ds-report-tone-failed-fg: #fca5a5;
+  --ds-report-sticky-shadow: 4px 0 12px rgba(0, 0, 0, 0.45);
 
   --ds-text: #ffffff;
   --ds-text-secondary: #939393;
@@ -416,15 +497,25 @@ input {
 
 .cabinet-layout[data-immersive="true"] {
   --sidebar-current-width: 0px;
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .cabinet-layout[data-immersive="true"] .cabinet-main {
   margin-left: 0;
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .cabinet-layout[data-immersive="true"] .cabinet-content {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
   padding: 0;
-  min-height: 100dvh;
+  overflow: hidden;
 }
 
 .cabinet-sidebar {
