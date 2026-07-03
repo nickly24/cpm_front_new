@@ -1,11 +1,14 @@
 "use client";
 
+import { AdminExamDeleteDialog } from "@/components/admin/exams/admin-exam-delete-dialog";
+import { AdminExamsBulkDeleteDialog } from "@/components/admin/exams/admin-exams-bulk-delete-dialog";
 import { AdminFullscreenBack } from "@/components/admin/admin-fullscreen-back";
 import examStyles from "@/components/admin/exams/admin-exams.module.css";
 import { AdminListPaginationBar } from "@/components/admin/tests/admin-list-pagination";
 import styles from "@/components/admin/tests/admin-tests.module.css";
 import { LoadingState } from "@/components/ui/loading-state";
 import {
+  deleteExam,
   fetchExamSessionsByExamPaginated,
   fetchExamsPaginated,
 } from "@/lib/exams/exams-api";
@@ -22,7 +25,8 @@ import {
   getExamGradeLabel,
 } from "@/lib/exams/exams-utils";
 import { useDebouncedValue } from "@/lib/hooks/use-debounced-value";
-import { useCallback, useEffect, useState } from "react";
+import { ListChecks, Trash2 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 const EXAMS_PAGE_SIZE = 20;
 const SESSIONS_PAGE_SIZE = 25;
@@ -130,6 +134,22 @@ export function AdminExamsSection() {
   const [selectedSession, setSelectedSession] = useState<ExamSession | null>(
     null,
   );
+  const [deleteTarget, setDeleteTarget] = useState<Exam | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedExamsById, setSelectedExamsById] = useState<Record<number, Exam>>(
+    {},
+  );
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [bulkDeleteError, setBulkDeleteError] = useState<string | null>(null);
+
+  const selectedExams = useMemo(
+    () => Object.values(selectedExamsById),
+    [selectedExamsById],
+  );
+  const selectedCount = selectedExams.length;
 
   const loadExams = useCallback(async () => {
     setExamsLoading(true);
@@ -213,6 +233,7 @@ export function AdminExamsSection() {
 
   useEffect(() => {
     setExamPage(1);
+    setSelectedExamsById({});
   }, [debouncedExamSearch, examSort]);
 
   useEffect(() => {
@@ -234,6 +255,182 @@ export function AdminExamsSection() {
     setSessionPagination(EMPTY_PAGINATION);
   };
 
+  const openDeleteDialog = (exam: Exam) => {
+    setDeleteError(null);
+    setDeleteTarget(exam);
+  };
+
+  const closeDeleteDialog = () => {
+    if (deleting) {
+      return;
+    }
+    setDeleteTarget(null);
+    setDeleteError(null);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteTarget) {
+      return;
+    }
+
+    setDeleting(true);
+    setDeleteError(null);
+
+    try {
+      const res = await deleteExam(deleteTarget.id);
+      const wasViewingDeletedExam = selectedExam?.id === deleteTarget.id;
+      setDeleteTarget(null);
+      setSelectedExamsById((prev) => {
+        if (!prev[deleteTarget.id]) {
+          return prev;
+        }
+        const next = { ...prev };
+        delete next[deleteTarget.id];
+        return next;
+      });
+      if (wasViewingDeletedExam) {
+        handleBackToExams();
+      }
+      await loadExams();
+      window.alert(`Экзамен удалён. Сессий: ${res.sessionsDeleted ?? 0}`);
+    } catch (err) {
+      setDeleteError(
+        err instanceof Error ? err.message : "Ошибка при удалении",
+      );
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const toggleSelectionMode = () => {
+    setSelectionMode((current) => {
+      if (current) {
+        setSelectedExamsById({});
+        setBulkDeleteOpen(false);
+        setBulkDeleteError(null);
+      }
+      return !current;
+    });
+  };
+
+  const isExamSelected = (examId: number) => Boolean(selectedExamsById[examId]);
+
+  const toggleExamSelection = (exam: Exam) => {
+    setSelectedExamsById((prev) => {
+      const next = { ...prev };
+      if (next[exam.id]) {
+        delete next[exam.id];
+      } else {
+        next[exam.id] = exam;
+      }
+      return next;
+    });
+  };
+
+  const allOnPageSelected =
+    exams.length > 0 && exams.every((exam) => isExamSelected(exam.id));
+
+  const toggleAllOnPage = () => {
+    setSelectedExamsById((prev) => {
+      const next = { ...prev };
+      if (allOnPageSelected) {
+        for (const exam of exams) {
+          delete next[exam.id];
+        }
+      } else {
+        for (const exam of exams) {
+          next[exam.id] = exam;
+        }
+      }
+      return next;
+    });
+  };
+
+  const clearSelection = () => {
+    setSelectedExamsById({});
+  };
+
+  const openBulkDeleteDialog = () => {
+    if (selectedCount === 0) {
+      return;
+    }
+    setBulkDeleteError(null);
+    setBulkDeleteOpen(true);
+  };
+
+  const closeBulkDeleteDialog = () => {
+    if (bulkDeleting) {
+      return;
+    }
+    setBulkDeleteOpen(false);
+    setBulkDeleteError(null);
+  };
+
+  const handleBulkDeleteConfirm = async () => {
+    if (selectedExams.length === 0) {
+      return;
+    }
+
+    setBulkDeleting(true);
+    setBulkDeleteError(null);
+
+    try {
+      let totalSessions = 0;
+      const deletedCount = selectedExams.length;
+      for (const exam of selectedExams) {
+        const res = await deleteExam(exam.id);
+        totalSessions += res.sessionsDeleted ?? 0;
+      }
+
+      setBulkDeleteOpen(false);
+      setSelectedExamsById({});
+      setSelectionMode(false);
+      await loadExams();
+      window.alert(
+        `Удалено экзаменов: ${deletedCount}. Сессий: ${totalSessions}`,
+      );
+    } catch (err) {
+      setBulkDeleteError(
+        err instanceof Error ? err.message : "Ошибка при удалении",
+      );
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
+
+  const handleExamCardClick = (exam: Exam) => {
+    if (selectionMode) {
+      toggleExamSelection(exam);
+      return;
+    }
+    handleSelectExam(exam);
+  };
+
+  const deleteDialog = deleteTarget ? (
+    <AdminExamDeleteDialog
+      exam={deleteTarget}
+      deleting={deleting}
+      deleteError={deleteError}
+      onCancel={closeDeleteDialog}
+      onConfirm={() => {
+        void handleDeleteConfirm();
+      }}
+    />
+  ) : null;
+
+  const bulkDeleteDialog =
+    bulkDeleteOpen && selectedExams.length > 0 ? (
+      <AdminExamsBulkDeleteDialog
+        exams={selectedExams}
+        deleting={bulkDeleting}
+        deleteError={bulkDeleteError}
+        onCancel={closeBulkDeleteDialog}
+        onConfirm={() => {
+          void handleBulkDeleteConfirm();
+        }}
+      />
+    ) : null;
+
   if (selectedSession) {
     return (
       <ExamSessionDetail
@@ -246,6 +443,7 @@ export function AdminExamsSection() {
   if (selectedExam) {
     return (
       <div className={styles.page}>
+        {deleteDialog}
         <AdminFullscreenBack onBack={handleBackToExams} label="К списку экзаменов" />
 
         <header className={styles.pageHeader}>
@@ -255,6 +453,16 @@ export function AdminExamsSection() {
               {formatExamDate(selectedExam.date)} · сессий:{" "}
               {sessionPagination.total || selectedExam.sessions_count || 0}
             </p>
+          </div>
+          <div className={examStyles.examHeaderActions}>
+            <button
+              type="button"
+              className={examStyles.examDeleteBtn}
+              onClick={() => openDeleteDialog(selectedExam)}
+            >
+              <Trash2 size={14} />
+              Удалить экзамен
+            </button>
           </div>
         </header>
 
@@ -346,6 +554,8 @@ export function AdminExamsSection() {
 
   return (
     <div className={styles.page}>
+      {deleteDialog}
+      {bulkDeleteDialog}
       <header className={styles.pageHeader}>
         <div>
           <h1 className={styles.pageTitle}>Экзамены</h1>
@@ -353,7 +563,57 @@ export function AdminExamsSection() {
             Выберите экзамен, чтобы посмотреть сессии учеников.
           </p>
         </div>
+        <div className={examStyles.examHeaderActions}>
+          <button
+            type="button"
+            className={`${examStyles.selectionModeBtn} ${
+              selectionMode ? examStyles.selectionModeBtnActive : ""
+            }`.trim()}
+            onClick={toggleSelectionMode}
+          >
+            <ListChecks size={16} />
+            {selectionMode ? "Выйти из выбора" : "Режим выбора"}
+          </button>
+        </div>
       </header>
+
+      {selectionMode ? (
+        <div className={examStyles.selectionToolbar}>
+          <p className={examStyles.selectionToolbarInfo}>
+            Выбрано: <strong>{selectedCount}</strong>
+            {selectedCount > 0 ? (
+              <span> · сохраняется при переходе по страницам</span>
+            ) : null}
+          </p>
+          <div className={examStyles.selectionToolbarActions}>
+            <button
+              type="button"
+              className={examStyles.selectionActionBtn}
+              onClick={toggleAllOnPage}
+              disabled={exams.length === 0}
+            >
+              {allOnPageSelected ? "Снять на странице" : "Выбрать на странице"}
+            </button>
+            <button
+              type="button"
+              className={examStyles.selectionActionBtn}
+              onClick={clearSelection}
+              disabled={selectedCount === 0}
+            >
+              Снять всё
+            </button>
+            <button
+              type="button"
+              className={`${examStyles.selectionActionBtn} ${examStyles.selectionDeleteBtn}`}
+              onClick={openBulkDeleteDialog}
+              disabled={selectedCount === 0}
+            >
+              <Trash2 size={14} />
+              Удалить выбранные ({selectedCount})
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       <div className={styles.filters}>
         <input
@@ -398,22 +658,56 @@ export function AdminExamsSection() {
       ) : (
         <>
           <div className={examStyles.examsGrid}>
-            {exams.map((exam) => (
-              <button
-                key={exam.id}
-                type="button"
-                className={examStyles.examListCard}
-                onClick={() => handleSelectExam(exam)}
-              >
-                <h3 className={examStyles.examListCardTitle}>{exam.name}</h3>
-                <p className={examStyles.examListCardDate}>
-                  {formatExamDate(exam.date)}
-                </p>
-                <p className={examStyles.examListCardHint}>
-                  {exam.sessions_count ?? 0} сессий · открыть →
-                </p>
-              </button>
-            ))}
+            {exams.map((exam) => {
+              const selected = isExamSelected(exam.id);
+
+              return (
+                <article
+                  key={exam.id}
+                  className={`${examStyles.examListCardWrap} ${
+                    selected ? examStyles.examListCardWrapSelected : ""
+                  }`.trim()}
+                >
+                  <div className={examStyles.examListCardTop}>
+                    {selectionMode ? (
+                      <input
+                        type="checkbox"
+                        className={examStyles.examSelectCheckbox}
+                        checked={selected}
+                        onChange={() => toggleExamSelection(exam)}
+                        aria-label={`Выбрать экзамен ${exam.name}`}
+                      />
+                    ) : null}
+                    <button
+                      type="button"
+                      className={examStyles.examListCardMain}
+                      onClick={() => handleExamCardClick(exam)}
+                    >
+                      <h3 className={examStyles.examListCardTitle}>{exam.name}</h3>
+                      <p className={examStyles.examListCardDate}>
+                        {formatExamDate(exam.date)}
+                      </p>
+                      <p className={examStyles.examListCardHint}>
+                        {exam.sessions_count ?? 0} сессий
+                        {selectionMode ? " · выбрать" : " · открыть →"}
+                      </p>
+                    </button>
+                  </div>
+                  {!selectionMode ? (
+                    <div className={examStyles.examListCardActions}>
+                      <button
+                        type="button"
+                        className={examStyles.examDeleteBtn}
+                        onClick={() => openDeleteDialog(exam)}
+                      >
+                        <Trash2 size={14} />
+                        Удалить
+                      </button>
+                    </div>
+                  ) : null}
+                </article>
+              );
+            })}
           </div>
 
           <AdminListPaginationBar

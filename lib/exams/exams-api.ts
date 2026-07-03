@@ -1,5 +1,7 @@
 import { apiRequest } from "@/lib/api/client";
 import type {
+  ExamDeletePreview,
+  ExamDeleteResponse,
   ExamsListResponse,
   ExamSessionsResponse,
   FetchExamSessionsParams,
@@ -58,4 +60,16 @@ export async function fetchStudentExamSessionsPaginated(
       sort: params.sort,
     })}`,
   );
+}
+
+export async function fetchExamDeletePreview(
+  examId: number,
+): Promise<ExamDeletePreview> {
+  return apiRequest<ExamDeletePreview>(`/exams/${examId}/delete-preview`);
+}
+
+export async function deleteExam(examId: number): Promise<ExamDeleteResponse> {
+  return apiRequest<ExamDeleteResponse>(`/exams/${examId}`, {
+    method: "DELETE",
+  });
 }

@@ -75,3 +75,14 @@ export interface FetchStudentExamSessionsParams {
   grade?: ExamGradeFilter;
   sort?: StudentExamSortField;
 }
+
+export interface ExamDeletePreview {
+  exam: Exam;
+  sessionsCount: number;
+}
+
+export interface ExamDeleteResponse {
+  message: string;
+  examId: number;
+  sessionsDeleted: number;
+}

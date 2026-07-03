@@ -141,7 +141,28 @@
   gap: var(--ds-space-4);
 }
 
-.examListCard {
+.examListCardMain {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-3);
+  flex: 1;
+  padding: 0;
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.examListCardMain:hover {
+  border-color: transparent;
+}
+
+.examListCardWrap:hover {
+  border-color: var(--ds-accent);
+  box-shadow: var(--ds-shadow-sm);
+}
+
+.examListCardWrap {
   display: flex;
   flex-direction: column;
   gap: var(--ds-space-3);
@@ -149,16 +170,131 @@
   border: 1px solid var(--ds-border);
   border-radius: var(--ds-radius-lg);
   background: var(--ds-surface);
-  text-align: left;
-  cursor: pointer;
-  transition:
-    border-color 0.15s ease,
-    box-shadow 0.15s ease;
 }
 
-.examListCard:hover {
+.examListCardActions {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: var(--ds-space-2);
+  border-top: 1px solid var(--ds-border);
+}
+
+.examDeleteBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid transparent;
+  border-radius: var(--ds-radius-sm);
+  background: var(--ds-danger-bg);
+  color: var(--ds-danger);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.examDeleteBtn:hover {
+  border-color: var(--ds-danger);
+}
+
+.examHeaderActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ds-space-3);
+  align-items: center;
+}
+
+.selectionToolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ds-space-3);
+  margin-bottom: var(--ds-space-4);
+  padding: var(--ds-space-4);
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-md);
+  background: var(--ds-surface-muted);
+}
+
+.selectionToolbarInfo {
+  font-size: 14px;
+  color: var(--ds-text-secondary);
+}
+
+.selectionToolbarInfo strong {
+  color: var(--ds-text);
+}
+
+.selectionToolbarActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ds-space-2);
+}
+
+.selectionModeBtn,
+.selectionActionBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-sm);
+  background: var(--ds-surface);
+  color: var(--ds-text);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.selectionModeBtn:hover,
+.selectionActionBtn:hover {
   border-color: var(--ds-accent);
-  box-shadow: var(--ds-shadow-sm);
+}
+
+.selectionModeBtnActive {
+  border-color: var(--ds-accent);
+  background: color-mix(in srgb, var(--ds-accent) 12%, var(--ds-surface));
+}
+
+.selectionDeleteBtn {
+  border-color: transparent;
+  background: var(--ds-danger-bg);
+  color: var(--ds-danger);
+}
+
+.selectionDeleteBtn:hover:not(:disabled) {
+  border-color: var(--ds-danger);
+}
+
+.selectionDeleteBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.examListCardWrapSelected {
+  border-color: var(--ds-accent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--ds-accent) 35%, transparent);
+}
+
+.examListCardTop {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--ds-space-3);
+}
+
+.examListCardTop .examListCardMain {
+  flex: 1;
+  min-width: 0;
+}
+
+.examSelectCheckbox {
+  margin-top: 2px;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  accent-color: var(--ds-accent);
+  cursor: pointer;
 }
 
 .examListCardTitle {
