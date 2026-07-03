@@ -594,6 +594,21 @@
   justify-content: flex-end;
 }
 
+.formBusyWrap {
+  position: relative;
+}
+
+.formBusyOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--ds-surface) 82%, transparent);
+  border-radius: var(--ds-radius-lg);
+}
+
 .backBtn {
   display: inline-flex;
   align-items: center;

@@ -3,6 +3,7 @@
 import { AdminFullscreenBack } from "@/components/admin/admin-fullscreen-back";
 import styles from "@/components/admin/tests/admin-tests.module.css";
 import { Button } from "@/components/ui/button";
+import { LoadingState } from "@/components/ui/loading-state";
 import { Toggle } from "@/components/ui/toggle";
 import {
   createAdminHomework,
@@ -57,6 +58,11 @@ export function AdminHomeworkForm({
         ? "Редактирование домашнего задания"
         : "Создание домашнего задания";
 
+  const savingLabel =
+    mode === "create"
+      ? "Создаём задание для всех студентов…"
+      : "Сохранение…";
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isReadOnly) return;
@@ -87,6 +93,8 @@ export function AdminHomeworkForm({
     }
   };
 
+  const fieldsDisabled = isReadOnly || saving;
+
   return (
     <div className={embedded ? styles.embeddedForm : styles.fullscreenShell}>
       {!embedded ? (
@@ -100,92 +108,106 @@ export function AdminHomeworkForm({
         <h2 className={styles.formSectionTitle}>{title}</h2>
       )}
 
-      <div className={embedded ? undefined : styles.fullscreenBody}>
+      <div
+        className={
+          embedded
+            ? styles.formBusyWrap
+            : `${styles.fullscreenBody} ${styles.formBusyWrap}`
+        }
+      >
+        {saving ? (
+          <div className={styles.formBusyOverlay} aria-hidden={false}>
+            <LoadingState label={savingLabel} variant="block" />
+          </div>
+        ) : null}
+
         {error ? <p className={styles.errorText}>{error}</p> : null}
 
         <form
           className={embedded ? styles.formEmbedded : styles.form}
           onSubmit={handleSubmit}
         >
-        <section className={styles.formSection}>
-          <h3 className={styles.formSectionTitle}>Параметры</h3>
+          <section className={styles.formSection}>
+            <h3 className={styles.formSectionTitle}>Параметры</h3>
 
-          <label className={styles.field}>
-            <span className={styles.fieldLabel}>Название</span>
-            <input
-              className={styles.input}
-              name="name"
-              value={form.name}
-              readOnly={isReadOnly}
-              onChange={(e) =>
-                setForm((prev) => ({ ...prev, name: e.target.value }))
-              }
-              required
-            />
-          </label>
+            <label className={styles.field}>
+              <span className={styles.fieldLabel}>Название</span>
+              <input
+                className={styles.input}
+                name="name"
+                value={form.name}
+                readOnly={isReadOnly}
+                disabled={saving}
+                onChange={(e) =>
+                  setForm((prev) => ({ ...prev, name: e.target.value }))
+                }
+                required
+              />
+            </label>
 
-          <label className={styles.field}>
-            <span className={styles.fieldLabel}>Тип</span>
-            <select
-              className={styles.input}
-              name="type"
-              value={form.type}
-              disabled={isReadOnly}
-              onChange={(e) =>
-                setForm((prev) => ({
-                  ...prev,
-                  type: e.target.value as HomeworkKind,
-                }))
-              }
-            >
-              <option value="ДЗНВ">ДЗНВ</option>
-              <option value="ОВ">ОВ</option>
-            </select>
-          </label>
+            <label className={styles.field}>
+              <span className={styles.fieldLabel}>Тип</span>
+              <select
+                className={styles.input}
+                name="type"
+                value={form.type}
+                disabled={fieldsDisabled}
+                onChange={(e) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    type: e.target.value as HomeworkKind,
+                  }))
+                }
+              >
+                <option value="ОВ">ОВ</option>
+                <option value="ДЗНВ">ДЗНВ</option>
+              </select>
+            </label>
 
-          <label className={styles.field}>
-            <span className={styles.fieldLabel}>Дедлайн</span>
-            <input
-              className={styles.input}
-              type="date"
-              name="deadline"
-              value={form.deadline}
-              readOnly={isReadOnly}
-              onChange={(e) =>
-                setForm((prev) => ({ ...prev, deadline: e.target.value }))
-              }
-              required
-            />
-          </label>
+            <label className={styles.field}>
+              <span className={styles.fieldLabel}>Дедлайн</span>
+              <input
+                className={styles.input}
+                type="date"
+                name="deadline"
+                value={form.deadline}
+                readOnly={isReadOnly}
+                disabled={saving}
+                onChange={(e) =>
+                  setForm((prev) => ({ ...prev, deadline: e.target.value }))
+                }
+                required
+              />
+            </label>
 
-          <div className={styles.formToggles}>
-            <Toggle
-              id={publishedId}
-              label="Видимость для студентов"
-              variant="success"
-              checked={form.published}
-              disabled={isReadOnly}
-              onChange={(checked) =>
-                setForm((prev) => ({ ...prev, published: checked }))
-              }
-            />
-          </div>
-        </section>
+            <div className={styles.formToggles}>
+              <Toggle
+                id={publishedId}
+                label="Видимость для студентов"
+                variant="success"
+                checked={form.published}
+                disabled={fieldsDisabled}
+                onChange={(checked) =>
+                  setForm((prev) => ({ ...prev, published: checked }))
+                }
+              />
+            </div>
+          </section>
 
-        {!isReadOnly && !embedded ? (
-          <div className={styles.formTopBar}>
-            <Button type="button" variant="ghost" onClick={onBack}>
-              Отмена
-            </Button>
-            <Button type="submit" disabled={saving}>
-              {saving
-                ? "Сохранение…"
-                : mode === "create"
-                  ? "Создать"
-                  : "Сохранить"}
-            </Button>
-          </div>
-        ) : null}
+          {!isReadOnly && !embedded ? (
+            <div className={styles.formTopBar}>
+              <Button type="button" variant="ghost" onClick={onBack} disabled={saving}>
+                Отмена
+              </Button>
+              <Button type="submit" disabled={saving}>
+                {saving
+                  ? "Сохранение…"
+                  : mode === "create"
+                    ? "Создать"
+                    : "Сохранить"}
+              </Button>
+            </div>
+          ) : null}
         </form>
       </div>
     </div>

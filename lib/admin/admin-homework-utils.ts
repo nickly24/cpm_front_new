@@ -13,7 +13,7 @@ export function defaultHomeworkDeadlineInputValue(): string {
 export function emptyAdminHomeworkForm() {
   return {
     name: "",
-    type: "ДЗНВ" as const,
+    type: "ОВ" as const,
     deadline: defaultHomeworkDeadlineInputValue(),
     published: true,
   };
