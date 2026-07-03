@@ -58,6 +58,22 @@ export function formatAdminTestDate(value?: string | null): string {
   });
 }
 
+export function formatResultsCountLabel(count: number): string {
+  const mod10 = count % 10;
+  const mod100 = count % 100;
+
+  if (mod100 >= 11 && mod100 <= 14) {
+    return `${count} результатов`;
+  }
+  if (mod10 === 1) {
+    return `${count} результат`;
+  }
+  if (mod10 >= 2 && mod10 <= 4) {
+    return `${count} результата`;
+  }
+  return `${count} результатов`;
+}
+
 export function toDatetimeLocalValue(value?: string | null): string {
   if (!value) {
     return "";

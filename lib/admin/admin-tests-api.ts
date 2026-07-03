@@ -1,5 +1,9 @@
 import { apiRequest } from "@/lib/api/client";
-import type { Direction } from "@/lib/admin/admin-tests-types";
+import type {
+  AdminExternalTestDeletePreview,
+  AdminExternalTestDeleteResponse,
+  Direction,
+} from "@/lib/admin/admin-tests-types";
 import type {
   AdminExternalTestFormData,
   AdminTestDetail,
@@ -87,4 +91,21 @@ export function getAdminTestTitle(test: AdminTestListItem): string {
 
 export function isAdminExternalTest(test: AdminTestListItem): boolean {
   return Boolean(test.isExternal || test.externalTest);
+}
+
+export async function fetchExternalTestDeletePreview(
+  testId: string,
+): Promise<AdminExternalTestDeletePreview> {
+  return apiRequest<AdminExternalTestDeletePreview>(
+    `/external-tests/${encodeURIComponent(testId)}/delete-preview`,
+  );
+}
+
+export async function deleteExternalAdminTest(
+  testId: string,
+): Promise<AdminExternalTestDeleteResponse> {
+  return apiRequest<AdminExternalTestDeleteResponse>(
+    `/external-tests/${encodeURIComponent(testId)}`,
+    { method: "DELETE" },
+  );
 }

@@ -74,3 +74,14 @@ export interface TestsDateFilter {
   startDate: string;
   endDate: string;
 }
+
+export interface AdminExternalTestDeletePreview {
+  test: AdminTestListItem;
+  resultsCount: number;
+}
+
+export interface AdminExternalTestDeleteResponse {
+  message: string;
+  testId: string;
+  resultsDeleted: number;
+}

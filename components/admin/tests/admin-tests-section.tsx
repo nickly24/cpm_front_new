@@ -1,5 +1,6 @@
 "use client";
 
+import { AdminExternalTestDeleteDialog } from "@/components/admin/tests/admin-external-test-delete-dialog";
 import { AdminExternalTestForm } from "@/components/admin/tests/admin-external-test-form";
 import { AdminTestDraftEditor } from "@/components/admin/tests/admin-test-draft-editor";
 import { AdminTestForm } from "@/components/admin/tests/admin-test-form";
@@ -11,6 +12,7 @@ import { LoadingState } from "@/components/ui/loading-state";
 import { Toggle } from "@/components/ui/toggle";
 import {
   deleteAdminTest,
+  deleteExternalAdminTest,
   fetchAdminDirections,
   fetchAdminTestById,
   fetchAdminTestsByDirection,
@@ -82,6 +84,12 @@ export function AdminTestsSection() {
   const [toggleBusy, setToggleBusy] = useState<string | null>(null);
   const [workspaceTestId, setWorkspaceTestId] = useState<string | null>(null);
   const [editingDraft, setEditingDraft] = useState<AdminTestDraft | null>(null);
+  const [externalDeleteTarget, setExternalDeleteTarget] =
+    useState<AdminTestListItem | null>(null);
+  const [externalDeleting, setExternalDeleting] = useState(false);
+  const [externalDeleteError, setExternalDeleteError] = useState<string | null>(
+    null,
+  );
   const { setImmersive } = useCabinetChrome();
 
   const loadTests = useCallback(async (direction: string) => {
@@ -249,6 +257,43 @@ export function AdminTestsSection() {
     }
   };
 
+  const openExternalDeleteDialog = (test: AdminTestListItem) => {
+    setExternalDeleteError(null);
+    setExternalDeleteTarget(test);
+  };
+
+  const closeExternalDeleteDialog = () => {
+    if (externalDeleting) {
+      return;
+    }
+    setExternalDeleteTarget(null);
+    setExternalDeleteError(null);
+  };
+
+  const handleExternalDeleteConfirm = async () => {
+    if (!externalDeleteTarget) {
+      return;
+    }
+
+    setExternalDeleting(true);
+    setExternalDeleteError(null);
+
+    try {
+      const res = await deleteExternalAdminTest(getAdminTestId(externalDeleteTarget));
+      setExternalDeleteTarget(null);
+      await loadTests(directionName);
+      window.alert(
+        `Внешний тест удалён. Результатов: ${res.resultsDeleted ?? 0}`,
+      );
+    } catch (err) {
+      setExternalDeleteError(
+        err instanceof Error ? err.message : "Ошибка при удалении",
+      );
+    } finally {
+      setExternalDeleting(false);
+    }
+  };
+
   const patchTestInList = (testId: string, patch: Partial<AdminTestListItem>) => {
     setTests((prev) =>
       prev.map((t) => (getAdminTestId(t) === testId ? { ...t, ...patch } : t)),
@@ -374,6 +419,18 @@ export function AdminTestsSection() {
 
   return (
     <div className={styles.page}>
+      {externalDeleteTarget ? (
+        <AdminExternalTestDeleteDialog
+          test={externalDeleteTarget}
+          deleting={externalDeleting}
+          deleteError={externalDeleteError}
+          onCancel={closeExternalDeleteDialog}
+          onConfirm={() => {
+            void handleExternalDeleteConfirm();
+          }}
+        />
+      ) : null}
+
       <header className={styles.pageHeader}>
         <h1 className={styles.pageTitle}>Управление тестами</h1>
         <div className={styles.headerActions}>
@@ -650,7 +707,15 @@ export function AdminTestsSection() {
                   )}
 
                   <div className={styles.cardActions}>
-                    {external ? null : (
+                    {external ? (
+                      <button
+                        type="button"
+                        className={`${styles.actionBtn} ${styles.actionBtnDanger}`}
+                        onClick={() => openExternalDeleteDialog(test)}
+                      >
+                        Удалить
+                      </button>
+                    ) : (
                       <>
                         <button
                           type="button"

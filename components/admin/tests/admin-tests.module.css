@@ -367,6 +367,138 @@
   line-height: 1.45;
 }
 
+.deleteDialogOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--ds-space-5);
+  background: rgba(15, 20, 25, 0.62);
+  backdrop-filter: blur(2px);
+}
+
+.deleteDialog {
+  width: min(480px, 100%);
+  padding: var(--ds-space-6);
+  border-radius: var(--ds-radius-lg);
+  background: var(--ds-surface);
+  box-shadow: var(--ds-shadow-lg);
+  border: 1px solid var(--ds-border);
+}
+
+.deleteDialogIconWrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  margin: 0 auto var(--ds-space-4);
+  border-radius: 999px;
+  background: var(--ds-danger-bg);
+}
+
+.deleteDialogIcon {
+  color: var(--ds-danger);
+}
+
+.deleteDialogTitle {
+  margin: 0 0 var(--ds-space-4);
+  text-align: center;
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.deleteDialogMeta {
+  margin-bottom: var(--ds-space-4);
+  padding: var(--ds-space-4);
+  border-radius: var(--ds-radius-md);
+  background: var(--ds-surface-muted);
+  border: 1px solid var(--ds-border);
+}
+
+.deleteDialogMetaTag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: var(--ds-space-2);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ds-text-muted);
+}
+
+.deleteDialogTestName {
+  margin: 0 0 var(--ds-space-1);
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.deleteDialogTestDate {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ds-text-muted);
+}
+
+.deleteDialogLoading {
+  justify-content: center;
+  margin: var(--ds-space-4) 0;
+}
+
+.deleteDialogStats {
+  margin-bottom: var(--ds-space-4);
+  padding: var(--ds-space-4);
+  border-radius: var(--ds-radius-md);
+  border: 1px solid color-mix(in srgb, var(--ds-danger) 24%, var(--ds-border));
+  background: color-mix(in srgb, var(--ds-danger-bg) 70%, var(--ds-surface));
+}
+
+.deleteDialogStatsLabel {
+  margin: 0 0 var(--ds-space-1);
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ds-text-muted);
+}
+
+.deleteDialogStatsValue {
+  margin: 0 0 var(--ds-space-2);
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--ds-danger);
+}
+
+.deleteDialogStatsHint {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--ds-text-muted);
+}
+
+.deleteDialogError {
+  margin: 0 0 var(--ds-space-4);
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--ds-danger);
+}
+
+.deleteDialogActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--ds-space-3);
+}
+
+.deleteDialogActions .actionBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 120px;
+  justify-content: center;
+}
+
 .stateBox {
   padding: var(--ds-space-10) var(--ds-space-5);
   text-align: center;
