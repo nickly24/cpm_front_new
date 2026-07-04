@@ -19,7 +19,6 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import {
   Background,
-  ControlButton,
   Controls,
   ReactFlow,
   ReactFlowProvider,
@@ -30,19 +29,32 @@ import {
 import {
   ArrowLeft,
   Check,
-  ChevronDown,
-  ChevronLeft,
   ChevronRight,
-  Clipboard,
   FileQuestion,
-  Hand,
-  MousePointer2,
   Redo2,
   Save,
+  Settings,
   Trash2,
   Undo2,
+  CircleDot,
+  GripVertical,
+  ListChecks,
+  Type,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { AdminTestDraftFlowOverlay } from "@/components/admin/tests/admin-test-draft-flow-overlay";
+import { AdminTestDraftQuestionSearch } from "@/components/admin/tests/admin-test-draft-question-search";
+import {
+  CARD_MIN_HEIGHT,
+  CARD_WIDTH,
+  GRID_START_X,
+  GRID_START_Y,
+  GRID_X,
+  linearizeLayout,
+  reorderQuestionsAsBlock,
+  slotX,
+  sortQuestions,
+} from "@/components/admin/tests/admin-test-draft-flow-layout";
 import styles from "@/components/admin/tests/admin-test-draft-editor.module.css";
 import {
   deleteAdminTestDraft,
@@ -61,6 +73,7 @@ import type {
   AutosaveState,
   Direction,
 } from "@/lib/admin/admin-test-drafts-types";
+import { convertQuestionAnswersOnTypeChange } from "@/lib/admin/admin-test-draft-convert";
 import type { AdminTestQuestionType } from "@/lib/admin/admin-tests-types";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -70,14 +83,11 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type DragEvent as ReactDragEvent,
   type PointerEvent as ReactPointerEvent,
 } from "react";
 
-const GRID_X = 360;
-const GRID_START_X = 120;
-const GRID_START_Y = 120;
 const CLIPBOARD_KEY = "application/x-cpm-test-draft";
-type InteractionMode = "select" | "pan";
 
 const issueBadgeBaseStyle: CSSProperties = {
   position: "absolute",
@@ -155,57 +165,11 @@ function autosaveSnapshot(draft: AdminTestDraft) {
 
 function normalizeCanvas(canvas?: DraftCanvasModel): DraftCanvasModel {
   const questions = canvas?.questions ?? [];
-  const layout = { ...(canvas?.layout ?? {}) };
-  questions.forEach((question, index) => {
-    if (!layout[question.id]) {
-      layout[question.id] = {
-        x: GRID_START_X + index * GRID_X,
-        y: GRID_START_Y,
-      };
-    }
-  });
-  return { questions, layout };
-}
-
-function linearizeLayout(questions: DraftQuestionNode[]) {
-  return Object.fromEntries(
-    questions.map((question, index) => [
-      question.id,
-      {
-        x: GRID_START_X + index * GRID_X,
-        y: GRID_START_Y,
-      },
-    ]),
-  );
-}
-
-function reorderQuestionsAsBlock(
-  canvas: DraftCanvasModel,
-  movingIds: string[],
-  anchorQuestionId: string,
-  anchorX: number,
-) {
-  const ordered = sortQuestions(canvas);
-  const movingSet = new Set(movingIds);
-  const movingQuestions = ordered.filter((question) => movingSet.has(question.id));
-  if (movingQuestions.length === 0) return ordered;
-
-  const remainingQuestions = ordered.filter((question) => !movingSet.has(question.id));
-  const anchorOffset = Math.max(
-    0,
-    movingQuestions.findIndex((question) => question.id === anchorQuestionId),
-  );
-  const anchorGridIndex = Math.round((anchorX - GRID_START_X) / GRID_X);
-  const insertIndex = Math.max(
-    0,
-    Math.min(remainingQuestions.length, anchorGridIndex - anchorOffset),
-  );
-
-  return [
-    ...remainingQuestions.slice(0, insertIndex),
-    ...movingQuestions,
-    ...remainingQuestions.slice(insertIndex),
-  ];
+  const ordered = sortQuestions({ questions, layout: canvas?.layout ?? {} });
+  return {
+    questions: ordered,
+    layout: linearizeLayout(ordered),
+  };
 }
 
 function answerDropError(target: DraftQuestionNode, answers: DraftAnswerNode[]) {
@@ -221,24 +185,230 @@ function answerDropError(target: DraftQuestionNode, answers: DraftAnswerNode[]) 
   return null;
 }
 
-function sortQuestions(canvas: DraftCanvasModel) {
-  return [...canvas.questions].sort((a, b) => {
-    const ap = canvas.layout[a.id] ?? { x: 0, y: 0 };
-    const bp = canvas.layout[b.id] ?? { x: 0, y: 0 };
-    return ap.y - bp.y || ap.x - bp.x;
-  });
+const QUESTION_TEXT_PLACEHOLDER = "Текст вопроса";
+const ANSWER_TEXT_PLACEHOLDER = "Вариант ответа";
+const TEXT_ANSWER_PLACEHOLDER = "Текстовый ответ";
+const AREA_SELECT_DRAG_THRESHOLD = 4;
+const DEFAULT_NEW_QUESTION_TYPE: AdminTestQuestionType = "single";
+
+function questionEditDraft(text: string) {
+  return text.trim() ? text : QUESTION_TEXT_PLACEHOLDER;
 }
 
-function labelForType(type: AdminTestQuestionType) {
-  if (type === "single") return "Один ответ";
-  if (type === "multiple") return "Несколько";
-  return "Текстовый";
+function answerEditDraft(text: string, kind: DraftAnswerNode["kind"]) {
+  if (text.trim()) return text;
+  return kind === "textAnswer" ? TEXT_ANSWER_PLACEHOLDER : ANSWER_TEXT_PLACEHOLDER;
 }
 
-function shortLabelForType(type: AdminTestQuestionType) {
-  if (type === "single") return "1";
-  if (type === "multiple") return "∞";
-  return "T";
+const QUESTION_TYPE_OPTIONS: Array<{
+  type: AdminTestQuestionType;
+  label: string;
+  description: string;
+  Icon: typeof CircleDot;
+}> = [
+  {
+    type: "single",
+    label: "Один ответ",
+    description: "Студент выбирает один правильный вариант",
+    Icon: CircleDot,
+  },
+  {
+    type: "multiple",
+    label: "Несколько",
+    description: "Можно отметить несколько правильных вариантов",
+    Icon: ListChecks,
+  },
+  {
+    type: "text",
+    label: "Текстовый",
+    description: "Студент вводит ответ текстом",
+    Icon: Type,
+  },
+];
+
+function QuestionPointsBadge({
+  points,
+  onChange,
+}: {
+  points: number;
+  onChange: (points: number) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(String(points));
+
+  useEffect(() => {
+    if (!editing) setDraft(String(points));
+  }, [editing, points]);
+
+  const commit = () => {
+    const parsed = Number.parseInt(draft, 10);
+    onChange(Number.isFinite(parsed) && parsed > 0 ? parsed : points);
+    setEditing(false);
+  };
+
+  if (editing) {
+    return (
+      <span className={styles.questionPointsEdit} data-question-meta="true">
+        <input
+          type="number"
+          min={1}
+          className={styles.questionPointsInput}
+          value={draft}
+          autoFocus
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={(event) => event.stopPropagation()}
+          onChange={(event) => setDraft(event.target.value)}
+          onBlur={commit}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              commit();
+            }
+            if (event.key === "Escape") {
+              setDraft(String(points));
+              setEditing(false);
+            }
+          }}
+        />
+        <span className={styles.questionPointsSuffix}>б.</span>
+      </span>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      className={styles.questionPoints}
+      data-question-meta="true"
+      onPointerDown={(event) => event.stopPropagation()}
+      onClick={(event) => {
+        event.stopPropagation();
+        setEditing(true);
+      }}
+    >
+      <span className={styles.questionPointsValue}>{points}</span>
+      <span className={styles.questionPointsSuffix}>б.</span>
+    </button>
+  );
+}
+
+function QuestionTypePicker({
+  type,
+  onChange,
+}: {
+  type: AdminTestQuestionType;
+  onChange: (type: AdminTestQuestionType) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const current = QUESTION_TYPE_OPTIONS.find((option) => option.type === type) ?? QUESTION_TYPE_OPTIONS[0];
+  const CurrentIcon = current.Icon;
+
+  useEffect(() => {
+    if (!open) return;
+    const handlePointerDown = (event: PointerEvent) => {
+      if (rootRef.current?.contains(event.target as HTMLElement)) return;
+      setOpen(false);
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("pointerdown", handlePointerDown);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("pointerdown", handlePointerDown);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [open]);
+
+  return (
+    <div ref={rootRef} className={`${styles.questionTypePicker} nopan`} data-question-meta="true">
+      <button
+        type="button"
+        className={`${styles.questionTypePickerButton} ${open ? styles.questionTypePickerButtonOpen : ""}`}
+        aria-label={`Тип вопроса: ${current.label}`}
+        aria-expanded={open}
+        onPointerDown={(event) => event.stopPropagation()}
+        onClick={(event) => {
+          event.stopPropagation();
+          setOpen((value) => !value);
+        }}
+      >
+        <CurrentIcon size={22} strokeWidth={2} aria-hidden="true" />
+      </button>
+      {open ? (
+        <div
+          className={styles.questionTypeMenu}
+          role="menu"
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={(event) => event.stopPropagation()}
+        >
+          {QUESTION_TYPE_OPTIONS.map((option) => {
+            const OptionIcon = option.Icon;
+            const active = option.type === type;
+            return (
+              <button
+                key={option.type}
+                type="button"
+                role="menuitemradio"
+                aria-checked={active}
+                className={`${styles.questionTypeOption} ${active ? styles.questionTypeOptionActive : ""}`}
+                onPointerDown={(event) => event.stopPropagation()}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onChange(option.type);
+                  setOpen(false);
+                }}
+              >
+                <span className={styles.questionTypeOptionIcon}>
+                  <OptionIcon size={18} strokeWidth={2} aria-hidden="true" />
+                </span>
+                <span className={styles.questionTypeOptionCopy}>
+                  <strong>{option.label}</strong>
+                  <span>{option.description}</span>
+                </span>
+                {active ? <Check size={16} className={styles.questionTypeOptionCheck} aria-hidden="true" /> : null}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function AnswerCorrectMark({
+  questionType,
+  isCorrect,
+  onToggle,
+}: {
+  questionType: AdminTestQuestionType;
+  isCorrect: boolean;
+  onToggle: () => void;
+}) {
+  if (questionType === "text") {
+    return (
+      <span className={styles.answerTextTypeMark} aria-label="Текстовый ответ" title="Текстовый ответ">
+        T
+      </span>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      className={`${styles.answerCorrectMark} ${isCorrect ? styles.answerCorrectMarkActive : ""}`}
+      aria-label={isCorrect ? "Правильный ответ" : "Отметить как правильный"}
+      aria-pressed={isCorrect}
+      onPointerDown={(event) => event.stopPropagation()}
+      onClick={(event) => {
+        event.stopPropagation();
+        onToggle();
+      }}
+    >
+      {isCorrect ? <Check size={12} strokeWidth={3} aria-hidden="true" /> : null}
+    </button>
+  );
 }
 
 function defaultQuestion(type: AdminTestQuestionType, position: { x: number; y: number }): {
@@ -346,73 +516,241 @@ function questionIdForIssue(canvas: DraftCanvasModel, issue: DraftValidationErro
   );
 }
 
+function AnswerInsertSlot({
+  label,
+  onAdd,
+  suppressed = false,
+}: {
+  label: string;
+  onAdd: () => void;
+  suppressed?: boolean;
+}) {
+  return (
+    <div
+      className={`${styles.answerInsertZone} ${suppressed ? styles.answerInsertZoneSuppressed : ""}`}
+      data-answer-insert="true"
+    >
+      <button
+        type="button"
+        className={`nopan ${styles.answerInsertButton}`}
+        aria-label={label}
+        onPointerDown={(event) => event.stopPropagation()}
+        onClick={(event) => {
+          event.stopPropagation();
+          onAdd();
+        }}
+      >
+        <span className={styles.answerInsertChip}>
+          <span className={styles.answerInsertPlus}>+</span>
+        </span>
+      </button>
+    </div>
+  );
+}
+
+function InlineTextEditor({
+  editing,
+  value,
+  draft,
+  placeholder,
+  className,
+  inputClassName,
+  interactive = true,
+  selectAllOnFocus = false,
+  onStartEdit,
+  onDraftChange,
+  onCommit,
+}: {
+  editing: boolean;
+  value: string;
+  draft: string;
+  placeholder: string;
+  className: string;
+  inputClassName: string;
+  interactive?: boolean;
+  selectAllOnFocus?: boolean;
+  onStartEdit: () => void;
+  onDraftChange: (value: string) => void;
+  onCommit: () => void;
+}) {
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (!editing || !inputRef.current) return;
+    inputRef.current.focus();
+    if (selectAllOnFocus) {
+      inputRef.current.select();
+      return;
+    }
+    const length = inputRef.current.value.length;
+    inputRef.current.setSelectionRange(length, length);
+  }, [editing, selectAllOnFocus]);
+
+  if (editing) {
+    return (
+      <textarea
+        ref={inputRef}
+        data-inline-editable="true"
+        className={`${className} ${inputClassName}`}
+        value={draft}
+        rows={1}
+        onChange={(event) => onDraftChange(event.target.value)}
+        onBlur={onCommit}
+        onPointerDown={(event) => event.stopPropagation()}
+        onClick={(event) => event.stopPropagation()}
+        onKeyDown={(event) => {
+          if (event.key === "Escape") {
+            event.preventDefault();
+            onCommit();
+          }
+        }}
+      />
+    );
+  }
+
+  if (!interactive) {
+    return <span className={className}>{value || placeholder}</span>;
+  }
+
+  return (
+    <span
+      data-inline-editable="true"
+      className={`${className} ${styles.inlineTextDisplay}`}
+      onPointerDown={(event) => event.stopPropagation()}
+      onClick={(event) => {
+        event.stopPropagation();
+        onStartEdit();
+      }}
+    >
+      {value || placeholder}
+    </span>
+  );
+}
+
 function SortableAnswer({
   answer,
+  questionType,
   selected,
+  previewSelected,
+  editing,
   copied,
   dragAnswerIds,
-  interactionMode,
+  editDraft,
   onSelect,
+  onStartEdit,
+  onDraftChange,
+  onCommitEdit,
+  onToggleCorrect,
 }: {
   answer: DraftAnswerNode;
+  questionType: AdminTestQuestionType;
   selected: boolean;
+  previewSelected: boolean;
+  editing: boolean;
   copied: boolean;
   dragAnswerIds: string[];
-  interactionMode: InteractionMode;
+  editDraft: string;
   onSelect: (additive: boolean) => void;
+  onStartEdit: () => void;
+  onDraftChange: (value: string) => void;
+  onCommitEdit: () => void;
+  onToggleCorrect: () => void;
 }) {
+  const placeholder =
+    answer.kind === "textAnswer" ? TEXT_ANSWER_PLACEHOLDER : ANSWER_TEXT_PLACEHOLDER;
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({
     id: answer.id,
-    disabled: interactionMode === "pan",
+    disabled: editing,
   });
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
   };
+
+  const handleNativeDragStart = (event: ReactDragEvent<HTMLDivElement>) => {
+    if (editing) {
+      event.preventDefault();
+      return;
+    }
+    event.stopPropagation();
+    event.dataTransfer.setData("application/x-cpm-answer-id", answer.id);
+    event.dataTransfer.setData("application/x-cpm-answer-ids", JSON.stringify(dragAnswerIds));
+    event.dataTransfer.effectAllowed = "move";
+    if (dragAnswerIds.length > 1) {
+      const preview = document.createElement("div");
+      preview.className = styles.dragStackPreview;
+      preview.innerHTML = `
+        <div class="${styles.dragStackLayer}"></div>
+        <div class="${styles.dragStackLayer}"></div>
+        <div class="${styles.dragStackCard}">
+          <span>${answer.text || placeholder}</span>
+          <strong>${dragAnswerIds.length}</strong>
+        </div>
+      `;
+      document.body.appendChild(preview);
+      event.dataTransfer.setDragImage(preview, 18, 18);
+      window.setTimeout(() => preview.remove(), 0);
+    }
+  };
+
   return (
     <div
       ref={setNodeRef}
       style={style}
       data-answer-chip="true"
       data-answer-id={answer.id}
-      className={`${styles.answerChip} ${answer.isCorrect ? styles.answerChipCorrect : ""} ${selected ? styles.answerChipSelected : ""} ${copied ? styles.answerChipCopied : ""}`}
-      onPointerDownCapture={(event) => {
-        if (interactionMode === "pan") return;
-        event.stopPropagation();
-        if (selected && !event.shiftKey && !event.metaKey && !event.ctrlKey) return;
-        onSelect(event.shiftKey || event.metaKey || event.ctrlKey);
-      }}
+      className={`${styles.answerChip} nopan ${selected ? styles.answerChipSelected : ""} ${previewSelected ? styles.answerChipPreviewSelected : ""} ${editing ? styles.answerChipEditing : ""} ${copied ? styles.answerChipCopied : ""}`}
       onClick={(event) => {
-        if (interactionMode === "pan") return;
         event.stopPropagation();
-      }}
-      draggable={interactionMode === "select"}
-      onDragStart={(event) => {
-        if (interactionMode === "pan") return;
-        event.dataTransfer.setData("application/x-cpm-answer-id", answer.id);
-        event.dataTransfer.setData("application/x-cpm-answer-ids", JSON.stringify(dragAnswerIds));
-        event.dataTransfer.effectAllowed = "move";
-        if (dragAnswerIds.length > 1) {
-          const preview = document.createElement("div");
-          preview.className = styles.dragStackPreview;
-          preview.innerHTML = `
-            <div class="${styles.dragStackLayer}"></div>
-            <div class="${styles.dragStackLayer}"></div>
-            <div class="${styles.dragStackCard}">
-              <span>${answer.text || (answer.kind === "textAnswer" ? "Текстовый ответ" : "Вариант ответа")}</span>
-              <strong>${dragAnswerIds.length}</strong>
-            </div>
-          `;
-          document.body.appendChild(preview);
-          event.dataTransfer.setDragImage(preview, 18, 18);
-          window.setTimeout(() => preview.remove(), 0);
+        if (editing) return;
+        if (event.shiftKey || event.metaKey || event.ctrlKey) {
+          onSelect(true);
+          return;
         }
+        if (selected) {
+          onStartEdit();
+          return;
+        }
+        onSelect(false);
       }}
-      {...attributes}
-      {...listeners}
     >
-      <span className={styles.answerDot} />
-      <span>{answer.text || (answer.kind === "textAnswer" ? "Текстовый ответ" : "Вариант ответа")}</span>
+      <button
+        type="button"
+        className={styles.answerReorderHandle}
+        aria-label="Переставить внутри вопроса"
+        disabled={editing}
+        onPointerDown={(event) => event.stopPropagation()}
+        onClick={(event) => event.stopPropagation()}
+        {...attributes}
+        {...(!editing ? listeners : {})}
+      >
+        <GripVertical size={14} strokeWidth={2} aria-hidden="true" />
+      </button>
+      <AnswerCorrectMark
+        questionType={questionType}
+        isCorrect={answer.isCorrect}
+        onToggle={onToggleCorrect}
+      />
+      <div
+        className={styles.answerDragBody}
+        draggable={!editing}
+        onDragStart={handleNativeDragStart}
+        onPointerDown={(event) => event.stopPropagation()}
+      >
+        <InlineTextEditor
+          editing={editing}
+          value={answer.text}
+          draft={editDraft}
+          placeholder={placeholder}
+          className={styles.answerText}
+          inputClassName={styles.answerTextInput}
+          interactive={false}
+          selectAllOnFocus={editing && !answer.text.trim()}
+          onStartEdit={onStartEdit}
+          onDraftChange={onDraftChange}
+          onCommit={onCommitEdit}
+        />
+      </div>
     </div>
   );
 }
@@ -426,7 +764,6 @@ function QuestionNode(props: NodeProps) {
     copiedAnswerIds: string[];
     dropErrorMessage: string | null;
     issues: DraftValidationError[];
-    interactionMode: InteractionMode;
     onSelectQuestion: (questionId: string) => void;
     onSelectAnswer: (questionId: string, answerId: string, additive: boolean) => void;
     onDragStart: (questionId: string) => void;
@@ -446,13 +783,44 @@ function QuestionNode(props: NodeProps) {
     ) => void;
     onReorderAnswers: (questionId: string, activeId: string, overId: string) => void;
     onDropAnswer: (targetQuestionId: string, answerIds: string[]) => void;
+    onAddAnswer: (questionId: string) => void;
+    onQuestionGrabStart: () => void;
+    onQuestionGrabEnd: () => void;
+    editingQuestion: boolean;
+    editingAnswerId: string | null;
+    inlineEditDraft: string;
+    onBeginEditQuestion: (questionId: string, text: string) => void;
+    onBeginEditAnswer: (questionId: string, answerId: string, text: string, kind: DraftAnswerNode["kind"]) => void;
+    onInlineEditDraftChange: (value: string) => void;
+    onCommitInlineEdit: () => void;
+    onChangeQuestionType: (questionId: string, type: AdminTestQuestionType) => void;
+    onUpdateQuestionPoints: (questionId: string, points: number) => void;
+    onToggleAnswerCorrect: (questionId: string, answerId: string) => void;
+    areaSelectionPreview: {
+      mode: "questions" | "answers";
+      questionId: string | null;
+      ids: string[];
+    } | null;
+    selectedQuestionIds: string[];
+    shiftKeyHeld: boolean;
   };
   const sensors = useSensors(
-    useSensor(PointerSensor),
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
   const copied = data.copiedIds.includes(data.question.id);
   const hasDropError = Boolean(data.dropErrorMessage);
+  const previewQuestionSelected =
+    data.areaSelectionPreview?.mode === "questions" &&
+    data.areaSelectionPreview.ids.includes(data.question.id);
+  const previewAnswerIds =
+    data.areaSelectionPreview?.mode === "answers" &&
+    data.areaSelectionPreview.questionId === data.question.id
+      ? data.areaSelectionPreview.ids
+      : [];
+  const questionSelected =
+    data.selectedQuestionIds.includes(data.question.id) &&
+    data.selectedAnswerIds.length === 0;
   const [issuesOpen, setIssuesOpen] = useState(false);
   const issueLevel = data.issues.some((issue) => issueSeverity(issue) === "error")
     ? "error"
@@ -466,6 +834,7 @@ function QuestionNode(props: NodeProps) {
     grabOffsetX: number;
     grabOffsetY: number;
     dragging: boolean;
+    element: HTMLDivElement;
   } | null>(null);
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
@@ -475,11 +844,16 @@ function QuestionNode(props: NodeProps) {
   };
 
   const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (data.interactionMode === "pan") return;
     if (event.button !== 0) return;
     const target = event.target as HTMLElement;
     if (target.closest("[data-answer-chip='true']")) return;
+    if (target.closest("[data-inline-editable='true']")) return;
+    if (target.closest("[data-answer-insert='true']")) return;
+    if (target.closest("[data-question-meta='true']")) return;
     event.stopPropagation();
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    data.onQuestionGrabStart();
 
     pointerState.current = {
       pointerId: event.pointerId,
@@ -488,6 +862,7 @@ function QuestionNode(props: NodeProps) {
       grabOffsetX: event.clientX - event.currentTarget.getBoundingClientRect().left,
       grabOffsetY: event.clientY - event.currentTarget.getBoundingClientRect().top,
       dragging: false,
+      element: event.currentTarget,
     };
 
     const handlePointerMove = (moveEvent: PointerEvent) => {
@@ -533,6 +908,10 @@ function QuestionNode(props: NodeProps) {
         data.onSelectQuestion(data.question.id);
       }
 
+      if (state.element.hasPointerCapture(upEvent.pointerId)) {
+        state.element.releasePointerCapture(upEvent.pointerId);
+      }
+      data.onQuestionGrabEnd();
       pointerState.current = null;
       window.removeEventListener("pointermove", handlePointerMove);
       window.removeEventListener("pointerup", handlePointerUp);
@@ -547,11 +926,13 @@ function QuestionNode(props: NodeProps) {
   return (
     <div
       data-question-id={data.question.id}
-      className={`${styles.questionNode} ${copied ? styles.questionNodeCopied : ""} ${hasDropError ? styles.questionNodeDropError : ""}`}
+      className={`nopan ${styles.questionNode} ${questionSelected ? styles.questionNodeSelected : ""} ${copied ? styles.questionNodeCopied : ""} ${hasDropError ? styles.questionNodeDropError : ""} ${previewQuestionSelected ? styles.questionNodePreviewSelected : ""}`}
       onPointerDown={onPointerDown}
       onClick={(event) => {
-        if (data.interactionMode === "pan") return;
         event.stopPropagation();
+        if ((event.target as HTMLElement).closest("[data-inline-editable='true']")) return;
+        if ((event.target as HTMLElement).closest("[data-question-meta='true']")) return;
+        data.onCommitInlineEdit();
         data.onSelectQuestion(data.question.id);
       }}
       onDragOver={(event) => event.preventDefault()}
@@ -613,11 +994,30 @@ function QuestionNode(props: NodeProps) {
       ) : null}
       <div className={styles.questionHead}>
         <span className={styles.questionNumber}>{data.index + 1}</span>
-        <strong>{data.question.points} б.</strong>
-        <span className={styles.questionType}>{labelForType(data.question.type)}</span>
+        <div className={styles.questionHeadActions}>
+          <QuestionPointsBadge
+            points={data.question.points}
+            onChange={(points) => data.onUpdateQuestionPoints(data.question.id, points)}
+          />
+          <QuestionTypePicker
+            type={data.question.type}
+            onChange={(type) => data.onChangeQuestionType(data.question.id, type)}
+          />
+        </div>
       </div>
       <div className={styles.questionBody}>
-        <p className={styles.questionText}>{data.question.text || "Текст вопроса"}</p>
+        <InlineTextEditor
+          editing={data.editingQuestion}
+          value={data.question.text}
+          draft={data.inlineEditDraft}
+          placeholder={QUESTION_TEXT_PLACEHOLDER}
+          className={styles.questionText}
+          inputClassName={styles.questionTextInput}
+          selectAllOnFocus={data.editingQuestion && !data.question.text.trim()}
+          onStartEdit={() => data.onBeginEditQuestion(data.question.id, data.question.text)}
+          onDraftChange={data.onInlineEditDraftChange}
+          onCommit={data.onCommitInlineEdit}
+        />
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
           <SortableContext
             items={data.question.answers.map((answer) => answer.id)}
@@ -631,14 +1031,17 @@ function QuestionNode(props: NodeProps) {
                   <SortableAnswer
                     key={answer.id}
                     answer={answer}
+                    questionType={data.question.type}
                     selected={data.selectedAnswerIds.includes(answer.id)}
+                    previewSelected={previewAnswerIds.includes(answer.id)}
+                    editing={data.editingAnswerId === answer.id}
                     copied={data.copiedAnswerIds.includes(answer.id)}
                     dragAnswerIds={
                       data.selectedAnswerIds.includes(answer.id) && data.selectedAnswerIds.length > 0
                         ? data.selectedAnswerIds
                         : [answer.id]
                     }
-                    interactionMode={data.interactionMode}
+                    editDraft={data.inlineEditDraft}
                     onSelect={(additive) =>
                       data.onSelectAnswer(
                         data.question.id,
@@ -646,9 +1049,29 @@ function QuestionNode(props: NodeProps) {
                         additive,
                       )
                     }
+                    onStartEdit={() =>
+                      data.onBeginEditAnswer(
+                        data.question.id,
+                        answer.id,
+                        answer.text,
+                        answer.kind,
+                      )
+                    }
+                    onDraftChange={data.onInlineEditDraftChange}
+                    onCommitEdit={data.onCommitInlineEdit}
+                    onToggleCorrect={() =>
+                      data.onToggleAnswerCorrect(data.question.id, answer.id)
+                    }
                   />
                 ))
               )}
+              <AnswerInsertSlot
+                label={
+                  data.question.type === "text" ? "Добавить текстовый ответ" : "Добавить вариант ответа"
+                }
+                suppressed={data.shiftKeyHeld}
+                onAdd={() => data.onAddAnswer(data.question.id)}
+              />
             </div>
           </SortableContext>
         </DndContext>
@@ -681,7 +1104,7 @@ function AdminTestDraftEditorInner({
   onPublished,
 }: AdminTestDraftEditorProps) {
   const { user } = useAuth();
-  const { screenToFlowPosition, getViewport, setViewport } = useReactFlow();
+  const { screenToFlowPosition, getViewport, setViewport, setCenter } = useReactFlow();
   const normalizedInitialDraft = useMemo(
     () => ({
       ...initialDraft,
@@ -694,6 +1117,12 @@ function AdminTestDraftEditorInner({
   });
   const [selectedQuestionIds, setSelectedQuestionIds] = useState<string[]>([]);
   const [selectedQuestionId, setSelectedQuestionId] = useState<string | null>(null);
+  const [areaSelectionPreview, setAreaSelectionPreview] = useState<{
+    mode: "questions" | "answers";
+    questionId: string | null;
+    ids: string[];
+  } | null>(null);
+  const [shiftKeyHeld, setShiftKeyHeld] = useState(false);
   const [selectedAnswerIds, setSelectedAnswerIds] = useState<string[]>([]);
   const [validationErrors, setValidationErrors] = useState<DraftValidationError[]>([]);
   const [autosaveState, setAutosaveState] = useState<AutosaveState>("saved");
@@ -703,12 +1132,9 @@ function AdminTestDraftEditorInner({
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [history, setHistory] = useState<DraftCanvasModel[]>([normalizeCanvas(initialDraft.canvas)]);
   const [historyIndex, setHistoryIndex] = useState(0);
-  const [interactionMode, setInteractionMode] = useState<InteractionMode>("select");
-  const [inspectorCollapsed, setInspectorCollapsed] = useState(false);
+  const [inspectorCollapsed, setInspectorCollapsed] = useState(true);
+  const [questionGrabActive, setQuestionGrabActive] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [questionTypeMenuOpen, setQuestionTypeMenuOpen] = useState(false);
-  const [insertQuestionType, setInsertQuestionType] =
-    useState<AdminTestQuestionType>("single");
   const lastSavedSnapshotRef = useRef(autosaveSnapshot(normalizedInitialDraft));
   const canvasRef = useRef<HTMLDivElement | null>(null);
   const horizontalScrollRef = useRef<HTMLDivElement | null>(null);
@@ -718,6 +1144,25 @@ function AdminTestDraftEditorInner({
   const syncingHorizontalScrollRef = useRef(false);
   const suppressPaneClickRef = useRef(false);
   const suppressQuestionClickRef = useRef(false);
+  const suppressAnswerClickRef = useRef(false);
+  const areaSelectionListenersRef = useRef<{
+    move: (event: PointerEvent) => void;
+    up: (event: PointerEvent) => void;
+  } | null>(null);
+  const areaSelectGuardRef = useRef<((event: Event) => void) | null>(null);
+  const areaSelectCaptureRef = useRef<{ root: HTMLDivElement; pointerId: number } | null>(null);
+  const inlineEditRef = useRef<{
+    kind: "question" | "answer";
+    questionId: string;
+    answerId?: string;
+    draft: string;
+  } | null>(null);
+  const [inlineEdit, setInlineEdit] = useState<{
+    kind: "question" | "answer";
+    questionId: string;
+    answerId?: string;
+    draft: string;
+  } | null>(null);
   const selectionSessionRef = useRef<{
     mode: "questions" | "answers";
     pointerId: number;
@@ -739,6 +1184,7 @@ function AdminTestDraftEditorInner({
       questionId: string;
       baseX: number;
       nodeEl: HTMLDivElement;
+      cardEl: HTMLDivElement;
     }>;
     rafId: number | null;
   } | null>(null);
@@ -794,24 +1240,6 @@ function AdminTestDraftEditorInner({
     syncSelection([questionId], questionId, []);
   }, [syncSelection]);
 
-  const selectQuestionFromClick = useCallback((questionId: string) => {
-    if (suppressQuestionClickRef.current) {
-      suppressQuestionClickRef.current = false;
-      return;
-    }
-    selectQuestionOnly(questionId);
-  }, [selectQuestionOnly]);
-
-  const selectAnswerOnly = useCallback((questionId: string, answerId: string, additive = false) => {
-    setSelectedQuestionIds([questionId]);
-    setSelectedQuestionId(questionId);
-    setSelectedAnswerIds((prev) => {
-      if (!additive || selectedQuestionId !== questionId) return [answerId];
-      if (prev.includes(answerId)) return prev.filter((id) => id !== answerId);
-      return [...prev, answerId];
-    });
-  }, [selectedQuestionId]);
-
   const showValidationError = useCallback((error: DraftValidationError) => {
     if (validationTimerRef.current !== null) {
       window.clearTimeout(validationTimerRef.current);
@@ -847,13 +1275,12 @@ function AdminTestDraftEditorInner({
         if (question.id !== questionId) return question;
         const next = { ...question, ...patch };
         if (patch.type && patch.type !== question.type) {
-          next.answers =
-            patch.type === "text"
-              ? [{ id: uid("text"), kind: "textAnswer", text: "", isCorrect: true }]
-              : [
-                  { id: uid("a"), kind: "answer", text: "", isCorrect: false },
-                  { id: uid("a"), kind: "answer", text: "", isCorrect: false },
-                ];
+          next.answers = convertQuestionAnswersOnTypeChange(
+            question.type,
+            patch.type,
+            question.answers,
+            uid,
+          );
         }
         return next;
       }),
@@ -879,6 +1306,182 @@ function AdminTestDraftEditorInner({
     }));
   }, [mutateCanvas]);
 
+  const setInlineEditState = useCallback(
+    (
+      next: {
+        kind: "question" | "answer";
+        questionId: string;
+        answerId?: string;
+        draft: string;
+      } | null,
+    ) => {
+      inlineEditRef.current = next;
+      setInlineEdit(next);
+    },
+    [],
+  );
+
+  const commitInlineEdit = useCallback(() => {
+    const current = inlineEditRef.current;
+    if (!current) return;
+    if (current.kind === "question") {
+      updateQuestion(current.questionId, { text: current.draft });
+    } else if (current.answerId) {
+      updateAnswer(current.questionId, current.answerId, { text: current.draft });
+    }
+    setInlineEditState(null);
+  }, [setInlineEditState, updateAnswer, updateQuestion]);
+
+  const changeQuestionType = useCallback(
+    (questionId: string, type: AdminTestQuestionType) => {
+      commitInlineEdit();
+      const question = draft.canvas.questions.find((item) => item.id === questionId);
+      if (!question || question.type === type) return;
+
+      const convertedAnswers = convertQuestionAnswersOnTypeChange(
+        question.type,
+        type,
+        question.answers,
+        uid,
+      );
+      updateQuestion(questionId, { type });
+
+      const convertedIdSet = new Set(convertedAnswers.map((answer) => answer.id));
+      const nextAnswerIds =
+        selectedQuestionId === questionId
+          ? selectedAnswerIds.filter((id) => convertedIdSet.has(id))
+          : [];
+      syncSelection([questionId], questionId, nextAnswerIds);
+    },
+    [
+      commitInlineEdit,
+      draft.canvas.questions,
+      selectedAnswerIds,
+      selectedQuestionId,
+      syncSelection,
+      updateQuestion,
+    ],
+  );
+
+  const updateQuestionPoints = useCallback(
+    (questionId: string, points: number) => {
+      commitInlineEdit();
+      updateQuestion(questionId, { points });
+    },
+    [commitInlineEdit, updateQuestion],
+  );
+
+  const toggleAnswerCorrect = useCallback(
+    (questionId: string, answerId: string) => {
+      const question = draft.canvas.questions.find((item) => item.id === questionId);
+      if (!question || question.type === "text") return;
+      const answer = question.answers.find((item) => item.id === answerId);
+      if (!answer || answer.kind !== "answer") return;
+      if (question.type === "single") {
+        updateAnswer(questionId, answerId, { isCorrect: true });
+        return;
+      }
+      updateAnswer(questionId, answerId, { isCorrect: !answer.isCorrect });
+    },
+    [draft.canvas.questions, updateAnswer],
+  );
+
+  const selectAnswerOnly = useCallback(
+    (questionId: string, answerId: string, additive = false) => {
+      if (suppressAnswerClickRef.current) {
+        suppressAnswerClickRef.current = false;
+        return;
+      }
+      const current = inlineEditRef.current;
+      if (
+        current &&
+        !(
+          current.kind === "answer" &&
+          current.questionId === questionId &&
+          current.answerId === answerId
+        )
+      ) {
+        commitInlineEdit();
+      }
+
+      let nextAnswerIds: string[];
+      if (!additive || selectedQuestionId !== questionId) {
+        nextAnswerIds = [answerId];
+      } else if (selectedAnswerIds.includes(answerId)) {
+        nextAnswerIds = selectedAnswerIds.filter((id) => id !== answerId);
+      } else {
+        nextAnswerIds = [...selectedAnswerIds, answerId];
+      }
+
+      syncSelection([questionId], questionId, nextAnswerIds);
+    },
+    [commitInlineEdit, selectedAnswerIds, selectedQuestionId, syncSelection],
+  );
+
+  const beginInlineEditQuestion = useCallback(
+    (questionId: string, text: string) => {
+      commitInlineEdit();
+      selectQuestionOnly(questionId);
+      setInlineEditState({
+        kind: "question",
+        questionId,
+        draft: questionEditDraft(text),
+      });
+    },
+    [commitInlineEdit, selectQuestionOnly, setInlineEditState],
+  );
+
+  const beginInlineEditAnswer = useCallback(
+    (questionId: string, answerId: string, text: string, kind: DraftAnswerNode["kind"]) => {
+      commitInlineEdit();
+      selectAnswerOnly(questionId, answerId, false);
+      setInlineEditState({
+        kind: "answer",
+        questionId,
+        answerId,
+        draft: answerEditDraft(text, kind),
+      });
+    },
+    [commitInlineEdit, selectAnswerOnly, setInlineEditState],
+  );
+
+  const updateInlineEditDraft = useCallback(
+    (draft: string) => {
+      setInlineEditState(
+        inlineEditRef.current ? { ...inlineEditRef.current, draft } : null,
+      );
+    },
+    [setInlineEditState],
+  );
+
+  const selectQuestionFromClick = useCallback((questionId: string) => {
+    if (suppressQuestionClickRef.current) {
+      suppressQuestionClickRef.current = false;
+      return;
+    }
+    const question = draft.canvas.questions.find((item) => item.id === questionId);
+    if (question && !question.text.trim()) {
+      beginInlineEditQuestion(questionId, question.text);
+      return;
+    }
+    commitInlineEdit();
+    selectQuestionOnly(questionId);
+  }, [beginInlineEditQuestion, commitInlineEdit, draft.canvas.questions, selectQuestionOnly]);
+
+  const selectAllAnswersInQuestion = useCallback(
+    (questionId: string) => {
+      const question = draft.canvas.questions.find((item) => item.id === questionId);
+      if (!question || question.answers.length === 0) return;
+      commitInlineEdit();
+      syncSelection(
+        [questionId],
+        questionId,
+        question.answers.map((answer) => answer.id),
+      );
+    },
+    [commitInlineEdit, draft.canvas.questions, syncSelection],
+  );
+
   const addQuestion = useCallback((type: AdminTestQuestionType, position?: { x: number; y: number }) => {
     const fallback = {
       x: GRID_START_X + draft.canvas.questions.length * GRID_X,
@@ -893,25 +1496,66 @@ function AdminTestDraftEditorInner({
     selectQuestionOnly(created.question.id);
   }, [draft.canvas.questions, mutateCanvas, selectQuestionOnly]);
 
+  const insertQuestionAt = useCallback((insertIndex: number, type: AdminTestQuestionType) => {
+    const created = defaultQuestion(type, { x: 0, y: GRID_START_Y });
+    mutateCanvas((canvas) => {
+      const ordered = sortQuestions(canvas);
+      const nextQuestions = [
+        ...ordered.slice(0, insertIndex),
+        created.question,
+        ...ordered.slice(insertIndex),
+      ];
+      return {
+        questions: nextQuestions,
+        layout: linearizeLayout(nextQuestions),
+      };
+    });
+    selectQuestionOnly(created.question.id);
+  }, [mutateCanvas, selectQuestionOnly]);
+
+  const appendAnswerToQuestion = useCallback(
+    (questionId: string, kind: "answer" | "textAnswer") => {
+      const question = draft.canvas.questions.find((item) => item.id === questionId);
+      if (!question) return;
+      if (question.type === "text" && kind !== "textAnswer") {
+        showValidationError({
+          targetId: question.id,
+          message: "Обычный ответ нельзя добавить в текстовый вопрос",
+        });
+        return;
+      }
+      if (question.type !== "text" && kind === "textAnswer") {
+        showValidationError({
+          targetId: question.id,
+          message: "Текстовый ответ можно добавить только в текстовый вопрос",
+        });
+        return;
+      }
+      const answer: DraftAnswerNode = {
+        id: uid(kind === "textAnswer" ? "text" : "a"),
+        kind,
+        text: "",
+        isCorrect: kind === "textAnswer",
+      };
+      updateQuestion(questionId, { answers: [...question.answers, answer] });
+      selectAnswerOnly(questionId, answer.id, false);
+    },
+    [draft.canvas.questions, selectAnswerOnly, showValidationError, updateQuestion],
+  );
+
+  const addAnswerToQuestion = useCallback(
+    (questionId: string) => {
+      const question = draft.canvas.questions.find((item) => item.id === questionId);
+      if (!question) return;
+      appendAnswerToQuestion(questionId, question.type === "text" ? "textAnswer" : "answer");
+    },
+    [appendAnswerToQuestion, draft.canvas.questions],
+  );
+
   const addAnswer = useCallback((kind: "answer" | "textAnswer") => {
     if (!selectedQuestion) return;
-    if (selectedQuestion.type === "text" && kind !== "textAnswer") {
-      showValidationError({ targetId: selectedQuestion.id, message: "Обычный ответ нельзя добавить в текстовый вопрос" });
-      return;
-    }
-    if (selectedQuestion.type !== "text" && kind === "textAnswer") {
-      showValidationError({ targetId: selectedQuestion.id, message: "Текстовый ответ можно добавить только в текстовый вопрос" });
-      return;
-    }
-    const answer: DraftAnswerNode = {
-      id: uid(kind === "textAnswer" ? "text" : "a"),
-      kind,
-      text: "",
-      isCorrect: kind === "textAnswer",
-    };
-    updateQuestion(selectedQuestion.id, { answers: [...selectedQuestion.answers, answer] });
-    selectAnswerOnly(selectedQuestion.id, answer.id, false);
-  }, [selectAnswerOnly, selectedQuestion, showValidationError, updateQuestion]);
+    appendAnswerToQuestion(selectedQuestion.id, kind);
+  }, [appendAnswerToQuestion, selectedQuestion]);
 
   const deleteSelection = useCallback(() => {
     if (selectedAnswerIds.length > 0 && selectedQuestion) {
@@ -1093,6 +1737,14 @@ function AdminTestDraftEditorInner({
     }));
   }, [mutateCanvas]);
 
+  const beginQuestionGrab = useCallback(() => {
+    setQuestionGrabActive(true);
+  }, []);
+
+  const endQuestionGrab = useCallback(() => {
+    setQuestionGrabActive(false);
+  }, []);
+
   const handleQuestionDragStart = useCallback((questionId: string) => {
     const groupIds =
       selectedQuestionIds.length > 1 && selectedQuestionIds.includes(questionId)
@@ -1103,14 +1755,25 @@ function AdminTestDraftEditorInner({
         const nodeEl = canvasRef.current?.querySelector<HTMLDivElement>(
           `.react-flow__node[data-id="${id}"]`,
         );
-        if (!nodeEl) return null;
+        const cardEl = nodeEl?.querySelector<HTMLDivElement>(`[data-question-id="${id}"]`);
+        if (!nodeEl || !cardEl) return null;
         return {
           questionId: id,
           baseX: draft.canvas.layout[id]?.x ?? GRID_START_X,
           nodeEl,
+          cardEl,
         };
       })
-      .filter((item): item is { questionId: string; baseX: number; nodeEl: HTMLDivElement } => item !== null);
+      .filter(
+        (
+          item,
+        ): item is {
+          questionId: string;
+          baseX: number;
+          nodeEl: HTMLDivElement;
+          cardEl: HTMLDivElement;
+        } => item !== null,
+      );
     if (items.length === 0) return;
     const anchorBaseX =
       items.find((item) => item.questionId === questionId)?.baseX ?? GRID_START_X;
@@ -1155,12 +1818,28 @@ function AdminTestDraftEditorInner({
         if (!activeSession || activeSession.anchorQuestionId !== questionId) return;
         activeSession.rafId = null;
         activeSession.items.forEach((item) => {
-          item.nodeEl.style.transform = `translate(${item.baseX + activeSession.pendingDeltaX}px, ${GRID_START_Y}px)`;
+          item.cardEl.style.transform = `translate(${activeSession.pendingDeltaX}px, 0px)`;
         });
       });
     },
     [screenToFlowPosition],
   );
+
+  const clearDragSessionStyles = useCallback((session: NonNullable<typeof dragSessionRef.current>) => {
+    session.items.forEach((item) => {
+      item.nodeEl.classList.remove("is-dragging");
+      item.nodeEl.classList.remove("is-stack-anchor");
+      item.nodeEl.removeAttribute("data-drag-count");
+      item.cardEl.style.transform = "";
+      item.nodeEl.style.zIndex = "";
+    });
+  }, []);
+
+  const clearAllCardTransforms = useCallback(() => {
+    canvasRef.current?.querySelectorAll<HTMLElement>("[data-question-id]").forEach((cardEl) => {
+      cardEl.style.transform = "";
+    });
+  }, []);
 
   const handleQuestionDragEnd = useCallback(
     (
@@ -1175,39 +1854,59 @@ function AdminTestDraftEditorInner({
         y: clientY - grabOffsetY,
       });
       const session = dragSessionRef.current;
-      if (session && session.rafId !== null) {
+      if (session?.rafId !== null && session?.rafId !== undefined) {
         window.cancelAnimationFrame(session.rafId);
       }
+
+      const prevOrder = sortQuestions(draft.canvas).map((question) => question.id);
+      const movingIds =
+        session && session.items.length > 0
+          ? session.items.map((item) => item.questionId)
+          : [questionId];
+      const releaseX = session
+        ? session.anchorBaseX + session.pendingDeltaX
+        : flowPosition.x;
+      const nextQuestions = reorderQuestionsAsBlock(
+        draft.canvas,
+        movingIds,
+        questionId,
+        releaseX,
+      );
+      const nextOrder = nextQuestions.map((question) => question.id);
+
       if (session) {
-        const deltaX = flowPosition.x - session.anchorBaseX;
-        session.items.forEach((item) => {
-          item.nodeEl.classList.remove("is-dragging");
-          item.nodeEl.classList.remove("is-stack-anchor");
-          item.nodeEl.removeAttribute("data-drag-count");
-          item.nodeEl.style.transform = `translate(${item.baseX + deltaX}px, ${GRID_START_Y}px)`;
-          item.nodeEl.style.zIndex = "";
-        });
+        clearDragSessionStyles(session);
       }
+      clearAllCardTransforms();
       dragSessionRef.current = null;
-      mutateCanvas((canvas) => {
-        const movingIds =
-          session && session.items.length > 0
-            ? session.items.map((item) => item.questionId)
-            : [questionId];
-        const nextQuestions = reorderQuestionsAsBlock(
-          canvas,
-          movingIds,
-          questionId,
-          flowPosition.x,
-        );
-        return {
+
+      if (!sameIds(prevOrder, nextOrder)) {
+        mutateCanvas(() => ({
           questions: nextQuestions,
           layout: linearizeLayout(nextQuestions),
-        };
-      });
+        }));
+      }
     },
-    [mutateCanvas, screenToFlowPosition],
+    [clearAllCardTransforms, clearDragSessionStyles, draft.canvas, mutateCanvas, screenToFlowPosition],
   );
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Shift") setShiftKeyHeld(true);
+    };
+    const onKeyUp = (event: KeyboardEvent) => {
+      if (event.key === "Shift") setShiftKeyHeld(false);
+    };
+    const onBlur = () => setShiftKeyHeld(false);
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("keyup", onKeyUp);
+    window.addEventListener("blur", onBlur);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keyup", onKeyUp);
+      window.removeEventListener("blur", onBlur);
+    };
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -1220,23 +1919,6 @@ function AdminTestDraftEditorInner({
       }
     };
   }, []);
-
-  useEffect(() => {
-    const root = canvasRef.current;
-    if (!root) return;
-    if (selectionSessionRef.current) return;
-
-    const selectedSet = new Set(selectedQuestionIds);
-    const cards = root.querySelectorAll<HTMLElement>("[data-question-id]");
-
-    cards.forEach((card) => {
-      const questionId = card.dataset.questionId ?? "";
-      card.classList.toggle(
-        styles.questionNodeSelected,
-        selectedSet.has(questionId),
-      );
-    });
-  }, [selectedQuestionIds]);
 
   const renderSelectionPreview = useCallback(() => {
     const session = selectionSessionRef.current;
@@ -1280,19 +1962,94 @@ function AdminTestDraftEditorInner({
     });
 
     session.currentIds = Array.from(ids);
-    elements.forEach((element) => {
-      const id =
-        session.mode === "answers"
-          ? element.dataset.answerId ?? ""
-          : element.dataset.questionId ?? "";
-      element.classList.toggle(
-        session.mode === "answers"
-          ? styles.answerChipSelected
-          : styles.questionNodeSelected,
-        ids.has(id),
-      );
+    setAreaSelectionPreview((prev) => {
+      const next = {
+        mode: session.mode,
+        questionId: session.questionId,
+        ids: session.currentIds,
+      };
+      if (
+        prev &&
+        prev.mode === next.mode &&
+        prev.questionId === next.questionId &&
+        sameIds(prev.ids, next.ids)
+      ) {
+        return prev;
+      }
+      return next;
     });
   }, []);
+
+  const disableAreaSelectGuard = useCallback(() => {
+    const onSelectStart = areaSelectGuardRef.current;
+    if (onSelectStart) {
+      document.removeEventListener("selectstart", onSelectStart);
+      areaSelectGuardRef.current = null;
+    }
+    document.body.style.userSelect = "";
+    const capture = areaSelectCaptureRef.current;
+    if (capture?.root.hasPointerCapture(capture.pointerId)) {
+      capture.root.releasePointerCapture(capture.pointerId);
+    }
+    areaSelectCaptureRef.current = null;
+    window.getSelection()?.removeAllRanges();
+  }, []);
+
+  const enableAreaSelectGuard = useCallback(
+    (root: HTMLDivElement, pointerId: number) => {
+      disableAreaSelectGuard();
+      const onSelectStart = (event: Event) => {
+        event.preventDefault();
+      };
+      document.addEventListener("selectstart", onSelectStart);
+      document.body.style.userSelect = "none";
+      areaSelectGuardRef.current = onSelectStart;
+      try {
+        root.setPointerCapture(pointerId);
+        areaSelectCaptureRef.current = { root, pointerId };
+      } catch {
+        areaSelectCaptureRef.current = null;
+      }
+    },
+    [disableAreaSelectGuard],
+  );
+
+  const cleanupAreaSelectionListeners = useCallback(() => {
+    disableAreaSelectGuard();
+    const listeners = areaSelectionListenersRef.current;
+    if (!listeners) return;
+    window.removeEventListener("pointermove", listeners.move);
+    window.removeEventListener("pointerup", listeners.up);
+    window.removeEventListener("pointercancel", listeners.up);
+    areaSelectionListenersRef.current = null;
+  }, [disableAreaSelectGuard]);
+
+  useEffect(() => {
+    return () => {
+      disableAreaSelectGuard();
+    };
+  }, [disableAreaSelectGuard]);
+
+  const hideAreaSelectionOverlay = useCallback(() => {
+    const overlay = selectionOverlayRef.current;
+    if (!overlay) return;
+    overlay.style.display = "none";
+    overlay.classList.remove(styles.selectionOverlayAnswers);
+    overlay.style.width = "0px";
+    overlay.style.height = "0px";
+    setAreaSelectionPreview(null);
+  }, []);
+
+  const cancelAreaSelection = useCallback(() => {
+    const session = selectionSessionRef.current;
+    if (session?.rafId !== null && session?.rafId !== undefined) {
+      window.cancelAnimationFrame(session.rafId);
+    }
+
+    hideAreaSelectionOverlay();
+    cleanupAreaSelectionListeners();
+    selectionSessionRef.current = null;
+  }, [cleanupAreaSelectionListeners, hideAreaSelectionOverlay]);
 
   const finishAreaSelection = useCallback(() => {
     const session = selectionSessionRef.current;
@@ -1304,14 +2061,8 @@ function AdminTestDraftEditorInner({
       renderSelectionPreview();
     }
 
-    const overlay = selectionOverlayRef.current;
-    if (overlay) {
-      overlay.style.display = "none";
-      overlay.classList.remove(styles.selectionOverlayAnswers);
-      overlay.style.width = "0px";
-      overlay.style.height = "0px";
-    }
-
+    hideAreaSelectionOverlay();
+    cleanupAreaSelectionListeners();
     selectionSessionRef.current = null;
     suppressPaneClickRef.current = true;
     suppressQuestionClickRef.current = true;
@@ -1319,9 +2070,16 @@ function AdminTestDraftEditorInner({
       suppressPaneClickRef.current = false;
       suppressQuestionClickRef.current = false;
     }, 120);
+
+    const dragDistance = Math.hypot(
+      session.latestX - session.startX,
+      session.latestY - session.startY,
+    );
+    const isClick = dragDistance < AREA_SELECT_DRAG_THRESHOLD;
     const ids = session.currentIds;
 
     if (ids.length === 0) {
+      if (isClick) return;
       if (session.mode === "answers" && session.questionId) {
         syncSelection([session.questionId], session.questionId, []);
       } else {
@@ -1332,67 +2090,82 @@ function AdminTestDraftEditorInner({
 
     if (session.mode === "answers" && session.questionId) {
       syncSelection([session.questionId], session.questionId, ids);
+      suppressAnswerClickRef.current = true;
+      window.setTimeout(() => {
+        suppressAnswerClickRef.current = false;
+      }, 120);
       return;
     }
 
     syncSelection(ids, ids.length === 1 ? ids[0] : null, []);
-  }, [clearSelection, renderSelectionPreview, syncSelection]);
+  }, [clearSelection, cleanupAreaSelectionListeners, hideAreaSelectionOverlay, renderSelectionPreview, syncSelection]);
 
   const handleAreaSelectionPointerDown = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
-    if (interactionMode === "pan") return;
     if (event.button !== 0 || !event.shiftKey) return;
+    setShiftKeyHeld(true);
 
     const target = event.target as HTMLElement;
-    if (target.closest(`.${styles.horizontalScroll}`)) return;
-    const targetQuestion = target.closest<HTMLElement>("[data-question-id]");
-    const answerQuestionId = targetQuestion?.dataset.questionId ?? null;
-    const mode: "questions" | "answers" =
-      answerQuestionId && answerQuestionId === selectedQuestionId
-        ? "answers"
-        : "questions";
-
-    if (mode === "questions" && target.closest(".react-flow__node")) {
-      return;
-    }
+    if (target.closest(`.${styles.bottomBar}`)) return;
+    if (target.closest("[data-answer-chip='true']")) return;
+    if (target.closest("[data-answer-insert='true']")) return;
     if (target.closest(".react-flow__controls") || target.closest(".react-flow__minimap")) {
       return;
     }
+
+    const targetQuestion = target.closest<HTMLElement>("[data-question-id]");
+    const startQuestionId = targetQuestion?.dataset.questionId ?? null;
+    const mode: "questions" | "answers" = startQuestionId ? "answers" : "questions";
+    const answerQuestionId = startQuestionId;
 
     const root = canvasRef.current;
     if (!root) return;
 
     event.preventDefault();
-    event.stopPropagation();
+    cleanupAreaSelectionListeners();
+    enableAreaSelectGuard(root, event.pointerId);
 
-    const session = {
-      mode,
-      pointerId: event.pointerId,
-      startX: event.clientX,
-      startY: event.clientY,
-      latestX: event.clientX,
-      latestY: event.clientY,
-      rafId: null,
-      baseSelectedIds:
-        event.metaKey || event.ctrlKey
-          ? mode === "answers"
-            ? selectedAnswerIds
-            : selectedQuestionIds
-          : [],
-      currentIds:
-        event.metaKey || event.ctrlKey
-          ? mode === "answers"
-            ? selectedAnswerIds
-            : selectedQuestionIds
-          : [],
-      questionId: mode === "answers" ? answerQuestionId : null,
-      root,
+    const pointerId = event.pointerId;
+    const startX = event.clientX;
+    const startY = event.clientY;
+    const baseSelectedIds =
+      event.metaKey || event.ctrlKey
+        ? mode === "answers"
+          ? selectedAnswerIds.filter(
+              (id) => targetQuestion?.querySelector(`[data-answer-id="${id}"]`) != null,
+            )
+          : selectedQuestionIds
+        : [];
+
+    const activateSession = (clientX: number, clientY: number) => {
+      if (selectionSessionRef.current) return;
+      selectionSessionRef.current = {
+        mode,
+        pointerId,
+        startX,
+        startY,
+        latestX: clientX,
+        latestY: clientY,
+        rafId: null,
+        baseSelectedIds,
+        currentIds: [...baseSelectedIds],
+        questionId: mode === "answers" ? answerQuestionId : null,
+        root,
+      };
+      renderSelectionPreview();
     };
-    selectionSessionRef.current = session;
-    renderSelectionPreview();
 
     const handlePointerMove = (moveEvent: PointerEvent) => {
+      if (moveEvent.pointerId !== pointerId) return;
+      moveEvent.preventDefault();
+
+      const distance = Math.hypot(moveEvent.clientX - startX, moveEvent.clientY - startY);
+      if (!selectionSessionRef.current) {
+        if (distance < AREA_SELECT_DRAG_THRESHOLD) return;
+        activateSession(moveEvent.clientX, moveEvent.clientY);
+      }
+
       const activeSession = selectionSessionRef.current;
-      if (!activeSession || moveEvent.pointerId !== activeSession.pointerId) return;
+      if (!activeSession) return;
       activeSession.latestX = moveEvent.clientX;
       activeSession.latestY = moveEvent.clientY;
       if (activeSession.rafId !== null) return;
@@ -1400,36 +2173,46 @@ function AdminTestDraftEditorInner({
     };
 
     const handlePointerUp = (upEvent: PointerEvent) => {
-      const activeSession = selectionSessionRef.current;
-      if (!activeSession || upEvent.pointerId !== activeSession.pointerId) return;
-      window.removeEventListener("pointermove", handlePointerMove);
-      window.removeEventListener("pointerup", handlePointerUp);
-      window.removeEventListener("pointercancel", handlePointerUp);
-      activeSession.latestX = upEvent.clientX;
-      activeSession.latestY = upEvent.clientY;
+      if (upEvent.pointerId !== pointerId) return;
+      cleanupAreaSelectionListeners();
+      if (!selectionSessionRef.current) return;
+      upEvent.preventDefault();
+      selectionSessionRef.current.latestX = upEvent.clientX;
+      selectionSessionRef.current.latestY = upEvent.clientY;
       finishAreaSelection();
     };
 
+    areaSelectionListenersRef.current = {
+      move: handlePointerMove,
+      up: handlePointerUp,
+    };
     window.addEventListener("pointermove", handlePointerMove);
     window.addEventListener("pointerup", handlePointerUp);
     window.addEventListener("pointercancel", handlePointerUp);
-  }, [finishAreaSelection, interactionMode, renderSelectionPreview, selectedAnswerIds, selectedQuestionId, selectedQuestionIds]);
+  }, [
+    cleanupAreaSelectionListeners,
+    enableAreaSelectGuard,
+    finishAreaSelection,
+    renderSelectionPreview,
+    selectedAnswerIds,
+    selectedQuestionIds,
+  ]);
 
   const handlePaneClick = useCallback(() => {
     if (suppressPaneClickRef.current) {
       suppressPaneClickRef.current = false;
       return;
     }
-    if (interactionMode === "pan") return;
+    commitInlineEdit();
     clearSelection();
-  }, [clearSelection, interactionMode]);
+  }, [clearSelection, commitInlineEdit]);
 
   const getHorizontalScrollMax = useCallback((zoom: number) => {
     const canvasWidth = canvasRef.current?.clientWidth ?? 0;
     const contentWidth =
       GRID_START_X * 2 +
       Math.max(0, sortedQuestions.length - 1) * GRID_X +
-      300;
+      CARD_WIDTH;
     return Math.max(0, contentWidth * zoom - canvasWidth + 240);
   }, [sortedQuestions.length]);
 
@@ -1515,6 +2298,38 @@ function AdminTestDraftEditorInner({
     window.addEventListener("pointercancel", handlePointerUp);
   }, [handleHorizontalScroll]);
 
+  const focusQuestionOnCanvas = useCallback(
+    async (questionId: string) => {
+      commitInlineEdit();
+      selectQuestionOnly(questionId);
+
+      const index = sortedQuestions.findIndex((question) => question.id === questionId);
+      const layout = draft.canvas.layout[questionId] ?? {
+        x: slotX(Math.max(0, index)),
+        y: GRID_START_Y,
+      };
+      const centerX = layout.x + CARD_WIDTH / 2;
+      const centerY = layout.y + CARD_MIN_HEIGHT / 2;
+      const zoom = getViewport().zoom;
+
+      await setCenter(centerX, centerY, {
+        duration: 450,
+        zoom,
+        interpolate: "smooth",
+      });
+      syncHorizontalScrollFromViewport(getViewport());
+    },
+    [
+      commitInlineEdit,
+      draft.canvas.layout,
+      getViewport,
+      selectQuestionOnly,
+      setCenter,
+      sortedQuestions,
+      syncHorizontalScrollFromViewport,
+    ],
+  );
+
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
       syncHorizontalScrollFromViewport(getViewport());
@@ -1528,16 +2343,18 @@ function AdminTestDraftEditorInner({
     return stableOrdered.map((question, index) => ({
       id: question.id,
       type: "question",
-      position: draft.canvas.layout[question.id] ?? { x: 0, y: 0 },
+      position: draft.canvas.layout[question.id] ?? {
+        x: slotX(index),
+        y: GRID_START_Y,
+      },
       draggable: false,
-      className: "draft-flow-node",
+      className: "draft-flow-node nopan",
       data: {
         question,
         index,
         selectedAnswerIds,
         copiedIds,
         copiedAnswerIds,
-        interactionMode,
         issues: visibleIssues.filter(
           (issue) => questionIdForIssue(draft.canvas, issue) === question.id,
         ),
@@ -1545,14 +2362,67 @@ function AdminTestDraftEditorInner({
           validationErrors.find((error) => error.targetId === question.id)?.message ?? null,
         onSelectQuestion: selectQuestionFromClick,
         onSelectAnswer: selectAnswerOnly,
+        onQuestionGrabStart: beginQuestionGrab,
+        onQuestionGrabEnd: endQuestionGrab,
         onDragStart: handleQuestionDragStart,
         onDragMove: handleQuestionDragMove,
         onDragEnd: handleQuestionDragEnd,
         onReorderAnswers: reorderAnswers,
         onDropAnswer: moveAnswerToQuestion,
+        onAddAnswer: addAnswerToQuestion,
+        editingQuestion:
+          inlineEdit?.kind === "question" && inlineEdit.questionId === question.id,
+        editingAnswerId:
+          inlineEdit?.kind === "answer" && inlineEdit.questionId === question.id
+            ? inlineEdit.answerId ?? null
+            : null,
+        inlineEditDraft:
+          inlineEdit &&
+          ((inlineEdit.kind === "question" && inlineEdit.questionId === question.id) ||
+            (inlineEdit.kind === "answer" && inlineEdit.questionId === question.id))
+            ? inlineEdit.draft
+            : "",
+        onBeginEditQuestion: beginInlineEditQuestion,
+        onBeginEditAnswer: beginInlineEditAnswer,
+        onInlineEditDraftChange: updateInlineEditDraft,
+        onCommitInlineEdit: commitInlineEdit,
+        onChangeQuestionType: changeQuestionType,
+        onUpdateQuestionPoints: updateQuestionPoints,
+        onToggleAnswerCorrect: toggleAnswerCorrect,
+        areaSelectionPreview,
+        selectedQuestionIds,
+        shiftKeyHeld,
       },
     }));
-  }, [copiedAnswerIds, copiedIds, draft.canvas, handleQuestionDragEnd, handleQuestionDragMove, handleQuestionDragStart, interactionMode, moveAnswerToQuestion, reorderAnswers, selectAnswerOnly, selectQuestionFromClick, selectedAnswerIds, validationErrors, visibleIssues]);
+  }, [
+    addAnswerToQuestion,
+    areaSelectionPreview,
+    beginInlineEditAnswer,
+    beginInlineEditQuestion,
+    beginQuestionGrab,
+    changeQuestionType,
+    commitInlineEdit,
+    copiedAnswerIds,
+    copiedIds,
+    draft.canvas,
+    endQuestionGrab,
+    handleQuestionDragEnd,
+    handleQuestionDragMove,
+    handleQuestionDragStart,
+    inlineEdit,
+    moveAnswerToQuestion,
+    reorderAnswers,
+    selectAnswerOnly,
+    selectQuestionFromClick,
+    selectedAnswerIds,
+    selectedQuestionIds,
+    shiftKeyHeld,
+    toggleAnswerCorrect,
+    updateInlineEditDraft,
+    updateQuestionPoints,
+    validationErrors,
+    visibleIssues,
+  ]);
 
   const handleNodesChange = useCallback(() => {
     // Positions are controlled by custom drag handlers for smoother motion.
@@ -1615,8 +2485,32 @@ function AdminTestDraftEditorInner({
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
+      const active = document.activeElement;
+      const isTypingTarget =
+        active instanceof HTMLTextAreaElement ||
+        active instanceof HTMLInputElement ||
+        active instanceof HTMLSelectElement;
+
+      if (
+        (event.code === "KeyA" || event.key.toLowerCase() === "a") &&
+        event.shiftKey &&
+        !event.metaKey &&
+        !event.ctrlKey &&
+        !event.altKey
+      ) {
+        if (isTypingTarget) return;
+        if (!selectedQuestionId) return;
+        event.preventDefault();
+        cancelAreaSelection();
+        selectAllAnswersInQuestion(selectedQuestionId);
+        return;
+      }
+
       const mod = event.metaKey || event.ctrlKey;
       if (!mod) return;
+
+      if (isTypingTarget) return;
+
       if (event.key.toLowerCase() === "c") {
         event.preventDefault();
         void copySelection();
@@ -1635,7 +2529,7 @@ function AdminTestDraftEditorInner({
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [copySelection, pasteSelection, redo, undo]);
+  }, [cancelAreaSelection, copySelection, pasteSelection, redo, selectAllAnswersInQuestion, selectedQuestionId, undo]);
 
   const publish = async () => {
     const errors = validateDraft(draft);
@@ -1678,10 +2572,9 @@ function AdminTestDraftEditorInner({
 
   return (
     <div
-      className={`${styles.editor} ${inspectorCollapsed ? styles.editorInspectorCollapsed : ""}`}
+      className={styles.editor}
       onClick={() => {
         setContextMenu(null);
-        setQuestionTypeMenuOpen(false);
       }}
     >
       <div className={styles.mobileBlock}>
@@ -1690,73 +2583,12 @@ function AdminTestDraftEditorInner({
         <Button type="button" onClick={onBack}>Назад</Button>
       </div>
 
-      <aside className={styles.rail} aria-label="Инструменты">
-        <button type="button" className={styles.railBack} onClick={onBack} data-tooltip="Назад">
-          <ArrowLeft size={20} />
-        </button>
-        <button
-          type="button"
-          className={styles.railButton}
-          data-tooltip={`Добавить вопрос: ${labelForType(insertQuestionType)}`}
-          draggable
-          onDragStart={(event) =>
-            event.dataTransfer.setData(
-              "application/x-cpm-question-type",
-              insertQuestionType,
-            )
-          }
-          onClick={() => addQuestion(insertQuestionType)}
-        >
-          <FileQuestion size={20} />
-        </button>
-        <div className={styles.railTypePicker} onClick={(event) => event.stopPropagation()}>
-          <button
-            type="button"
-            className={styles.railTypeButton}
-            data-tooltip="Тип нового вопроса"
-            onClick={() => setQuestionTypeMenuOpen((value) => !value)}
-          >
-            <span>{shortLabelForType(insertQuestionType)}</span>
-            <ChevronDown size={14} />
-          </button>
-          {questionTypeMenuOpen ? (
-            <div className={styles.railTypeMenu}>
-              {(["single", "multiple", "text"] as AdminTestQuestionType[]).map((type) => (
-                <button
-                  key={type}
-                  type="button"
-                  className={`${styles.railTypeOption} ${insertQuestionType === type ? styles.railTypeOptionActive : ""}`}
-                  onClick={() => {
-                    setInsertQuestionType(type);
-                    setQuestionTypeMenuOpen(false);
-                  }}
-                >
-                  <span>{shortLabelForType(type)}</span>
-                  <strong>{labelForType(type)}</strong>
-                </button>
-              ))}
-            </div>
-          ) : null}
-        </div>
-        <button type="button" className={styles.railButton} onClick={() => addAnswer("answer")} data-tooltip="Добавить вариант ответа">
-          <Check size={20} />
-        </button>
-        <button type="button" className={styles.railButton} onClick={() => addAnswer("textAnswer")} data-tooltip="Добавить текстовый ответ">
-          <Clipboard size={20} />
-        </button>
-        <div className={styles.railSpacer} />
-        <button type="button" className={styles.railButton} onClick={undo} data-tooltip="Отменить">
-          <Undo2 size={18} />
-        </button>
-        <button type="button" className={styles.railButton} onClick={redo} data-tooltip="Повторить">
-          <Redo2 size={18} />
-        </button>
-      </aside>
-
       <main className={styles.canvasShell}>
         {lockWarning ? <div className={styles.lockBanner}>{lockWarning}</div> : null}
         <header className={styles.topbar}>
-          <MousePointer2 size={20} />
+          <button type="button" className={styles.topbarBack} onClick={onBack} aria-label="Назад">
+            <ArrowLeft size={20} />
+          </button>
           <div className={styles.titleBlock}>
             <h1>{draft.title || "Без названия"}</h1>
             <p>
@@ -1790,7 +2622,7 @@ function AdminTestDraftEditorInner({
 
         <div
           ref={canvasRef}
-          className={`${styles.canvas} ${interactionMode === "pan" ? styles.canvasPan : ""}`}
+          className={styles.canvas}
           onDragOver={(event) => event.preventDefault()}
           onDrop={(event) => {
             const type = event.dataTransfer.getData("application/x-cpm-question-type") as AdminTestQuestionType;
@@ -1803,80 +2635,122 @@ function AdminTestDraftEditorInner({
           }}
           onPointerDownCapture={handleAreaSelectionPointerDown}
         >
+          {sortedQuestions.length === 0 ? (
+            <div className={styles.canvasEmpty}>
+              <div className={styles.canvasEmptyCard}>
+                <FileQuestion size={36} strokeWidth={1.75} aria-hidden="true" />
+                <h2>Начните с первого вопроса</h2>
+                <p>Добавьте вопрос на полотно, чтобы собрать тест</p>
+                <Button type="button" onClick={() => addQuestion(DEFAULT_NEW_QUESTION_TYPE)}>
+                  Добавить вопрос
+                </Button>
+              </div>
+            </div>
+          ) : null}
           <div ref={selectionOverlayRef} className={styles.selectionOverlay} />
           <ReactFlow
+            style={{ ["--draft-card-width" as string]: `${CARD_WIDTH}px` }}
             nodes={nodes}
             edges={[]}
             nodeTypes={nodeTypes}
             onNodesChange={handleNodesChange}
             onNodeClick={(_event, node) => {
-              if (interactionMode === "pan") return;
               selectQuestionFromClick(node.id);
             }}
             onPaneClick={handlePaneClick}
+            onMove={(_event, viewport) => syncHorizontalScrollFromViewport(viewport)}
             onMoveEnd={(_event, viewport) => syncHorizontalScrollFromViewport(viewport)}
             selectionOnDrag={false}
-            panOnDrag={interactionMode === "pan"}
+            nodesDraggable={false}
+            panOnScroll
+            panOnScrollSpeed={1.25}
+            panOnDrag={!questionGrabActive}
+            zoomOnScroll={false}
+            zoomOnPinch
             fitView
             snapToGrid={false}
           >
             <Background gap={24} size={1} />
-            <Controls position="bottom-left" showInteractive={false}>
-              <ControlButton
-                className={interactionMode === "select" ? styles.controlButtonActive : ""}
-                title="Курсор"
-                onClick={() => setInteractionMode("select")}
-              >
-                <MousePointer2 size={16} />
-              </ControlButton>
-              <ControlButton
-                className={interactionMode === "pan" ? styles.controlButtonActive : ""}
-                title="Рука"
-                onClick={() => setInteractionMode("pan")}
-              >
-                <Hand size={16} />
-              </ControlButton>
-            </Controls>
-          </ReactFlow>
-          <div
-            ref={horizontalScrollRef}
-            className={styles.horizontalScroll}
-            onPointerDown={(event) => event.stopPropagation()}
-            onClick={(event) => event.stopPropagation()}
-            onScroll={handleHorizontalScroll}
-            aria-label="Горизонтальная прокрутка полотна"
-          >
-            <div
-              ref={horizontalScrollThumbRef}
-              className={styles.horizontalScrollThumb}
-              onPointerDown={handleHorizontalThumbPointerDown}
+            <AdminTestDraftFlowOverlay
+              canvas={draft.canvas}
+              hidden={questionGrabActive}
+              onInsertAt={(insertIndex) => insertQuestionAt(insertIndex, DEFAULT_NEW_QUESTION_TYPE)}
             />
-            <div
-              className={styles.horizontalScrollContent}
-              style={{
-                width: `${Math.max(900, sortedQuestions.length * GRID_X + 420)}px`,
+            <Controls position="bottom-left" showInteractive={false} />
+          </ReactFlow>
+          <div className={styles.bottomBar}>
+            <AdminTestDraftQuestionSearch
+              questions={sortedQuestions}
+              onSelect={(questionId) => {
+                void focusQuestionOnCanvas(questionId);
               }}
             />
+            <div
+              ref={horizontalScrollRef}
+              className={styles.horizontalScroll}
+              onPointerDown={(event) => event.stopPropagation()}
+              onClick={(event) => event.stopPropagation()}
+              onScroll={handleHorizontalScroll}
+              aria-label="Горизонтальная прокрутка полотна"
+            >
+              <div
+                ref={horizontalScrollThumbRef}
+                className={styles.horizontalScrollThumb}
+                onPointerDown={handleHorizontalThumbPointerDown}
+              />
+              <div
+                className={styles.horizontalScrollContent}
+                style={{
+                  width: `${Math.max(900, GRID_START_X + Math.max(0, sortedQuestions.length - 1) * GRID_X + CARD_WIDTH + GRID_START_X)}px`,
+                }}
+              />
+            </div>
           </div>
+        </div>
+
+        <div
+          className={`${styles.historyFab} ${inspectorCollapsed ? "" : styles.historyFabInspectorOpen}`}
+        >
+          <button type="button" className={styles.historyFabButton} onClick={undo} aria-label="Отменить">
+            <Undo2 size={18} />
+          </button>
+          <button type="button" className={styles.historyFabButton} onClick={redo} aria-label="Повторить">
+            <Redo2 size={18} />
+          </button>
         </div>
       </main>
 
-      <aside className={`${styles.inspector} ${inspectorCollapsed ? styles.inspectorCollapsed : ""}`}>
-        <button
-          type="button"
-          className={styles.inspectorToggle}
-          onClick={() => setInspectorCollapsed((value) => !value)}
-          title={inspectorCollapsed ? "Развернуть панель" : "Свернуть панель"}
-        >
-          {inspectorCollapsed ? <ChevronLeft size={18} /> : <ChevronRight size={18} />}
-        </button>
-        {inspectorCollapsed ? null : (
+      <aside
+        className={`${styles.inspectorShell} ${inspectorCollapsed ? styles.inspectorShellCollapsed : styles.inspectorShellOpen}`}
+        aria-label="Настройки"
+      >
+        {inspectorCollapsed ? (
+          <button
+            type="button"
+            className={styles.inspectorToggle}
+            onClick={() => setInspectorCollapsed(false)}
+            title="Настройки теста"
+            aria-label="Открыть настройки"
+          >
+            <Settings size={18} />
+          </button>
+        ) : (
           <>
-        <div className={styles.inspectorHeader}>
-          <h2>{selectedQuestion ? "Свойства вопроса" : "Настройки теста"}</h2>
-          <p>{selectedAnswer ? "Выбран ответ внутри вопроса" : "Автосейв включён"}</p>
-        </div>
-        <div className={styles.inspectorBody}>
+            <button
+              type="button"
+              className={styles.inspectorToggle}
+              onClick={() => setInspectorCollapsed(true)}
+              title="Свернуть панель"
+              aria-label="Закрыть настройки"
+            >
+              <ChevronRight size={18} />
+            </button>
+            <div className={styles.inspectorPanel}>
+              <div className={styles.inspectorHeader}>
+                <h2>{selectedQuestion ? "Свойства вопроса" : "Настройки теста"}</h2>
+                <p>{selectedAnswer ? "Выбран ответ — редактирование в карточке" : "Автосейв включён"}</p>
+              </div>
+              <div className={styles.inspectorBody}>
           {selectedQuestion ? (
             <>
               <label className={styles.field}>
@@ -1884,20 +2758,14 @@ function AdminTestDraftEditorInner({
                 <select
                   className={styles.select}
                   value={selectedQuestion.type}
-                  onChange={(event) => updateQuestion(selectedQuestion.id, { type: event.target.value as AdminTestQuestionType })}
+                  onChange={(event) =>
+                    changeQuestionType(selectedQuestion.id, event.target.value as AdminTestQuestionType)
+                  }
                 >
                   <option value="single">Одиночный выбор</option>
                   <option value="multiple">Множественный выбор</option>
                   <option value="text">Текстовый ответ</option>
                 </select>
-              </label>
-              <label className={styles.field}>
-                <span>Текст вопроса</span>
-                <textarea
-                  className={styles.textarea}
-                  value={selectedQuestion.text}
-                  onChange={(event) => updateQuestion(selectedQuestion.id, { text: event.target.value })}
-                />
               </label>
               <label className={styles.field}>
                 <span>Баллы</span>
@@ -1909,27 +2777,15 @@ function AdminTestDraftEditorInner({
                   onChange={(event) => updateQuestion(selectedQuestion.id, { points: Number(event.target.value) })}
                 />
               </label>
-              {selectedAnswer ? (
-                <>
-                  <label className={styles.field}>
-                    <span>Текст ответа</span>
-                    <textarea
-                      className={styles.textarea}
-                      value={selectedAnswer.text}
-                      onChange={(event) => updateAnswer(selectedQuestion.id, selectedAnswer.id, { text: event.target.value })}
-                    />
-                  </label>
-                  {selectedAnswer.kind === "answer" ? (
-                    <label className={styles.switchLabel}>
-                      <span>Правильный</span>
-                      <input
-                        type="checkbox"
-                        checked={selectedAnswer.isCorrect}
-                        onChange={(event) => updateAnswer(selectedQuestion.id, selectedAnswer.id, { isCorrect: event.target.checked })}
-                      />
-                    </label>
-                  ) : null}
-                </>
+              {selectedAnswer && selectedAnswer.kind === "answer" ? (
+                <label className={styles.switchLabel}>
+                  <span>Правильный ответ</span>
+                  <input
+                    type="checkbox"
+                    checked={selectedAnswer.isCorrect}
+                    onChange={(event) => updateAnswer(selectedQuestion.id, selectedAnswer.id, { isCorrect: event.target.checked })}
+                  />
+                </label>
               ) : null}
               <Button type="button" variant="ghost" onClick={deleteSelection}>Удалить выбранное</Button>
             </>
@@ -1987,7 +2843,8 @@ function AdminTestDraftEditorInner({
               <p>Детали по вопросам открываются по значкам над карточками.</p>
             </div>
           ) : null}
-        </div>
+              </div>
+            </div>
           </>
         )}
       </aside>

@@ -1,0 +1,88 @@
+.overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.overlayHidden {
+  opacity: 0;
+}
+
+.links {
+  overflow: visible;
+}
+
+.linkLine {
+  stroke: rgba(148, 163, 184, 0.55);
+  stroke-width: 2;
+  stroke-linecap: round;
+  pointer-events: none;
+}
+
+.slots {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.insertSlot {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  background: transparent;
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.insertSlotHidden {
+  pointer-events: none;
+  opacity: 0;
+}
+
+.insertPlus {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+  color: rgba(100, 116, 139, 0.45);
+  opacity: 0;
+  transform: scale(0.92);
+  transition:
+    opacity 140ms ease,
+    transform 140ms ease,
+    color 140ms ease,
+    border-color 140ms ease,
+    background 140ms ease;
+}
+
+.insertSlot:hover .insertPlus,
+.insertSlot:focus-visible .insertPlus {
+  opacity: 1;
+  transform: scale(1);
+  border-color: rgba(37, 99, 235, 0.35);
+  background: #fff;
+  color: #2563eb;
+}
+
+.insertPlusIcon {
+  font-size: 24px;
+  font-weight: 500;
+  line-height: 1;
+}
+
+:global([data-question-id].flow-insert-spread-left) {
+  transform: translateX(-18px);
+}
+
+:global([data-question-id].flow-insert-spread-right) {
+  transform: translateX(18px);
+}
