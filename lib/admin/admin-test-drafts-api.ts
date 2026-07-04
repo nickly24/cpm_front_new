@@ -60,3 +60,9 @@ export async function publishAdminTestDraft(draftId: string) {
     method: "POST",
   });
 }
+
+export async function deleteAdminTestDraft(draftId: string) {
+  return apiRequest<{ success: boolean }>(`/test-drafts/${draftId}`, {
+    method: "DELETE",
+  });
+}

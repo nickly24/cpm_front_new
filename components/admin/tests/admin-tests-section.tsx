@@ -24,6 +24,7 @@ import {
 import {
   createAdminTestDraft,
   createAdminTestDraftFromTest,
+  deleteAdminTestDraft,
   fetchAdminTestDrafts,
 } from "@/lib/admin/admin-test-drafts-api";
 import type { AdminTestDraft } from "@/lib/admin/admin-test-drafts-types";
@@ -44,6 +45,7 @@ import {
   getAdminTestStatusLabel,
 } from "@/lib/admin/admin-tests-utils";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Trash2 } from "lucide-react";
 
 const IMMERSIVE_VIEWS: AdminTestsView[] = [
   "create",
@@ -84,6 +86,7 @@ export function AdminTestsSection() {
   const [toggleBusy, setToggleBusy] = useState<string | null>(null);
   const [workspaceTestId, setWorkspaceTestId] = useState<string | null>(null);
   const [editingDraft, setEditingDraft] = useState<AdminTestDraft | null>(null);
+  const [deletingDraftId, setDeletingDraftId] = useState<string | null>(null);
   const [externalDeleteTarget, setExternalDeleteTarget] =
     useState<AdminTestListItem | null>(null);
   const [externalDeleting, setExternalDeleting] = useState(false);
@@ -222,6 +225,33 @@ export function AdminTestsSection() {
       window.alert(
         err instanceof Error ? err.message : "Не удалось создать драфт из теста",
       );
+    }
+  };
+
+  const handleDeleteDraft = async (draft: AdminTestDraft) => {
+    const title = draft.title?.trim() || "Без названия";
+    if (
+      !window.confirm(
+        `Удалить драфт «${title}»? Черновик будет удалён без возможности восстановления.`,
+      )
+    ) {
+      return;
+    }
+
+    setDeletingDraftId(draft.id);
+    try {
+      await deleteAdminTestDraft(draft.id);
+      if (editingDraft?.id === draft.id) {
+        setEditingDraft(null);
+        setView("list");
+      }
+      await loadDrafts();
+    } catch (err) {
+      window.alert(
+        err instanceof Error ? err.message : "Не удалось удалить драфт",
+      );
+    } finally {
+      setDeletingDraftId(null);
     }
   };
 
@@ -476,21 +506,41 @@ export function AdminTestsSection() {
         ) : (
           <div className={styles.draftsList}>
             {drafts.map((draft) => (
-              <button
+              <article
                 key={draft.id}
-                type="button"
-                className={styles.draftItem}
+                className={styles.draftItemCard}
                 onClick={() => {
                   setEditingDraft(draft);
                   setView("draftEditor");
                 }}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    setEditingDraft(draft);
+                    setView("draftEditor");
+                  }
+                }}
+                role="button"
+                tabIndex={0}
               >
                 <strong>{draft.title || "Без названия"}</strong>
                 <span>
                   {draft.canvas?.questions?.length ?? 0} вопросов ·{" "}
                   {draft.direction || "направление не выбрано"}
                 </span>
-              </button>
+                <button
+                  type="button"
+                  className={styles.draftDeleteButton}
+                  aria-label="Удалить драфт"
+                  disabled={deletingDraftId === draft.id}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    void handleDeleteDraft(draft);
+                  }}
+                >
+                  <Trash2 size={14} />
+                </button>
+              </article>
             ))}
           </div>
         )}

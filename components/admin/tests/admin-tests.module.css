@@ -115,12 +115,14 @@
   gap: var(--ds-space-3);
 }
 
-.draftItem {
+.draftItemCard {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: 6px;
   padding: var(--ds-space-4);
+  padding-right: 40px;
   border: 1px solid var(--ds-border);
   border-radius: var(--ds-radius-md);
   background: var(--ds-surface-muted);
@@ -129,11 +131,47 @@
   cursor: pointer;
 }
 
-.draftItem:hover {
+.draftItemCard:hover {
   border-color: var(--ds-accent);
 }
 
-.draftItem span {
+.draftItemCard:hover strong {
+  color: var(--ds-accent);
+}
+
+.draftItemCard:focus-visible {
+  outline: 2px solid var(--ds-accent);
+  outline-offset: 2px;
+}
+
+.draftDeleteButton {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  border-radius: var(--ds-radius-sm);
+  background: transparent;
+  color: var(--ds-text-muted);
+  cursor: pointer;
+}
+
+.draftDeleteButton:hover:not(:disabled) {
+  background: var(--ds-danger-bg);
+  color: var(--ds-danger);
+}
+
+.draftDeleteButton:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.draftItemCard span {
   color: var(--ds-text-secondary);
   font-size: 12px;
 }

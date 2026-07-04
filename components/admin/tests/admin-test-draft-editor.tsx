@@ -39,11 +39,13 @@ import {
   MousePointer2,
   Redo2,
   Save,
+  Trash2,
   Undo2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import styles from "@/components/admin/tests/admin-test-draft-editor.module.css";
 import {
+  deleteAdminTestDraft,
   lockAdminTestDraft,
   publishAdminTestDraft,
   unlockAdminTestDraft,
@@ -703,6 +705,7 @@ function AdminTestDraftEditorInner({
   const [historyIndex, setHistoryIndex] = useState(0);
   const [interactionMode, setInteractionMode] = useState<InteractionMode>("select");
   const [inspectorCollapsed, setInspectorCollapsed] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [questionTypeMenuOpen, setQuestionTypeMenuOpen] = useState(false);
   const [insertQuestionType, setInsertQuestionType] =
     useState<AdminTestQuestionType>("single");
@@ -1648,6 +1651,28 @@ function AdminTestDraftEditorInner({
     }
   };
 
+  const deleteDraft = async () => {
+    const title = draft.title?.trim() || "Без названия";
+    if (
+      !window.confirm(
+        `Удалить драфт «${title}»? Черновик будет удалён без возможности восстановления.`,
+      )
+    ) {
+      return;
+    }
+
+    setDeleting(true);
+    try {
+      await deleteAdminTestDraft(draft.id);
+      onBack();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Не удалось удалить драфт";
+      window.alert(message);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const autosaveLabel =
     autosaveState === "saving" ? "Сохраняем..." : autosaveState === "error" ? "Ошибка автосейва" : "Сохранено";
 
@@ -1746,6 +1771,16 @@ function AdminTestDraftEditorInner({
             </Button>
             <Button type="button" variant="ghost" size="sm" onClick={() => void pasteSelection()}>
               Вставить
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className={styles.deleteDraftButton}
+              disabled={deleting || !canEdit}
+              onClick={() => void deleteDraft()}
+            >
+              <Trash2 size={16} /> {deleting ? "Удаляем..." : "Удалить драфт"}
             </Button>
             <Button type="button" onClick={publish}>
               <Save size={16} /> Сохранить как тест

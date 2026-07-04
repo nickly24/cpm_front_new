@@ -256,6 +256,18 @@
   text-align: right;
 }
 
+.deleteDraftButton {
+  color: #dc2626 !important;
+}
+
+.deleteDraftButton:hover:not(:disabled) {
+  background: #fef2f2 !important;
+}
+
+.deleteDraftButton:disabled {
+  opacity: 0.55;
+}
+
 .canvas {
   flex: 1;
   min-height: 0;
