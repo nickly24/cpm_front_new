@@ -79,7 +79,7 @@ export function AdminExternalTestForm({
   };
 
   return (
-    <div className={`${styles.fullscreenShell} ${styles.formWrap}`}>
+    <div className={styles.fullscreenShell}>
       <header className={styles.fullscreenHeader}>
         <div className={styles.fullscreenHeaderContent}>
           <AdminFullscreenBack onBack={onBack} />
@@ -87,9 +87,10 @@ export function AdminExternalTestForm({
         </div>
       </header>
 
-      {error ? <p className={styles.errorText}>{error}</p> : null}
+      <div className={styles.fullscreenBody}>
+        {error ? <p className={styles.errorText}>{error}</p> : null}
 
-      <form className={styles.form} onSubmit={handleSubmit}>
+        <form className={styles.form} onSubmit={handleSubmit}>
         <section className={styles.formSection}>
           <h3 className={styles.formSectionTitle}>Основная информация</h3>
 
@@ -153,6 +154,7 @@ export function AdminExternalTestForm({
           {saving ? "Сохранение…" : "Создать внешний тест"}
         </Button>
       </form>
+      </div>
     </div>
   );
 }

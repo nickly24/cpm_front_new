@@ -624,6 +624,8 @@
   display: flex;
   flex-direction: column;
   gap: var(--ds-space-5);
+  flex: 1;
+  min-height: 0;
 }
 
 .formTopBar {
@@ -891,13 +893,18 @@
 .fullscreenShell {
   display: flex;
   flex-direction: column;
-  min-height: 100dvh;
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+  max-height: 100dvh;
+  overflow: hidden;
   background: var(--ds-bg);
 }
 
 .fullscreenHeader {
   display: flex;
   flex-direction: column;
+  flex-shrink: 0;
   padding: 0;
   border-bottom: 1px solid var(--ds-border);
   background: var(--ds-surface);
@@ -925,12 +932,15 @@
 
 .fullscreenBody {
   flex: 1;
+  min-height: 0;
+  overflow-y: auto;
   padding: var(--ds-space-5) var(--ds-space-6) var(--ds-space-8);
 }
 
 .workspaceTabs {
   display: flex;
   flex-wrap: wrap;
+  flex-shrink: 0;
   gap: var(--ds-space-2);
   padding: 0 var(--ds-space-6);
   border-bottom: 1px solid var(--ds-border);

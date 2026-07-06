@@ -518,6 +518,12 @@ input {
   overflow: hidden;
 }
 
+.cabinet-layout[data-immersive="true"] .cabinet-content > * {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+}
+
 .cabinet-sidebar {
   position: fixed;
   top: 0;

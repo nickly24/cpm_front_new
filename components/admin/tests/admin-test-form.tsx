@@ -186,7 +186,7 @@ export function AdminTestForm({
 
   const wrapClass = embedded
     ? styles.embeddedFormInner
-    : `${styles.fullscreenShell} ${styles.formWrap}`;
+    : styles.fullscreenShell;
 
   return (
     <div className={wrapClass}>
@@ -201,12 +201,13 @@ export function AdminTestForm({
         <h2 className={styles.formSectionTitle}>{title}</h2>
       )}
 
-      {error ? <p className={styles.errorText}>{error}</p> : null}
+      <div className={embedded ? undefined : styles.fullscreenBody}>
+        {error ? <p className={styles.errorText}>{error}</p> : null}
 
-      <form
-        className={embedded ? styles.formEmbedded : styles.form}
-        onSubmit={handleSubmit}
-      >
+        <form
+          className={embedded ? styles.formEmbedded : styles.form}
+          onSubmit={handleSubmit}
+        >
         <section className={styles.formSection}>
           <h3 className={styles.formSectionTitle}>Основная информация</h3>
 
@@ -379,14 +380,15 @@ export function AdminTestForm({
         ) : null}
       </form>
 
-      {showQuestionPopup && !isReadOnly ? (
-        <QuestionPopup
-          question={currentQuestion}
-          onChange={setCurrentQuestion}
-          onSave={saveQuestion}
-          onClose={() => setShowQuestionPopup(false)}
-        />
-      ) : null}
+        {showQuestionPopup && !isReadOnly ? (
+          <QuestionPopup
+            question={currentQuestion}
+            onChange={setCurrentQuestion}
+            onSave={saveQuestion}
+            onClose={() => setShowQuestionPopup(false)}
+          />
+        ) : null}
+      </div>
     </div>
   );
 }
