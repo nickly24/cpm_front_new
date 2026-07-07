@@ -1,8 +1,12 @@
 "use client";
 
 import styles from "@/components/admin/training/admin-training.module.css";
+import { SectionHeroBanner } from "@/components/student/section-hero-banner";
+import heroStyles from "@/components/student/section-hero-banner.module.css";
 import { Button } from "@/components/ui/button";
 import { LoadingState } from "@/components/ui/loading-state";
+import { cn } from "@/lib/cn";
+import { STUDENT_SECTION_BANNERS } from "@/lib/student/section-banners";
 import {
   createTrainingCard,
   createTrainingTheme,
@@ -18,8 +22,24 @@ import type {
   AdminTrainingDirectionRow,
   AdminTrainingSectionRow,
 } from "@/lib/training/admin-training-types";
-import { Pencil, Plus, Trash2 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import {
+  adminSectionKey,
+  normalizeAdminSection,
+} from "@/lib/training/admin-training-types";
+import {
+  BookOpen,
+  ChevronRight,
+  ClipboardList,
+  ExternalLink,
+  FileText,
+  Layers,
+  Pencil,
+  Plus,
+  Search,
+  Trash2,
+} from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type AdminView = "directions" | "sections" | "cards";
 
@@ -34,6 +54,84 @@ interface ModalState {
 
 function confirmDelete(message: string): boolean {
   return window.confirm(message);
+}
+
+function AdminSearchPopover({
+  value,
+  onChange,
+  placeholder,
+  open,
+  onOpenChange,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const anchorRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const handlePointerDown = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (anchorRef.current && !anchorRef.current.contains(target)) {
+        onOpenChange(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => document.removeEventListener("mousedown", handlePointerDown);
+  }, [onOpenChange, open]);
+
+  useEffect(() => {
+    if (open) {
+      inputRef.current?.focus();
+    }
+  }, [open]);
+
+  return (
+    <>
+      {open ? (
+        <button
+          type="button"
+          className={styles.popoverBackdrop}
+          aria-label="Закрыть"
+          onClick={() => onOpenChange(false)}
+        />
+      ) : null}
+      <div className={styles.popoverAnchor} ref={anchorRef}>
+        <button
+          type="button"
+          className={cn(
+            styles.toolbarIconBtn,
+            (open || value.trim()) && styles.toolbarIconBtnActive,
+          )}
+          aria-label="Поиск"
+          aria-expanded={open}
+          onClick={() => onOpenChange(!open)}
+        >
+          <Search size={17} aria-hidden />
+        </button>
+        {open ? (
+          <div className={styles.searchPopover} role="dialog" aria-label="Поиск">
+            <label className={styles.searchField}>
+              <Search size={15} aria-hidden />
+              <input
+                ref={inputRef}
+                className={styles.searchInput}
+                value={value}
+                onChange={(event) => onChange(event.target.value)}
+                placeholder={placeholder}
+              />
+            </label>
+          </div>
+        ) : null}
+      </div>
+    </>
+  );
 }
 
 function FormModal({
@@ -232,6 +330,7 @@ function FormModal({
 }
 
 export function AdminTrainingSection() {
+  const router = useRouter();
   const [view, setView] = useState<AdminView>("directions");
   const [directions, setDirections] = useState<AdminTrainingDirectionRow[]>([]);
   const [selectedDirection, setSelectedDirection] =
@@ -244,21 +343,33 @@ export function AdminTrainingSection() {
   const [error, setError] = useState<string | null>(null);
   const [modal, setModal] = useState<ModalState | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
 
   const loadCatalog = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const data = await fetchAdminTrainingCatalog();
-      setDirections(data);
+      const normalized = data.map((direction) => ({
+        ...direction,
+        sections: (direction.sections ?? []).map(normalizeAdminSection),
+        topics: (direction.topics ?? direction.sections ?? []).map(
+          normalizeAdminSection,
+        ),
+      }));
+      setDirections(normalized);
       setSelectedDirection((prev) => {
         if (!prev) return prev;
-        return data.find((d) => d.id === prev.id) ?? prev;
+        return normalized.find((d) => d.id === prev.id) ?? prev;
       });
       setSelectedSection((prev) => {
         if (!prev) return prev;
-        for (const direction of data) {
-          const section = direction.sections.find((s) => s.id === prev.id);
+        const prevKey = adminSectionKey(prev);
+        for (const direction of normalized) {
+          const section = direction.sections.find(
+            (item) => adminSectionKey(item) === prevKey,
+          );
           if (section) return section;
         }
         return prev;
@@ -289,14 +400,43 @@ export function AdminTrainingSection() {
   }, [loadCatalog]);
 
   useEffect(() => {
-    if (view === "cards" && selectedSection) {
+    if (
+      view === "cards" &&
+      selectedSection?.kind === "manual" &&
+      selectedSection.id
+    ) {
       void loadCards(selectedSection.id);
     }
   }, [view, selectedSection, loadCards, reloadKey]);
 
+  useEffect(() => {
+    setSearchTerm("");
+    setSearchOpen(false);
+  }, [view, selectedDirection?.id, selectedSection?.id]);
+
   const refresh = () => setReloadKey((v) => v + 1);
 
+  const filteredSections = useMemo(() => {
+    if (!selectedDirection) return [];
+    const query = searchTerm.trim().toLowerCase();
+    if (!query) return selectedDirection.sections;
+    return selectedDirection.sections.filter((section) =>
+      section.name.toLowerCase().includes(query),
+    );
+  }, [searchTerm, selectedDirection]);
+
+  const filteredCards = useMemo(() => {
+    const query = searchTerm.trim().toLowerCase();
+    if (!query) return cards;
+    return cards.filter(
+      (card) =>
+        card.question.toLowerCase().includes(query) ||
+        card.answer.toLowerCase().includes(query),
+    );
+  }, [cards, searchTerm]);
+
   const handleDeleteSection = async (section: AdminTrainingSectionRow) => {
+    if (section.kind === "test" || !section.id) return;
     const hint =
       section.cards_count > 0
         ? `Удалить раздел «${section.name}» и ${section.cards_count} карточек?`
@@ -305,7 +445,10 @@ export function AdminTrainingSection() {
     try {
       const res = await deleteTrainingTheme(section.id);
       if (!res.success) throw new Error(res.error);
-      if (selectedSection?.id === section.id) {
+      if (
+        selectedSection &&
+        adminSectionKey(selectedSection) === adminSectionKey(section)
+      ) {
         setSelectedSection(null);
         setView("sections");
       }
@@ -347,202 +490,362 @@ export function AdminTrainingSection() {
     }
   };
 
-  const pageTitle =
-    view === "cards" && selectedSection
-      ? selectedSection.name
-      : view === "sections" && selectedDirection
-        ? selectedDirection.name
-        : "Тренировки";
+  const openTestSection = (
+    direction: AdminTrainingDirectionRow,
+    section: AdminTrainingSectionRow,
+  ) => {
+    if (!section.test_id) return;
+    const params = new URLSearchParams({
+      direction: direction.name,
+      test: section.test_id,
+    });
+    router.push(`/cabinet/admin/tests?${params.toString()}`);
+  };
 
-  const pageSubtitle =
+  const openSection = (
+    direction: AdminTrainingDirectionRow,
+    section: AdminTrainingSectionRow,
+  ) => {
+    if (section.kind === "test") {
+      openTestSection(direction, section);
+      return;
+    }
+    setSelectedSection(section);
+    setView("cards");
+  };
+
+  const heroSubtitle =
     view === "directions"
-      ? "Направления из справочника тестов → разделы → карточки."
-      : view === "sections"
-        ? "Manual-разделы внутри направления. Test-разделы создаются из тестов с открытыми ответами."
-        : "Вопросы и ответы для режима карточек.";
+      ? "Направления из справочника тестов → разделы → карточки"
+      : view === "sections" && selectedDirection
+        ? `Разделы направления «${selectedDirection.name}»`
+        : selectedSection
+          ? `Карточки раздела «${selectedSection.name}»`
+          : "Управление карточками для студентов";
 
-  return (
-    <div className={styles.page}>
-      <header className={styles.header}>
-        <div>
-          {view !== "directions" ? (
-            <nav className={styles.breadcrumb} aria-label="Навигация">
+  const breadcrumb =
+    view !== "directions" ? (
+      <nav className={heroStyles.breadcrumb} aria-label="Навигация">
+        <button
+          type="button"
+          className={heroStyles.breadcrumbLink}
+          onClick={() => {
+            setView("directions");
+            setSelectedDirection(null);
+            setSelectedSection(null);
+          }}
+        >
+          Направления
+        </button>
+        {selectedDirection ? (
+          <>
+            <span className={heroStyles.breadcrumbSep}>/</span>
+            {view === "sections" ? (
+              <span className={heroStyles.breadcrumbCurrent}>
+                {selectedDirection.name}
+              </span>
+            ) : (
               <button
                 type="button"
-                className={styles.breadcrumbLink}
+                className={heroStyles.breadcrumbLink}
                 onClick={() => {
-                  setView("directions");
-                  setSelectedDirection(null);
+                  setView("sections");
                   setSelectedSection(null);
                 }}
               >
-                Направления
+                {selectedDirection.name}
               </button>
-              {selectedDirection ? (
-                <>
-                  <span className={styles.breadcrumbSep}>/</span>
-                  {view === "sections" ? (
-                    <span className={styles.breadcrumbCurrent}>
-                      {selectedDirection.name}
-                    </span>
-                  ) : (
-                    <button
-                      type="button"
-                      className={styles.breadcrumbLink}
-                      onClick={() => {
-                        setView("sections");
-                        setSelectedSection(null);
-                      }}
-                    >
-                      {selectedDirection.name}
-                    </button>
-                  )}
-                </>
-              ) : null}
-              {view === "cards" && selectedSection ? (
-                <>
-                  <span className={styles.breadcrumbSep}>/</span>
-                  <span className={styles.breadcrumbCurrent}>
-                    {selectedSection.name}
-                  </span>
-                </>
-              ) : null}
-            </nav>
-          ) : null}
-          <span className={styles.eyebrow}>Управление</span>
-          <h1 className={styles.title}>{pageTitle}</h1>
-          <p className={styles.subtitle}>{pageSubtitle}</p>
-        </div>
-        {view !== "directions" ? (
-          <Button type="button" className={styles.flashModeBtn} onClick={openCreate}>
-            <Plus size={16} aria-hidden />
-            {view === "sections" ? "Раздел" : "Карточка"}
-          </Button>
+            )}
+          </>
         ) : null}
-      </header>
+        {view === "cards" && selectedSection ? (
+          <>
+            <span className={heroStyles.breadcrumbSep}>/</span>
+            <span className={heroStyles.breadcrumbCurrent}>
+              {selectedSection.name}
+            </span>
+          </>
+        ) : null}
+      </nav>
+    ) : null;
+
+  return (
+    <div className={styles.page}>
+      <SectionHeroBanner
+        imageSrc={STUDENT_SECTION_BANNERS.trainFlashcards}
+        textTone="dark"
+        eyebrow="Управление"
+        title="Карточки"
+        subtitle={heroSubtitle}
+        leading={breadcrumb ?? undefined}
+        footer={
+          view !== "directions" ? (
+            <Button
+              type="button"
+              className={styles.heroActionBtn}
+              onClick={openCreate}
+            >
+              <Plus size={16} aria-hidden />
+              {view === "sections" ? "Новый раздел" : "Новая карточка"}
+            </Button>
+          ) : undefined
+        }
+      />
 
       {error ? <p className={styles.alert}>{error}</p> : null}
 
       {loading ? (
         <LoadingState label="Загрузка…" variant="panel" />
       ) : view === "directions" ? (
-        <div className={styles.panel}>
-          {directions.length === 0 ? (
-            <p className={styles.empty}>
-              Направлений нет. Добавьте их в справочнике тестов.
+        directions.length === 0 ? (
+          <div className={styles.empty}>
+            <h2 className={styles.emptyTitle}>Направлений нет</h2>
+            <p className={styles.emptyText}>
+              Добавьте направления в справочнике тестов — они появятся здесь
+              автоматически.
             </p>
-          ) : (
-            <div className={styles.list}>
-              {directions.map((direction) => (
-                <div key={direction.id} className={styles.row}>
-                  <button
-                    type="button"
-                    className={styles.rowMain}
-                    onClick={() => {
-                      setSelectedDirection(direction);
-                      setView("sections");
-                    }}
-                  >
-                    <p className={styles.rowTitle}>{direction.name}</p>
-                    <p className={styles.rowMeta}>
-                      {direction.topics_count} разделов · {direction.cards_count}{" "}
-                      карточек
-                    </p>
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+          </div>
+        ) : (
+          <div className={styles.directionGrid}>
+            {directions.map((direction) => (
+              <button
+                key={direction.id}
+                type="button"
+                className={styles.directionCard}
+                onClick={() => {
+                  setSelectedDirection(direction);
+                  setView("sections");
+                }}
+              >
+                <span className={styles.directionCardIcon} aria-hidden>
+                  <BookOpen size={18} />
+                </span>
+                <h3 className={styles.directionCardTitle}>{direction.name}</h3>
+                <p className={styles.directionCardMeta}>
+                  {direction.topics_count} разделов · {direction.cards_count}{" "}
+                  карточек
+                </p>
+                <ChevronRight
+                  size={18}
+                  className={styles.directionCardArrow}
+                  aria-hidden
+                />
+              </button>
+            ))}
+          </div>
+        )
       ) : view === "sections" && selectedDirection ? (
-        <div className={styles.panel}>
-          {selectedDirection.sections.length === 0 ? (
-            <p className={styles.empty}>
-              В направлении «{selectedDirection.name}» пока нет manual-разделов.
-            </p>
-          ) : (
-            <div className={styles.list}>
-              {selectedDirection.sections.map((section) => (
-                <div key={section.id} className={styles.row}>
-                  <button
-                    type="button"
-                    className={styles.rowMain}
-                    onClick={() => {
-                      setSelectedSection(section);
-                      setView("cards");
-                    }}
-                  >
-                    <p className={styles.rowTitle}>{section.name}</p>
-                    <p className={styles.rowMeta}>
-                      {section.cards_count} карточек
-                    </p>
-                  </button>
-                  <div className={styles.rowActions}>
-                    <button
-                      type="button"
-                      className={styles.iconBtn}
-                      aria-label="Редактировать"
-                      onClick={() =>
-                        setModal({ kind: "section-edit", section })
-                      }
-                    >
-                      <Pencil size={16} />
-                    </button>
-                    <button
-                      type="button"
-                      className={`${styles.iconBtn} ${styles.iconBtnDanger}`}
-                      aria-label="Удалить"
-                      onClick={() => void handleDeleteSection(section)}
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                </div>
+        <>
+          <div className={styles.catalogHeader}>
+            <div className={styles.directionTabs}>
+              {directions.map((direction) => (
+                <button
+                  key={direction.id}
+                  type="button"
+                  className={cn(
+                    styles.directionTab,
+                    selectedDirection.id === direction.id &&
+                      styles.directionTabActive,
+                  )}
+                  onClick={() => {
+                    setSelectedDirection(direction);
+                    setSelectedSection(null);
+                  }}
+                >
+                  {direction.name}
+                </button>
               ))}
             </div>
+            <AdminSearchPopover
+              value={searchTerm}
+              onChange={setSearchTerm}
+              placeholder="Поиск раздела…"
+              open={searchOpen}
+              onOpenChange={setSearchOpen}
+            />
+          </div>
+
+          <p className={styles.infoBanner}>
+            <Layers size={16} aria-hidden />
+            <span>
+              <strong>Manual-разделы</strong> создаются здесь. Разделы{" "}
+              <strong>из тестов</strong> ведут в раздел «Тесты» — там
+              редактируются вопросы и видимость ответов.
+            </span>
+          </p>
+
+          {filteredSections.length === 0 ? (
+            <div className={styles.empty}>
+              <h2 className={styles.emptyTitle}>
+                {selectedDirection.sections.length === 0
+                  ? "Разделов пока нет"
+                  : "Ничего не найдено"}
+              </h2>
+              <p className={styles.emptyText}>
+                {selectedDirection.sections.length === 0
+                  ? `В направлении «${selectedDirection.name}» нет manual-разделов и опубликованных тестов с карточками. Создайте manual-раздел или добавьте тест в разделе «Тесты».`
+                  : "Попробуйте изменить строку поиска."}
+              </p>
+            </div>
+          ) : (
+            <>
+              <p className={styles.listMeta}>
+                {filteredSections.length} из {selectedDirection.sections.length}{" "}
+                разделов
+              </p>
+              <div className={styles.sectionList}>
+                {filteredSections.map((section) => {
+                  const isTestSection = section.kind === "test";
+
+                  return (
+                    <div
+                      key={adminSectionKey(section)}
+                      className={styles.sectionCard}
+                    >
+                      <button
+                        type="button"
+                        className={styles.sectionCardMain}
+                        onClick={() => {
+                          if (!selectedDirection) return;
+                          openSection(selectedDirection, section);
+                        }}
+                      >
+                        <span
+                          className={cn(
+                            styles.sectionCardBadge,
+                            isTestSection && styles.sectionCardBadgeTest,
+                          )}
+                        >
+                          {isTestSection ? (
+                            <ClipboardList size={12} aria-hidden />
+                          ) : (
+                            <FileText size={12} aria-hidden />
+                          )}
+                          {isTestSection ? "Из теста" : "Manual"}
+                        </span>
+                        <h3 className={styles.sectionCardTitle}>
+                          {section.name}
+                        </h3>
+                        <p className={styles.sectionCardMeta}>
+                          {section.cards_count} карточек
+                          {isTestSection && section.visible === false
+                            ? " · ответы скрыты у студентов"
+                            : ""}
+                        </p>
+                      </button>
+                      <div className={styles.rowActions}>
+                        {isTestSection ? (
+                          <button
+                            type="button"
+                            className={styles.iconBtn}
+                            aria-label="Открыть тест"
+                            onClick={() => {
+                              if (!selectedDirection) return;
+                              openTestSection(selectedDirection, section);
+                            }}
+                          >
+                            <ExternalLink size={16} />
+                          </button>
+                        ) : (
+                          <>
+                            <button
+                              type="button"
+                              className={styles.iconBtn}
+                              aria-label="Редактировать"
+                              onClick={() =>
+                                setModal({ kind: "section-edit", section })
+                              }
+                            >
+                              <Pencil size={16} />
+                            </button>
+                            <button
+                              type="button"
+                              className={cn(styles.iconBtn, styles.iconBtnDanger)}
+                              aria-label="Удалить"
+                              onClick={() => void handleDeleteSection(section)}
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
           )}
-        </div>
-      ) : view === "cards" && selectedSection ? (
-        <div className={styles.panel}>
+        </>
+      ) : view === "cards" &&
+        selectedSection &&
+        selectedSection.kind === "manual" ? (
+        <>
+          <div className={cn(styles.catalogHeader, styles.catalogHeaderEnd)}>
+            <AdminSearchPopover
+              value={searchTerm}
+              onChange={setSearchTerm}
+              placeholder="Поиск по вопросу или ответу…"
+              open={searchOpen}
+              onOpenChange={setSearchOpen}
+            />
+          </div>
+
           {cardsLoading ? (
-            <LoadingState label="Загрузка карточек…" variant="compact" />
+            <LoadingState label="Загрузка карточек…" variant="inline" />
           ) : cards.length === 0 ? (
-            <p className={styles.empty}>
-              В разделе «{selectedSection.name}» пока нет карточек.
-            </p>
-          ) : (
-            <div className={styles.list}>
-              {cards.map((card) => (
-                <div key={card.id} className={styles.row}>
-                  <div className={styles.rowMain}>
-                    <p className={styles.rowTitle}>{card.question}</p>
-                    <p className={styles.cardPreview}>
-                      <strong>Ответ:</strong> {card.answer}
-                    </p>
-                  </div>
-                  <div className={styles.rowActions}>
-                    <button
-                      type="button"
-                      className={styles.iconBtn}
-                      aria-label="Редактировать"
-                      onClick={() => setModal({ kind: "card-edit", card })}
-                    >
-                      <Pencil size={16} />
-                    </button>
-                    <button
-                      type="button"
-                      className={`${styles.iconBtn} ${styles.iconBtnDanger}`}
-                      aria-label="Удалить"
-                      onClick={() => void handleDeleteCard(card)}
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                </div>
-              ))}
+            <div className={styles.empty}>
+              <h2 className={styles.emptyTitle}>Карточек пока нет</h2>
+              <p className={styles.emptyText}>
+                В разделе «{selectedSection.name}» ещё нет карточек. Добавьте
+                первую.
+              </p>
             </div>
+          ) : filteredCards.length === 0 ? (
+            <div className={styles.empty}>
+              <h2 className={styles.emptyTitle}>Ничего не найдено</h2>
+              <p className={styles.emptyText}>
+                Попробуйте изменить строку поиска.
+              </p>
+            </div>
+          ) : (
+            <>
+              <p className={styles.listMeta}>
+                {filteredCards.length} из {cards.length} карточек
+              </p>
+              <div className={styles.cardList}>
+                {filteredCards.map((card) => (
+                  <div key={card.id} className={styles.cardItem}>
+                    <div className={styles.cardItemBody}>
+                      <p className={styles.cardQuestion}>{card.question}</p>
+                      <p className={styles.cardAnswer}>
+                        <span className={styles.cardAnswerLabel}>Ответ: </span>
+                        {card.answer}
+                      </p>
+                    </div>
+                    <div className={styles.rowActions}>
+                      <button
+                        type="button"
+                        className={styles.iconBtn}
+                        aria-label="Редактировать"
+                        onClick={() => setModal({ kind: "card-edit", card })}
+                      >
+                        <Pencil size={16} />
+                      </button>
+                      <button
+                        type="button"
+                        className={cn(styles.iconBtn, styles.iconBtnDanger)}
+                        aria-label="Удалить"
+                        onClick={() => void handleDeleteCard(card)}
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
           )}
-        </div>
+        </>
       ) : null}
 
       {modal ? (

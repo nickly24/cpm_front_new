@@ -29,6 +29,6 @@ export const ADMIN_SECTION_DESCRIPTIONS: Record<string, string> = {
   attendance: "Учёт посещаемости",
   scan: "Сканирование QR и пропусков",
   zaps: "Запросы учеников на отгул",
-  train: "Темы, тренировки и карточки для запоминания",
+  train: "Направления, разделы и карточки для студентов",
   ratings: "Рейтинг и успеваемость",
 };

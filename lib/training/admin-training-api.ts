@@ -6,6 +6,7 @@ import type {
   AdminTrainingDirectionRow,
   TrainingMutationResponse,
 } from "./admin-training-types";
+import { normalizeAdminSection } from "./admin-training-types";
 
 export async function fetchAdminTrainingCatalog() {
   const data = await apiRequest<AdminTrainingCatalogResponse>(
@@ -17,8 +18,8 @@ export async function fetchAdminTrainingCatalog() {
   const directions = data.directions ?? data.sections ?? [];
   return directions.map((d) => ({
     ...d,
-    sections: d.sections ?? d.topics ?? [],
-    topics: d.topics ?? d.sections ?? [],
+    sections: (d.sections ?? d.topics ?? []).map(normalizeAdminSection),
+    topics: (d.topics ?? d.sections ?? []).map(normalizeAdminSection),
   })) as AdminTrainingDirectionRow[];
 }
 

@@ -6,6 +6,8 @@ interface SectionHeroBannerProps {
   imageSrc: string;
   /** Fallback tint while image loads */
   fallbackColor?: string;
+  /** `light` — белый текст на картинке; `dark` — тёмный текст на светлой картинке */
+  textTone?: "light" | "dark";
   eyebrow?: string;
   title: string;
   subtitle?: string;
@@ -16,7 +18,8 @@ interface SectionHeroBannerProps {
 
 export function SectionHeroBanner({
   imageSrc,
-  fallbackColor = "#efb09a",
+  fallbackColor,
+  textTone = "light",
   eyebrow,
   title,
   subtitle,
@@ -24,13 +27,23 @@ export function SectionHeroBanner({
   footer,
   className,
 }: SectionHeroBannerProps) {
+  const isDarkText = textTone === "dark";
+  const resolvedFallback =
+    fallbackColor ?? (isDarkText ? "#fff3eb" : "#efb09a");
+
   return (
-    <header className={cn(styles.hero, className)}>
+    <header
+      className={cn(
+        styles.hero,
+        isDarkText && styles.heroDarkText,
+        className,
+      )}
+    >
       <div
         className={styles.heroBg}
         style={{
-          backgroundColor: fallbackColor,
-          backgroundImage: `url("${imageSrc}")`,
+          backgroundColor: resolvedFallback,
+          backgroundImage: imageSrc ? `url("${imageSrc}")` : undefined,
         }}
         aria-hidden
       />

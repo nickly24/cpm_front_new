@@ -38,9 +38,14 @@ import { getSectionLabel } from "@/lib/navigation";
 interface SectionContentProps {
   role: UserRole;
   section: string;
+  trainPathSegments?: string[];
 }
 
-export function SectionContent({ role, section }: SectionContentProps) {
+export function SectionContent({
+  role,
+  section,
+  trainPathSegments = [],
+}: SectionContentProps) {
   if (role === "student" && section === "performance") {
     return <StudentPerformanceSection />;
   }
@@ -70,7 +75,9 @@ export function SectionContent({ role, section }: SectionContentProps) {
   }
 
   if (role === "student" && section === "train") {
-    return <StudentTrainingSection />;
+    return (
+      <StudentTrainingSection role={role} pathSegments={trainPathSegments} />
+    );
   }
 
   if (role === "admin" && section === "dashboard") {

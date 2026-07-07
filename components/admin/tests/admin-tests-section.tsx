@@ -44,7 +44,8 @@ import {
   getAdminTestStatus,
   getAdminTestStatusLabel,
 } from "@/lib/admin/admin-tests-utils";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Trash2 } from "lucide-react";
 
 const IMMERSIVE_VIEWS: AdminTestsView[] = [
@@ -66,6 +67,8 @@ function statusBadgeClass(status: ReturnType<typeof getAdminTestStatus>) {
 }
 
 export function AdminTestsSection() {
+  const searchParams = useSearchParams();
+  const openedFromUrlRef = useRef(false);
   const [directions, setDirections] = useState<Direction[]>([]);
   const [directionName, setDirectionName] = useState("");
   const [tests, setTests] = useState<AdminTestListItem[]>([]);
@@ -176,6 +179,23 @@ export function AdminTestsSection() {
     setImmersive(IMMERSIVE_VIEWS.includes(view));
     return () => setImmersive(false);
   }, [view, setImmersive]);
+
+  useEffect(() => {
+    if (openedFromUrlRef.current || loadingDirections) return;
+
+    const direction = searchParams.get("direction");
+    const testId = searchParams.get("test");
+    if (!direction && !testId) return;
+
+    openedFromUrlRef.current = true;
+    if (direction) {
+      setDirectionName(direction);
+    }
+    if (testId) {
+      setWorkspaceTestId(testId);
+      setView("workspace");
+    }
+  }, [loadingDirections, searchParams]);
 
   const filteredTests = useMemo(() => {
     let list = tests;

@@ -77,7 +77,8 @@ export function Sidebar({
             <ul className="cabinet-nav-list">
               {group.items.map((item) => {
                 const href = getSectionHref(role, item.id);
-                const isActive = pathname === href;
+                const isActive =
+                  pathname === href || pathname.startsWith(`${href}/`);
                 const Icon = item.icon;
 
                 return (

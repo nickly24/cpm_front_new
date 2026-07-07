@@ -1,8 +1,14 @@
+export type AdminTrainingSectionKind = "manual" | "test";
+
 export interface AdminTrainingSectionRow {
-  id: number;
+  kind: AdminTrainingSectionKind;
+  id?: number;
+  test_id?: string;
   name: string;
   direction_id: number;
   cards_count: number;
+  visible?: boolean;
+  source_test_title?: string;
   /** @deprecated */
   section_id?: number;
 }
@@ -46,4 +52,18 @@ export interface TrainingMutationResponse {
   theme_id?: number;
   card_id?: number;
   direction_id?: number;
+}
+
+export function adminSectionKey(section: AdminTrainingSectionRow): string {
+  if (section.kind === "test") {
+    return `test:${section.test_id ?? section.name}`;
+  }
+  return `manual:${section.id ?? section.name}`;
+}
+
+export function normalizeAdminSection(
+  section: AdminTrainingSectionRow,
+): AdminTrainingSectionRow {
+  if (section.kind) return section;
+  return { ...section, kind: "manual" };
 }

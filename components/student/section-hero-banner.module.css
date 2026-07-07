@@ -11,9 +11,16 @@
   position: absolute;
   inset: 0;
   background-color: #efb09a;
-  background-size: 100% auto;
+  background-size: cover;
   background-position: center center;
   background-repeat: no-repeat;
+  transform: scale(1.14);
+  transform-origin: center center;
+}
+
+.heroDarkText .heroBg {
+  background-position: right center;
+  transform: scale(1.2);
 }
 
 .heroOverlay {
@@ -121,12 +128,51 @@
   color: #ffffff;
 }
 
-@media (max-width: 768px) {
-  .heroBg {
-    background-size: 100% auto;
-    background-position: center center;
-  }
+.heroDarkText .heroOverlay {
+  background: transparent;
+}
 
+.heroDarkText .heroEyebrow {
+  color: var(--ds-accent);
+}
+
+.heroDarkText .heroTitle {
+  color: var(--ds-text);
+}
+
+.heroDarkText .heroSubtitle {
+  color: var(--ds-text-secondary);
+  font-weight: 500;
+}
+
+.heroDarkText .heroFooter {
+  color: var(--ds-text-secondary);
+}
+
+.heroDarkText .heroFooter strong {
+  color: var(--ds-text);
+}
+
+.heroDarkText .breadcrumbLink,
+.heroDarkText .heroLeading :global(button) {
+  color: var(--ds-accent);
+}
+
+.heroDarkText .breadcrumbLink:hover,
+.heroDarkText .heroLeading :global(button:hover) {
+  color: var(--ds-accent-hover);
+}
+
+.heroDarkText .breadcrumbSep,
+.heroDarkText .heroLeading :global(span) {
+  color: var(--ds-text-muted);
+}
+
+.heroDarkText .breadcrumbCurrent {
+  color: var(--ds-text);
+}
+
+@media (max-width: 768px) {
   .heroOverlay {
     background: linear-gradient(
       90deg,
@@ -134,6 +180,10 @@
       rgba(16, 12, 10, 0.22) 52%,
       rgba(16, 12, 10, 0.06) 100%
     );
+  }
+
+  .heroDarkText .heroOverlay {
+    background: transparent;
   }
 
   .heroContent {
@@ -145,11 +195,6 @@
   .hero {
     min-height: clamp(132px, 33vw, 176px);
     padding: 20px 18px;
-  }
-
-  .heroBg {
-    background-size: 100% auto;
-    background-position: center center;
   }
 
   .heroOverlay {
@@ -181,14 +226,22 @@
   .breadcrumbCurrent {
     text-shadow: 0 1px 8px rgba(0, 0, 0, 0.28);
   }
+
+  .heroDarkText .heroTitle,
+  .heroDarkText .heroSubtitle,
+  .heroDarkText .heroFooter,
+  .heroDarkText .heroEyebrow,
+  .heroDarkText .breadcrumbLink,
+  .heroDarkText .breadcrumbCurrent {
+    text-shadow: none;
+  }
+
+  .heroDarkText .heroOverlay {
+    background: transparent;
+  }
 }
 
 @media (max-width: 400px) {
-  .heroBg {
-    background-size: 100% auto;
-    background-position: center center;
-  }
-
   .heroContent {
     max-width: min(100%, 210px);
   }

@@ -8,10 +8,10 @@ import type {
   TrainingDirection,
   TrainingSectionNode,
 } from "@/lib/training/training-types";
-import { getProgressLabel } from "@/lib/training/training-utils";
+import { calcProgressPercent, getProgressLabel } from "@/lib/training/training-utils";
 import { cn } from "@/lib/cn";
-import { Search } from "lucide-react";
-import { useEffect, useState } from "react";
+import { ClipboardList, FileText, Search, SlidersHorizontal } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 
 interface TrainingSectionsListViewProps {
   directions: TrainingDirection[];
@@ -46,6 +46,44 @@ export function TrainingSectionsListView({
   const [sectionsError, setSectionsError] = useState<string | null>(null);
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const searchPopoverRef = useRef<HTMLDivElement>(null);
+  const filtersPopoverRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  const filtersActive = kindFilter !== "all" || progressFilter !== "all";
+
+  useEffect(() => {
+    if (!searchOpen && !filtersOpen) return;
+
+    const handlePointerDown = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (
+        searchOpen &&
+        searchPopoverRef.current &&
+        !searchPopoverRef.current.contains(target)
+      ) {
+        setSearchOpen(false);
+      }
+      if (
+        filtersOpen &&
+        filtersPopoverRef.current &&
+        !filtersPopoverRef.current.contains(target)
+      ) {
+        setFiltersOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => document.removeEventListener("mousedown", handlePointerDown);
+  }, [filtersOpen, searchOpen]);
+
+  useEffect(() => {
+    if (searchOpen) {
+      searchInputRef.current?.focus();
+    }
+  }, [searchOpen]);
 
   useEffect(() => {
     setPage(1);
@@ -94,110 +132,219 @@ export function TrainingSectionsListView({
 
   return (
     <div className={styles.sectionsCatalog}>
-      <div className={styles.sectionsFilterRow}>
-        {directions.map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            className={cn(
-              styles.sectionsFilterChip,
-              selectedDirectionId === item.id && styles.sectionsFilterChipActive,
-            )}
-            onClick={() => onSelectDirection(item.id)}
-          >
-            {item.name}
-          </button>
-        ))}
-      </div>
+      {searchOpen || filtersOpen ? (
+        <button
+          type="button"
+          className={styles.sectionsPopoverBackdrop}
+          aria-label="Закрыть"
+          onClick={() => {
+            setSearchOpen(false);
+            setFiltersOpen(false);
+          }}
+        />
+      ) : null}
 
-      <div className={styles.sectionsToolbar}>
-        <label className={styles.sectionsSearch}>
-          <Search size={15} aria-hidden />
-          <input
-            value={searchTerm}
-            onChange={(event) => setSearchTerm(event.target.value)}
-            placeholder="Поиск раздела..."
-          />
-        </label>
+      <div className={styles.sectionsCatalogHeader}>
         <div className={styles.sectionsFilterRow}>
-          {([
-            ["all", "Все"],
-            ["manual", "Только карточки"],
-            ["test", "Только тесты"],
-          ] as const).map(([value, label]) => (
+          {directions.map((item) => (
             <button
-              key={value}
+              key={item.id}
               type="button"
               className={cn(
                 styles.sectionsFilterChip,
-                kindFilter === value && styles.sectionsFilterChipActive,
+                selectedDirectionId === item.id && styles.sectionsFilterChipActive,
               )}
-              onClick={() => setKindFilter(value)}
+              onClick={() => onSelectDirection(item.id)}
             >
-              {label}
+              {item.name}
             </button>
           ))}
         </div>
-        <div className={styles.sectionsFilterRow}>
-          {([
-            ["all", "Все"],
-            ["in_progress", "Есть что учить"],
-            ["learned", "Полностью выучено"],
-          ] as const).map(([value, label]) => (
+
+        <div className={styles.sectionsCatalogActions}>
+          <div className={styles.sectionsPopoverAnchor} ref={searchPopoverRef}>
             <button
-              key={value}
               type="button"
               className={cn(
-                styles.sectionsFilterChip,
-                progressFilter === value && styles.sectionsFilterChipActive,
+                styles.sectionsIconBtn,
+                (searchOpen || searchTerm.trim()) && styles.sectionsIconBtnActive,
               )}
-              onClick={() => setProgressFilter(value)}
+              aria-label="Поиск раздела"
+              aria-expanded={searchOpen}
+              onClick={() => {
+                setSearchOpen((prev) => !prev);
+                setFiltersOpen(false);
+              }}
             >
-              {label}
+              <Search size={17} aria-hidden />
             </button>
-          ))}
-        </div>
-      </div>
-
-      <div className={styles.cardGrid}>
-        {sections.map((section) => (
-          <button
-            key={`${section.kind}:${section.refId}`}
-            type="button"
-            className={cn(
-              styles.topicCard,
-              section.kind === "test" && styles.topicCardTest,
-            )}
-            onClick={() => onSelectSection(section)}
-          >
-            <h3 className={styles.cardName}>{section.name}</h3>
-            {section.kind === "test" && section.sourceTestTitle ? (
-              <p className={styles.cardBadge}>
-                На базе теста: {section.sourceTestTitle}
-              </p>
+            {searchOpen ? (
+              <div className={styles.sectionsPopover} role="dialog" aria-label="Поиск">
+                <label className={styles.sectionsSearch}>
+                  <Search size={15} aria-hidden />
+                  <input
+                    ref={searchInputRef}
+                    value={searchTerm}
+                    onChange={(event) => setSearchTerm(event.target.value)}
+                    placeholder="Поиск раздела..."
+                  />
+                </label>
+              </div>
             ) : null}
-            <p className={styles.cardMeta}>
-              {section.learned_cards} / {section.total_cards} выучено
-              {(section.answer_changed_cards ?? 0) > 0
-                ? ` · ${section.answer_changed_cards} с новым ответом`
-                : ""}
-            </p>
-            <div className={styles.progressRow}>
-              <span className={styles.progressLabel}>
-                {getProgressLabel(section.progress_percent)}
-              </span>
-              <span className={styles.progressValue}>
-                {section.progress_percent}%
-              </span>
-            </div>
-            <div className={styles.progressTrack}>
+          </div>
+
+          <div className={styles.sectionsPopoverAnchor} ref={filtersPopoverRef}>
+            <button
+              type="button"
+              className={cn(
+                styles.sectionsIconBtn,
+                (filtersOpen || filtersActive) && styles.sectionsIconBtnActive,
+              )}
+              aria-label="Фильтры"
+              aria-expanded={filtersOpen}
+              onClick={() => {
+                setFiltersOpen((prev) => !prev);
+                setSearchOpen(false);
+              }}
+            >
+              <SlidersHorizontal size={17} aria-hidden />
+            </button>
+            {filtersOpen ? (
+              <div className={styles.sectionsPopover} role="dialog" aria-label="Фильтры">
+                <p className={styles.sectionsPopoverLabel}>Тип</p>
+                <div className={styles.sectionsFilterRow}>
+                  {([
+                    ["all", "Все"],
+                    ["manual", "Только карточки"],
+                    ["test", "Только тесты"],
+                  ] as const).map(([value, label]) => (
+                    <button
+                      key={value}
+                      type="button"
+                      className={cn(
+                        styles.sectionsFilterChip,
+                        kindFilter === value && styles.sectionsFilterChipActive,
+                      )}
+                      onClick={() => setKindFilter(value)}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                <p className={styles.sectionsPopoverLabel}>Прогресс</p>
+                <div className={styles.sectionsFilterRow}>
+                  {([
+                    ["all", "Все"],
+                    ["in_progress", "Есть что учить"],
+                    ["learned", "Полностью выучено"],
+                  ] as const).map(([value, label]) => (
+                    <button
+                      key={value}
+                      type="button"
+                      className={cn(
+                        styles.sectionsFilterChip,
+                        progressFilter === value && styles.sectionsFilterChipActive,
+                      )}
+                      onClick={() => setProgressFilter(value)}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      </div>
+
+      <div className={styles.sectionsList}>
+        {sections.map((section) => {
+          const staleCount = section.answer_changed_cards ?? 0;
+          const showSourceTest =
+            section.kind === "test" &&
+            section.sourceTestTitle &&
+            section.sourceTestTitle.trim() !== section.name.trim();
+
+          const progressPercent = calcProgressPercent(
+            section.learned_cards,
+            section.total_cards,
+          );
+          const progressWidth =
+            progressPercent > 0 ? Math.max(progressPercent, 3) : 0;
+
+          return (
+            <div
+              key={`${section.kind}:${section.refId}`}
+              role="button"
+              tabIndex={0}
+              className={styles.sectionListItem}
+              onClick={() => onSelectSection(section)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  onSelectSection(section);
+                }
+              }}
+            >
+              <div className={styles.sectionListItemHead}>
+                <span
+                  className={cn(
+                    styles.sectionKindBadge,
+                    section.kind === "test" && styles.sectionKindBadgeTest,
+                  )}
+                >
+                  {section.kind === "test" ? (
+                    <ClipboardList size={12} aria-hidden />
+                  ) : (
+                    <FileText size={12} aria-hidden />
+                  )}
+                  {section.kind === "test" ? "Из теста" : "Свои карточки"}
+                </span>
+                <span className={styles.sectionListItemPercent}>
+                  {progressPercent}%
+                </span>
+              </div>
+
+              <h3 className={styles.sectionListItemTitle}>{section.name}</h3>
+
+              {showSourceTest ? (
+                <p className={styles.sectionListItemSource}>
+                  Тест: {section.sourceTestTitle}
+                </p>
+              ) : null}
+
+              <p className={styles.sectionListItemMeta}>
+                <span>
+                  {section.learned_cards} из {section.total_cards} выучено
+                </span>
+                <span className={styles.sectionListItemDot} aria-hidden>
+                  ·
+                </span>
+                <span>{getProgressLabel(progressPercent)}</span>
+                {staleCount > 0 ? (
+                  <>
+                    <span className={styles.sectionListItemDot} aria-hidden>
+                      ·
+                    </span>
+                    <span className={styles.sectionListItemStale}>
+                      {staleCount} с новым ответом
+                    </span>
+                  </>
+                ) : null}
+              </p>
+
               <div
-                className={styles.progressFill}
-                style={{ width: `${section.progress_percent}%` }}
-              />
+                className={styles.batchRowTrack}
+                style={{ height: 8, width: "100%" }}
+              >
+                <div
+                  className={styles.batchRowFill}
+                  style={{ width: `${progressWidth}%` }}
+                />
+              </div>
             </div>
-          </button>
-        ))}
+          );
+        })}
       </div>
 
       {sectionsError ? <p className={styles.alert}>{sectionsError}</p> : null}
