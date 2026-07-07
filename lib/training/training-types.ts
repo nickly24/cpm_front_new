@@ -1,94 +1,149 @@
+export type CardStatus = "unlearned" | "learned" | "answer_changed";
+
+export type SectionKind = "manual" | "test";
+
+export type StudyFilter = "all" | "unlearned" | "learned" | "stale";
+
+export interface SectionStats {
+  total: number;
+  learned: number;
+  answer_changed: number;
+  unlearned: number;
+  progress_percent?: number;
+}
+
 export interface TrainingCard {
-  id: number;
+  card_ref: string;
+  card_id?: number;
+  question_id?: number;
   question: string;
   answer: string;
-  theme_id: number;
+  sort_order?: number;
+  content_fingerprint: string;
+  status: CardStatus;
+  /** @deprecated use status */
   is_learned?: boolean;
 }
 
-export interface TrainingTopic {
-  id: number;
+export interface StudyBatch {
+  index: number;
+  from: number;
+  to: number;
+  size: number;
+  stats: SectionStats;
+}
+
+export interface StudySettings {
+  batch_size: number;
+  last_batch_index: number | null;
+  study_mode: StudyFilter;
+}
+
+export interface TrainingSectionNode {
+  kind: SectionKind;
+  refId: string;
   name: string;
-  section_id: number;
+  sourceTestTitle?: string;
+  stats: SectionStats;
   total_cards: number;
   learned_cards: number;
+  answer_changed_cards?: number;
   progress_percent: number;
 }
 
-export interface TrainingSection {
+/** Направление (бывш. training section / тема) */
+export interface TrainingDirection {
   id: number;
   name: string;
-  sort_order: number;
-  topics: TrainingTopic[];
+  sections: TrainingSectionNode[];
+  /** @deprecated use sections */
+  topics?: TrainingSectionNode[];
   total_cards: number;
   learned_cards: number;
+  answer_changed_cards?: number;
   progress_percent: number;
 }
 
-export interface TrainingSectionMeta {
-  id: number;
-  name: string;
-  sort_order: number;
-}
+/** @deprecated use TrainingDirection */
+export type TrainingSection = TrainingDirection;
+
+/** @deprecated use TrainingSectionNode */
+export type TrainingTopic = TrainingSectionNode & {
+  id?: number | string;
+  section_id?: number;
+  direction_id?: number;
+};
 
 export interface TrainingTreeResponse {
   success: boolean;
-  sections: TrainingSection[];
+  student_id: number;
+  directions: TrainingDirection[];
+  /** @deprecated */
+  sections?: TrainingDirection[];
 }
 
-export interface TrainingSectionsResponse {
-  success: boolean;
-  sections: TrainingSectionMeta[];
-}
-
-/** Backend may return a bare array or { success, themes } */
-export type ThemesApiPayload =
-  | TrainingThemeRow[]
-  | { success?: boolean; themes?: TrainingThemeRow[] };
-
-export interface TrainingThemeRow {
-  id: number;
-  name: string;
-  section_id?: number | null;
-}
-
-export interface AllCardsByThemeResponse {
+export interface SectionStudyViewResponse {
   success: boolean;
   student_id: number;
-  theme_id: number;
+  section_kind: SectionKind;
+  section_ref_id: string;
+  section_name: string;
   cards: TrainingCard[];
-  total_cards: number;
-  learned_cards: number;
-  remaining_cards: number;
+  stats: SectionStats;
+  batches: StudyBatch[];
+  settings: StudySettings;
 }
 
-export interface CardsToLearnResponse {
+export interface SectionBatchResponse {
   success: boolean;
   student_id: number;
-  theme_id: number;
-  cards_to_learn: TrainingCard[];
+  section_kind: SectionKind;
+  section_ref_id: string;
+  batch_index: number;
+  batch: StudyBatch;
+  study_mode: StudyFilter;
+  cards: TrainingCard[];
   count: number;
 }
 
-export interface LearnedQuestionsResponse {
-  success: boolean;
+export interface MarkCardLearnedPayload {
   student_id: number;
-  theme_id: number;
-  learned_questions: TrainingCard[];
-  count: number;
+  section_kind: SectionKind;
+  section_ref_id: string;
+  card_ref: string;
+  content_fingerprint: string;
 }
 
-export interface AddLearnedPayload {
-  student_id: number;
-  question_id: number;
-}
-
-export interface AddLearnedResponse {
+export interface MarkCardLearnedResponse {
   success: boolean;
-  message?: string;
+  card_ref?: string;
+  status?: CardStatus;
+  error?: string;
 }
 
-export interface RemoveLearnedResponse {
-  success: boolean;
-  message?: string;
+export interface StudySettingsPayload {
+  batch_size?: number;
+  last_batch_index?: number | null;
+  study_mode?: StudyFilter;
 }
+
+export interface StudySettingsResponse {
+  success: boolean;
+  settings?: StudySettings;
+  error?: string;
+}
+
+export const BATCH_SIZE_PRESETS = [10, 20, 30] as const;
+
+export const CARD_STATUS_LABELS: Record<CardStatus, string> = {
+  unlearned: "Не выучено",
+  learned: "Выучено",
+  answer_changed: "Поменялся ответ",
+};
+
+export const STUDY_FILTER_LABELS: Record<StudyFilter, string> = {
+  all: "Весь батч",
+  unlearned: "Невыученные",
+  learned: "Повторить выученные",
+  stale: "Поменялся ответ",
+};

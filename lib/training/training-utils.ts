@@ -25,13 +25,31 @@ export function shuffleCards<T>(items: T[]): T[] {
   return copy;
 }
 
+export function splitCardsByStatus(cards: TrainingCard[]): {
+  learned: TrainingCard[];
+  unlearned: TrainingCard[];
+  answer_changed: TrainingCard[];
+} {
+  const learned = cards.filter((c) => c.status === "learned");
+  const answer_changed = cards.filter((c) => c.status === "answer_changed");
+  const unlearned = cards.filter((c) => c.status === "unlearned");
+  return { learned, unlearned, answer_changed };
+}
+
+/** @deprecated */
 export function splitCardsByLearned(cards: TrainingCard[]): {
   learned: TrainingCard[];
   unlearned: TrainingCard[];
 } {
-  const learned = cards.filter((c) => c.is_learned);
-  const unlearned = cards.filter((c) => !c.is_learned);
-  return { learned, unlearned };
+  const { learned, unlearned, answer_changed } = splitCardsByStatus(cards);
+  return {
+    learned,
+    unlearned: [...unlearned, ...answer_changed],
+  };
 }
 
 export const FLASH_ONBOARDING_KEY = "flash_onboarding_seen";
+
+export function sectionKey(kind: string, refId: string): string {
+  return `${kind}:${refId}`;
+}

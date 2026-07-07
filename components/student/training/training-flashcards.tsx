@@ -5,22 +5,21 @@ import { Button } from "@/components/ui/button";
 import { LoadingState } from "@/components/ui/loading-state";
 import { useCabinetChrome } from "@/contexts/cabinet-chrome-context";
 import {
-  fetchCardsToLearn,
-  fetchLearnedQuestions,
-  markQuestionLearned,
+  fetchSectionBatch,
+  markCardLearned,
 } from "@/lib/training/training-api";
-import type { TrainingCard, TrainingTopic } from "@/lib/training/training-types";
+import type {
+  SectionKind,
+  StudyFilter,
+  TrainingCard,
+  TrainingSectionNode,
+} from "@/lib/training/training-types";
 import {
   FLASH_ONBOARDING_KEY,
   shuffleCards,
 } from "@/lib/training/training-utils";
 import { cn } from "@/lib/cn";
-import {
-  ArrowLeft,
-  ArrowRight,
-  Check,
-  RotateCcw,
-} from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, RotateCcw } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 type AnimationState =
@@ -30,19 +29,26 @@ type AnimationState =
   | "swiping-right";
 
 interface TrainingFlashcardsProps {
-  topic: TrainingTopic;
+  section: TrainingSectionNode;
   studentId: number;
+  batchIndex: number;
+  studyMode: StudyFilter;
   onBack: () => void;
   onLearnedCountChange?: (learned: number, total: number) => void;
 }
 
 export function TrainingFlashcards({
-  topic,
+  section,
   studentId,
+  batchIndex,
+  studyMode,
   onBack,
   onLearnedCountChange,
 }: TrainingFlashcardsProps) {
   const { setImmersive } = useCabinetChrome();
+  const sectionKind = section.kind as SectionKind;
+  const sectionRefId = section.refId;
+
   const [cards, setCards] = useState<TrainingCard[]>([]);
   const [learnedCount, setLearnedCount] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
@@ -58,6 +64,11 @@ export function TrainingFlashcards({
   const mouseDragging = useRef(false);
   const mouseStartX = useRef(0);
   const wasDragging = useRef(false);
+  const onLearnedCountChangeRef = useRef(onLearnedCountChange);
+
+  useEffect(() => {
+    onLearnedCountChangeRef.current = onLearnedCountChange;
+  }, [onLearnedCountChange]);
 
   const setSwipe = (value: number) => {
     swipeOffsetRef.current = value;
@@ -77,33 +88,33 @@ export function TrainingFlashcards({
     }
   }, []);
 
-  const onLearnedCountChangeRef = useRef(onLearnedCountChange);
-
-  useEffect(() => {
-    onLearnedCountChangeRef.current = onLearnedCountChange;
-  }, [onLearnedCountChange]);
-
   const loadDeck = useCallback(async () => {
     setLoading(true);
     try {
-      const [unlearned, learned] = await Promise.all([
-        fetchCardsToLearn(studentId, topic.id),
-        fetchLearnedQuestions(studentId, topic.id),
-      ]);
-      const shuffled = shuffleCards(unlearned.cards_to_learn);
+      const data = await fetchSectionBatch(
+        studentId,
+        sectionKind,
+        sectionRefId,
+        batchIndex,
+        studyMode,
+      );
+      const shuffled = shuffleCards(data.cards);
       setCards(shuffled);
-      const learnedN = learned.count ?? 0;
-      const total = learnedN + shuffled.length;
-      setLearnedCount(learnedN);
-      setTotalCount(total);
+      const batchStats = data.batch.stats;
+      setLearnedCount(batchStats.learned);
+      setTotalCount(batchStats.total);
       setCurrentIndex(0);
       setIsFlipped(false);
+      onLearnedCountChangeRef.current?.(
+        batchStats.learned,
+        batchStats.total,
+      );
     } catch {
       setCards([]);
     } finally {
       setLoading(false);
     }
-  }, [studentId, topic.id]);
+  }, [batchIndex, sectionKind, sectionRefId, studentId, studyMode]);
 
   useEffect(() => {
     void loadDeck();
@@ -157,9 +168,12 @@ export function TrainingFlashcards({
 
     try {
       await animateTransition("right");
-      await markQuestionLearned({
+      await markCardLearned({
         student_id: studentId,
-        question_id: card.id,
+        section_kind: sectionKind,
+        section_ref_id: sectionRefId,
+        card_ref: card.card_ref,
+        content_fingerprint: card.content_fingerprint,
       });
 
       const nextLearned = learnedCount + 1;
@@ -168,12 +182,8 @@ export function TrainingFlashcards({
 
       setCards((prev) => {
         const next = prev.filter((_, i) => i !== currentIndex);
-        if (next.length === 0) {
-          return next;
-        }
-        setCurrentIndex((idx) =>
-          idx >= next.length ? 0 : idx,
-        );
+        if (next.length === 0) return next;
+        setCurrentIndex((idx) => (idx >= next.length ? 0 : idx));
         return next;
       });
       setIsFlipped(false);
@@ -240,16 +250,15 @@ export function TrainingFlashcards({
       <div className={styles.flashShell}>
         <button type="button" className={styles.flashBackBtn} onClick={onBack}>
           <ArrowLeft size={16} aria-hidden />
-          Назад к теме
+          Назад к разделу
         </button>
         <div className={styles.completeBox}>
-          <h3>Все карточки изучены</h3>
+          <h3>Нет карточек в этом режиме</h3>
           <p className={styles.cardMeta}>
-            Отличная работа — можно вернуться к списку или выбрать другую
-            тренировку.
+            Выберите другой батч или режим заучивания.
           </p>
           <Button type="button" onClick={onBack}>
-            К теме
+            К разделу
           </Button>
         </div>
       </div>
@@ -259,7 +268,8 @@ export function TrainingFlashcards({
   const currentCard = cards[currentIndex];
   const nextCard = cards[(currentIndex + 1) % cards.length];
   const total = totalCount || learnedCount + cards.length;
-  const progressPercent = total > 0 ? Math.round((learnedCount / total) * 100) : 0;
+  const progressPercent =
+    total > 0 ? Math.round((learnedCount / total) * 100) : 0;
   const rotation = Math.max(-15, Math.min(15, swipeOffset / 15));
   const rememberOpacity = Math.min(1, Math.max(0, swipeOffset / 140));
   const repeatOpacity = Math.min(1, Math.max(0, -swipeOffset / 140));
@@ -276,7 +286,7 @@ export function TrainingFlashcards({
             <ArrowLeft size={16} aria-hidden />
             Назад
           </button>
-          <p className={styles.flashTopicName}>{topic.name}</p>
+          <p className={styles.flashTopicName}>{section.name}</p>
         </div>
 
         <div className={styles.flashProgressRow}>
@@ -301,24 +311,9 @@ export function TrainingFlashcards({
             <h3>Режим карточек</h3>
             <ul>
               <li>Нажмите на карточку, чтобы увидеть ответ.</li>
-              <li>
-                Свайп вправо или кнопка «Знаю» — карточка засчитывается как
-                выученная.
-              </li>
-              <li>
-                Свайп влево или «Повторить» — вернётся в конец колоды.
-              </li>
+              <li>Свайп вправо или «Знаю» — карточка засчитывается.</li>
+              <li>Свайп влево или «Повторить» — карточка остаётся в колоде.</li>
             </ul>
-            <div className={styles.swipeHints}>
-              <span className={styles.swipeHintItem}>
-                <RotateCcw size={14} aria-hidden />
-                Повторить
-              </span>
-              <span className={styles.swipeHintItem}>
-                Знаю
-                <ArrowRight size={14} aria-hidden />
-              </span>
-            </div>
             <Button type="button" onClick={dismissOnboarding}>
               Начать
             </Button>
@@ -364,11 +359,6 @@ export function TrainingFlashcards({
             <div className={styles.flashcardFace}>
               <p className={styles.flashcardFaceLabel}>Вопрос</p>
               <p className={styles.flashcardFaceText}>{currentCard.question}</p>
-              {!isFlipped ? (
-                <span className={styles.flashcardTapHint}>
-                  Нажмите, чтобы увидеть ответ
-                </span>
-              ) : null}
             </div>
             <div className={cn(styles.flashcardFace, styles.flashcardBack)}>
               <p className={styles.flashcardFaceLabel}>Ответ</p>

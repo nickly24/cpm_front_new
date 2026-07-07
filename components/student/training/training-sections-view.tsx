@@ -2,36 +2,37 @@
 
 import styles from "@/components/student/training/student-training.module.css";
 import { LoadingState } from "@/components/ui/loading-state";
-import type { TrainingSection } from "@/lib/training/training-types";
+import type { TrainingDirection } from "@/lib/training/training-types";
 import { getProgressLabel } from "@/lib/training/training-utils";
 
-interface TrainingSectionsViewProps {
-  sections: TrainingSection[];
+interface TrainingDirectionsViewProps {
+  directions: TrainingDirection[];
   loading: boolean;
   error: string | null;
-  onSelectSection: (section: TrainingSection) => void;
+  onSelectDirection: (direction: TrainingDirection) => void;
 }
 
-export function TrainingSectionsView({
-  sections,
+export function TrainingDirectionsView({
+  directions,
   loading,
   error,
-  onSelectSection,
-}: TrainingSectionsViewProps) {
+  onSelectDirection,
+}: TrainingDirectionsViewProps) {
   if (loading) {
-    return <LoadingState label="Загрузка тем…" variant="panel" />;
+    return <LoadingState label="Загрузка направлений…" variant="panel" />;
   }
 
   if (error) {
     return <p className={styles.alert}>{error}</p>;
   }
 
-  if (sections.length === 0) {
+  if (directions.length === 0) {
     return (
       <div className={styles.emptyState}>
-        <h2 className={styles.emptyTitle}>Темы пока недоступны</h2>
+        <h2 className={styles.emptyTitle}>Направления пока недоступны</h2>
         <p className={styles.emptyText}>
-          Разделы тренировки появятся, когда преподаватель добавит карточки.
+          Разделы с карточками появятся, когда преподаватель добавит материал
+          или откроет ответы в тестах.
         </p>
       </div>
     );
@@ -39,31 +40,31 @@ export function TrainingSectionsView({
 
   return (
     <div className={styles.cardGrid}>
-      {sections.map((section) => (
+      {directions.map((direction) => (
         <button
-          key={section.id}
+          key={direction.id}
           type="button"
           className={styles.sectionCard}
-          onClick={() => onSelectSection(section)}
+          onClick={() => onSelectDirection(direction)}
         >
-          <h3 className={styles.cardName}>{section.name}</h3>
+          <h3 className={styles.cardName}>{direction.name}</h3>
           <p className={styles.cardMeta}>
-            {section.topics.length}{" "}
-            {section.topics.length === 1 ? "тренировка" : "тренировок"} ·{" "}
-            {section.learned_cards} / {section.total_cards} карточек
+            {direction.sections.length}{" "}
+            {direction.sections.length === 1 ? "раздел" : "разделов"} ·{" "}
+            {direction.learned_cards} / {direction.total_cards} выучено
           </p>
           <div className={styles.progressRow}>
             <span className={styles.progressLabel}>
-              {getProgressLabel(section.progress_percent)}
+              {getProgressLabel(direction.progress_percent)}
             </span>
             <span className={styles.progressValue}>
-              {section.progress_percent}%
+              {direction.progress_percent}%
             </span>
           </div>
           <div className={styles.progressTrack}>
             <div
               className={styles.progressFill}
-              style={{ width: `${section.progress_percent}%` }}
+              style={{ width: `${direction.progress_percent}%` }}
             />
           </div>
         </button>
@@ -71,3 +72,6 @@ export function TrainingSectionsView({
     </div>
   );
 }
+
+/** @deprecated use TrainingDirectionsView */
+export const TrainingSectionsView = TrainingDirectionsView;

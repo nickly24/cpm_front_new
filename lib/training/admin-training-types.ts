@@ -1,22 +1,26 @@
-export interface AdminTrainingTopicRow {
-  id: number;
-  name: string;
-  section_id: number;
-  cards_count: number;
-}
-
 export interface AdminTrainingSectionRow {
   id: number;
   name: string;
-  sort_order: number;
-  topics: AdminTrainingTopicRow[];
+  direction_id: number;
+  cards_count: number;
+  /** @deprecated */
+  section_id?: number;
+}
+
+export interface AdminTrainingDirectionRow {
+  id: number;
+  name: string;
+  sections: AdminTrainingSectionRow[];
+  topics: AdminTrainingSectionRow[];
   topics_count: number;
   cards_count: number;
 }
 
 export interface AdminTrainingCatalogResponse {
   success: boolean;
-  sections: AdminTrainingSectionRow[];
+  directions: AdminTrainingDirectionRow[];
+  /** @deprecated */
+  sections?: AdminTrainingDirectionRow[];
   error?: string;
 }
 
@@ -25,6 +29,7 @@ export interface AdminTrainingCardRow {
   question: string;
   answer: string;
   theme_id: number;
+  sort_order?: number;
 }
 
 export interface AdminCardsByThemeResponse {
@@ -38,7 +43,7 @@ export interface AdminCardsByThemeResponse {
 export interface TrainingMutationResponse {
   success: boolean;
   error?: string;
-  section_id?: number;
   theme_id?: number;
   card_id?: number;
+  direction_id?: number;
 }

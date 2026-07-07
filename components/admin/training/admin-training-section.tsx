@@ -5,39 +5,30 @@ import { Button } from "@/components/ui/button";
 import { LoadingState } from "@/components/ui/loading-state";
 import {
   createTrainingCard,
-  createTrainingSection,
   createTrainingTheme,
   deleteTrainingCard,
-  deleteTrainingSection,
   deleteTrainingTheme,
   fetchAdminCardsByTheme,
   fetchAdminTrainingCatalog,
   updateTrainingCard,
-  updateTrainingSection,
   updateTrainingTheme,
 } from "@/lib/training/admin-training-api";
 import type {
   AdminTrainingCardRow,
+  AdminTrainingDirectionRow,
   AdminTrainingSectionRow,
-  AdminTrainingTopicRow,
 } from "@/lib/training/admin-training-types";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
-type AdminView = "sections" | "topics" | "cards";
+type AdminView = "directions" | "sections" | "cards";
 
-type ModalKind =
-  | "section-create"
-  | "section-edit"
-  | "topic-create"
-  | "topic-edit"
-  | "card-create"
-  | "card-edit";
+type ModalKind = "section-create" | "section-edit" | "card-create" | "card-edit";
 
 interface ModalState {
   kind: ModalKind;
+  direction?: AdminTrainingDirectionRow;
   section?: AdminTrainingSectionRow;
-  topic?: AdminTrainingTopicRow;
   card?: AdminTrainingCardRow;
 }
 
@@ -47,18 +38,17 @@ function confirmDelete(message: string): boolean {
 
 function FormModal({
   state,
-  sections,
+  directions,
   onClose,
   onSaved,
 }: {
   state: ModalState;
-  sections: AdminTrainingSectionRow[];
+  directions: AdminTrainingDirectionRow[];
   onClose: () => void;
   onSaved: () => void;
 }) {
   const [name, setName] = useState("");
-  const [sortOrder, setSortOrder] = useState("0");
-  const [sectionId, setSectionId] = useState("");
+  const [directionId, setDirectionId] = useState("");
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -68,22 +58,12 @@ function FormModal({
     setError(null);
     if (state.kind === "section-create") {
       setName("");
-      setSortOrder("0");
+      setDirectionId(String(state.direction?.id ?? directions[0]?.id ?? ""));
       return;
     }
     if (state.kind === "section-edit" && state.section) {
       setName(state.section.name);
-      setSortOrder(String(state.section.sort_order));
-      return;
-    }
-    if (state.kind === "topic-create") {
-      setName("");
-      setSectionId(String(state.section?.id ?? ""));
-      return;
-    }
-    if (state.kind === "topic-edit" && state.topic) {
-      setName(state.topic.name);
-      setSectionId(String(state.topic.section_id));
+      setDirectionId(String(state.section.direction_id));
       return;
     }
     if (state.kind === "card-create") {
@@ -95,7 +75,7 @@ function FormModal({
       setQuestion(state.card.question);
       setAnswer(state.card.answer);
     }
-  }, [state]);
+  }, [directions, state]);
 
   useEffect(() => {
     document.body.style.overflow = "hidden";
@@ -106,16 +86,12 @@ function FormModal({
 
   const title =
     state.kind === "section-create"
-      ? "Новая тема"
+      ? "Новый раздел"
       : state.kind === "section-edit"
-        ? "Редактировать тему"
-        : state.kind === "topic-create"
-          ? "Новая тренировка"
-          : state.kind === "topic-edit"
-            ? "Редактировать тренировку"
-            : state.kind === "card-create"
-              ? "Новая карточка"
-              : "Редактировать карточку";
+        ? "Редактировать раздел"
+        : state.kind === "card-create"
+          ? "Новая карточка"
+          : "Редактировать карточку";
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -126,40 +102,26 @@ function FormModal({
       switch (state.kind) {
         case "section-create":
           if (!name.trim()) throw new Error("Укажите название");
-          res = await createTrainingSection({
+          if (!directionId) throw new Error("Выберите направление");
+          res = await createTrainingTheme({
             name: name.trim(),
-            sort_order: Number(sortOrder) || 0,
+            direction_id: Number(directionId),
           });
           break;
         case "section-edit":
           if (!state.section) return;
-          res = await updateTrainingSection(state.section.id, {
+          res = await updateTrainingTheme(state.section.id, {
             name: name.trim(),
-            sort_order: Number(sortOrder) || 0,
-          });
-          break;
-        case "topic-create":
-          if (!name.trim()) throw new Error("Укажите название");
-          if (!sectionId) throw new Error("Выберите тему");
-          res = await createTrainingTheme({
-            name: name.trim(),
-            section_id: Number(sectionId),
-          });
-          break;
-        case "topic-edit":
-          if (!state.topic) return;
-          res = await updateTrainingTheme(state.topic.id, {
-            name: name.trim(),
-            section_id: Number(sectionId),
+            direction_id: Number(directionId),
           });
           break;
         case "card-create":
-          if (!state.topic) return;
+          if (!state.section) return;
           if (!question.trim() || !answer.trim()) {
             throw new Error("Заполните вопрос и ответ");
           }
           res = await createTrainingCard({
-            theme_id: state.topic.id,
+            theme_id: state.section.id,
             question: question.trim(),
             answer: answer.trim(),
           });
@@ -193,63 +155,42 @@ function FormModal({
         onClick={(event) => event.stopPropagation()}
         role="dialog"
         aria-modal="true"
-        aria-labelledby="training-modal-title"
       >
-        <h2 id="training-modal-title" className={styles.modalTitle}>
-          {title}
-        </h2>
-        {(state.kind === "section-create" || state.kind === "topic-create") && (
+        <h2 className={styles.modalTitle}>{title}</h2>
+        {(state.kind === "section-create" || state.kind === "section-edit") && (
           <p className={styles.modalHint}>
-            {state.kind === "section-create"
-              ? "Тема — верхний уровень: предмет или блок материала."
-              : "Тренировка — набор карточек внутри темы."}
+            Раздел — набор карточек внутри направления (предмета).
           </p>
         )}
 
         <form className={styles.form} onSubmit={(e) => void handleSubmit(e)}>
           {(state.kind === "section-create" ||
-            state.kind === "section-edit" ||
-            state.kind === "topic-create" ||
-            state.kind === "topic-edit") && (
-            <label className={styles.field}>
-              <span className={styles.label}>Название</span>
-              <input
-                className={styles.input}
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                autoFocus
-              />
-            </label>
-          )}
-
-          {(state.kind === "section-create" ||
             state.kind === "section-edit") && (
-            <label className={styles.field}>
-              <span className={styles.label}>Порядок сортировки</span>
-              <input
-                className={styles.input}
-                type="number"
-                value={sortOrder}
-                onChange={(e) => setSortOrder(e.target.value)}
-              />
-            </label>
-          )}
-
-          {(state.kind === "topic-create" || state.kind === "topic-edit") && (
-            <label className={styles.field}>
-              <span className={styles.label}>Тема (раздел)</span>
-              <select
-                className={styles.input}
-                value={sectionId}
-                onChange={(e) => setSectionId(e.target.value)}
-              >
-                {sections.map((section) => (
-                  <option key={section.id} value={section.id}>
-                    {section.name}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <>
+              <label className={styles.field}>
+                <span className={styles.label}>Название раздела</span>
+                <input
+                  className={styles.input}
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  autoFocus
+                />
+              </label>
+              <label className={styles.field}>
+                <span className={styles.label}>Направление</span>
+                <select
+                  className={styles.input}
+                  value={directionId}
+                  onChange={(e) => setDirectionId(e.target.value)}
+                >
+                  {directions.map((direction) => (
+                    <option key={direction.id} value={direction.id}>
+                      {direction.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </>
           )}
 
           {(state.kind === "card-create" || state.kind === "card-edit") && (
@@ -291,12 +232,12 @@ function FormModal({
 }
 
 export function AdminTrainingSection() {
-  const [view, setView] = useState<AdminView>("sections");
-  const [sections, setSections] = useState<AdminTrainingSectionRow[]>([]);
+  const [view, setView] = useState<AdminView>("directions");
+  const [directions, setDirections] = useState<AdminTrainingDirectionRow[]>([]);
+  const [selectedDirection, setSelectedDirection] =
+    useState<AdminTrainingDirectionRow | null>(null);
   const [selectedSection, setSelectedSection] =
     useState<AdminTrainingSectionRow | null>(null);
-  const [selectedTopic, setSelectedTopic] =
-    useState<AdminTrainingTopicRow | null>(null);
   const [cards, setCards] = useState<AdminTrainingCardRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [cardsLoading, setCardsLoading] = useState(false);
@@ -309,32 +250,32 @@ export function AdminTrainingSection() {
     setError(null);
     try {
       const data = await fetchAdminTrainingCatalog();
-      setSections(data);
+      setDirections(data);
+      setSelectedDirection((prev) => {
+        if (!prev) return prev;
+        return data.find((d) => d.id === prev.id) ?? prev;
+      });
       setSelectedSection((prev) => {
         if (!prev) return prev;
-        return data.find((s) => s.id === prev.id) ?? prev;
-      });
-      setSelectedTopic((prev) => {
-        if (!prev) return prev;
-        for (const section of data) {
-          const topic = section.topics.find((t) => t.id === prev.id);
-          if (topic) return topic;
+        for (const direction of data) {
+          const section = direction.sections.find((s) => s.id === prev.id);
+          if (section) return section;
         }
         return prev;
       });
     } catch (err) {
-      setSections([]);
+      setDirections([]);
       setError(err instanceof Error ? err.message : "Ошибка загрузки");
     } finally {
       setLoading(false);
     }
   }, [reloadKey]);
 
-  const loadCards = useCallback(async (topicId: number) => {
+  const loadCards = useCallback(async (sectionId: number) => {
     setCardsLoading(true);
     setError(null);
     try {
-      setCards(await fetchAdminCardsByTheme(topicId));
+      setCards(await fetchAdminCardsByTheme(sectionId));
     } catch (err) {
       setCards([]);
       setError(err instanceof Error ? err.message : "Ошибка загрузки карточек");
@@ -348,45 +289,25 @@ export function AdminTrainingSection() {
   }, [loadCatalog]);
 
   useEffect(() => {
-    if (view === "cards" && selectedTopic) {
-      void loadCards(selectedTopic.id);
+    if (view === "cards" && selectedSection) {
+      void loadCards(selectedSection.id);
     }
-  }, [view, selectedTopic, loadCards, reloadKey]);
+  }, [view, selectedSection, loadCards, reloadKey]);
 
   const refresh = () => setReloadKey((v) => v + 1);
 
   const handleDeleteSection = async (section: AdminTrainingSectionRow) => {
     const hint =
-      section.topics_count > 0
-        ? `Удалить тему «${section.name}» вместе с ${section.topics_count} тренировками и ${section.cards_count} карточками?`
-        : `Удалить тему «${section.name}»?`;
+      section.cards_count > 0
+        ? `Удалить раздел «${section.name}» и ${section.cards_count} карточек?`
+        : `Удалить раздел «${section.name}»?`;
     if (!confirmDelete(hint)) return;
     try {
-      const res = await deleteTrainingSection(section.id);
+      const res = await deleteTrainingTheme(section.id);
       if (!res.success) throw new Error(res.error);
       if (selectedSection?.id === section.id) {
         setSelectedSection(null);
-        setSelectedTopic(null);
         setView("sections");
-      }
-      refresh();
-    } catch (err) {
-      window.alert(err instanceof Error ? err.message : "Ошибка удаления");
-    }
-  };
-
-  const handleDeleteTopic = async (topic: AdminTrainingTopicRow) => {
-    const hint =
-      topic.cards_count > 0
-        ? `Удалить тренировку «${topic.name}» и ${topic.cards_count} карточек?`
-        : `Удалить тренировку «${topic.name}»?`;
-    if (!confirmDelete(hint)) return;
-    try {
-      const res = await deleteTrainingTheme(topic.id);
-      if (!res.success) throw new Error(res.error);
-      if (selectedTopic?.id === topic.id) {
-        setSelectedTopic(null);
-        setView("topics");
       }
       refresh();
     } catch (err) {
@@ -396,104 +317,93 @@ export function AdminTrainingSection() {
 
   const handleDeleteCard = async (card: AdminTrainingCardRow) => {
     if (
-    !confirmDelete(
-      `Удалить карточку «${
-        card.question.length > 60
-          ? `${card.question.slice(0, 60)}…`
-          : card.question
-      }»?`,
-    )
-  ) {
+      !confirmDelete(
+        `Удалить карточку «${
+          card.question.length > 60
+            ? `${card.question.slice(0, 60)}…`
+            : card.question
+        }»?`,
+      )
+    ) {
       return;
     }
     try {
       const res = await deleteTrainingCard(card.id);
       if (!res.success) throw new Error(res.error);
       refresh();
-      if (selectedTopic) void loadCards(selectedTopic.id);
+      if (selectedSection) void loadCards(selectedSection.id);
     } catch (err) {
       window.alert(err instanceof Error ? err.message : "Ошибка удаления");
     }
   };
 
-  const createLabel =
-    view === "sections"
-      ? "Тема"
-      : view === "topics"
-        ? "Тренировка"
-        : "Карточка";
-
   const openCreate = () => {
-    if (view === "sections") {
-      setModal({ kind: "section-create" });
+    if (view === "sections" && selectedDirection) {
+      setModal({ kind: "section-create", direction: selectedDirection });
       return;
     }
-    if (view === "topics" && selectedSection) {
-      setModal({ kind: "topic-create", section: selectedSection });
-      return;
-    }
-    if (view === "cards" && selectedTopic) {
-      setModal({ kind: "card-create", topic: selectedTopic });
+    if (view === "cards" && selectedSection) {
+      setModal({ kind: "card-create", section: selectedSection });
     }
   };
 
   const pageTitle =
-    view === "cards" && selectedTopic
-      ? selectedTopic.name
-      : view === "topics" && selectedSection
-        ? selectedSection.name
+    view === "cards" && selectedSection
+      ? selectedSection.name
+      : view === "sections" && selectedDirection
+        ? selectedDirection.name
         : "Тренировки";
 
   const pageSubtitle =
-    view === "sections"
-      ? "Темы → тренировки → карточки. Управление контентом для учеников."
-      : view === "topics"
-        ? "Тренировки внутри темы — наборы карточек."
+    view === "directions"
+      ? "Направления из справочника тестов → разделы → карточки."
+      : view === "sections"
+        ? "Manual-разделы внутри направления. Test-разделы создаются из тестов с открытыми ответами."
         : "Вопросы и ответы для режима карточек.";
 
   return (
     <div className={styles.page}>
       <header className={styles.header}>
         <div>
-          {view !== "sections" ? (
+          {view !== "directions" ? (
             <nav className={styles.breadcrumb} aria-label="Навигация">
               <button
                 type="button"
                 className={styles.breadcrumbLink}
                 onClick={() => {
-                  setView("sections");
+                  setView("directions");
+                  setSelectedDirection(null);
                   setSelectedSection(null);
-                  setSelectedTopic(null);
                 }}
               >
-                Темы
+                Направления
               </button>
-              {selectedSection ? (
+              {selectedDirection ? (
                 <>
                   <span className={styles.breadcrumbSep}>/</span>
-                  {view === "topics" ? (
+                  {view === "sections" ? (
                     <span className={styles.breadcrumbCurrent}>
-                      {selectedSection.name}
+                      {selectedDirection.name}
                     </span>
                   ) : (
                     <button
                       type="button"
                       className={styles.breadcrumbLink}
                       onClick={() => {
-                        setView("topics");
-                        setSelectedTopic(null);
+                        setView("sections");
+                        setSelectedSection(null);
                       }}
                     >
-                      {selectedSection.name}
+                      {selectedDirection.name}
                     </button>
                   )}
                 </>
               ) : null}
-              {view === "cards" && selectedTopic ? (
+              {view === "cards" && selectedSection ? (
                 <>
                   <span className={styles.breadcrumbSep}>/</span>
                   <span className={styles.breadcrumbCurrent}>
-                    {selectedTopic.name}
+                    {selectedSection.name}
                   </span>
                 </>
               ) : null}
@@ -503,42 +413,68 @@ export function AdminTrainingSection() {
           <h1 className={styles.title}>{pageTitle}</h1>
           <p className={styles.subtitle}>{pageSubtitle}</p>
         </div>
-        <Button
-          type="button"
-          className={styles.flashModeBtn}
-          onClick={openCreate}
-        >
-          <Plus size={16} aria-hidden />
-          {createLabel}
-        </Button>
+        {view !== "directions" ? (
+          <Button type="button" className={styles.flashModeBtn} onClick={openCreate}>
+            <Plus size={16} aria-hidden />
+            {view === "sections" ? "Раздел" : "Карточка"}
+          </Button>
+        ) : null}
       </header>
 
       {error ? <p className={styles.alert}>{error}</p> : null}
 
       {loading ? (
         <LoadingState label="Загрузка…" variant="panel" />
-      ) : view === "sections" ? (
+      ) : view === "directions" ? (
         <div className={styles.panel}>
-          {sections.length === 0 ? (
+          {directions.length === 0 ? (
             <p className={styles.empty}>
-              Тем пока нет. Создайте первую — например, «Государство и право».
+              Направлений нет. Добавьте их в справочнике тестов.
             </p>
           ) : (
             <div className={styles.list}>
-              {sections.map((section) => (
+              {directions.map((direction) => (
+                <div key={direction.id} className={styles.row}>
+                  <button
+                    type="button"
+                    className={styles.rowMain}
+                    onClick={() => {
+                      setSelectedDirection(direction);
+                      setView("sections");
+                    }}
+                  >
+                    <p className={styles.rowTitle}>{direction.name}</p>
+                    <p className={styles.rowMeta}>
+                      {direction.topics_count} разделов · {direction.cards_count}{" "}
+                      карточек
+                    </p>
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : view === "sections" && selectedDirection ? (
+        <div className={styles.panel}>
+          {selectedDirection.sections.length === 0 ? (
+            <p className={styles.empty}>
+              В направлении «{selectedDirection.name}» пока нет manual-разделов.
+            </p>
+          ) : (
+            <div className={styles.list}>
+              {selectedDirection.sections.map((section) => (
                 <div key={section.id} className={styles.row}>
                   <button
                     type="button"
                     className={styles.rowMain}
                     onClick={() => {
                       setSelectedSection(section);
-                      setView("topics");
+                      setView("cards");
                     }}
                   >
                     <p className={styles.rowTitle}>{section.name}</p>
                     <p className={styles.rowMeta}>
-                      {section.topics_count} тренировок · {section.cards_count}{" "}
-                      карточек · порядок {section.sort_order}
+                      {section.cards_count} карточек
                     </p>
                   </button>
                   <div className={styles.rowActions}>
@@ -566,59 +502,13 @@ export function AdminTrainingSection() {
             </div>
           )}
         </div>
-      ) : view === "topics" && selectedSection ? (
-        <div className={styles.panel}>
-          {selectedSection.topics.length === 0 ? (
-            <p className={styles.empty}>
-              В теме «{selectedSection.name}» пока нет тренировок.
-            </p>
-          ) : (
-            <div className={styles.list}>
-              {selectedSection.topics.map((topic) => (
-                <div key={topic.id} className={styles.row}>
-                  <button
-                    type="button"
-                    className={styles.rowMain}
-                    onClick={() => {
-                      setSelectedTopic(topic);
-                      setView("cards");
-                    }}
-                  >
-                    <p className={styles.rowTitle}>{topic.name}</p>
-                    <p className={styles.rowMeta}>
-                      {topic.cards_count} карточек
-                    </p>
-                  </button>
-                  <div className={styles.rowActions}>
-                    <button
-                      type="button"
-                      className={styles.iconBtn}
-                      aria-label="Редактировать"
-                      onClick={() => setModal({ kind: "topic-edit", topic })}
-                    >
-                      <Pencil size={16} />
-                    </button>
-                    <button
-                      type="button"
-                      className={`${styles.iconBtn} ${styles.iconBtnDanger}`}
-                      aria-label="Удалить"
-                      onClick={() => void handleDeleteTopic(topic)}
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      ) : view === "cards" && selectedTopic ? (
+      ) : view === "cards" && selectedSection ? (
         <div className={styles.panel}>
           {cardsLoading ? (
             <LoadingState label="Загрузка карточек…" variant="compact" />
           ) : cards.length === 0 ? (
             <p className={styles.empty}>
-              В тренировке «{selectedTopic.name}» пока нет карточек.
+              В разделе «{selectedSection.name}» пока нет карточек.
             </p>
           ) : (
             <div className={styles.list}>
@@ -658,13 +548,13 @@ export function AdminTrainingSection() {
       {modal ? (
         <FormModal
           state={modal}
-          sections={sections}
+          directions={directions}
           onClose={() => setModal(null)}
           onSaved={() => {
             setModal(null);
             refresh();
-            if (view === "cards" && selectedTopic) {
-              void loadCards(selectedTopic.id);
+            if (view === "cards" && selectedSection) {
+              void loadCards(selectedSection.id);
             }
           }}
         />

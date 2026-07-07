@@ -1,266 +1,147 @@
-import { ApiError, apiRequest } from "@/lib/api/client";
+import { apiRequest } from "@/lib/api/client";
 import { calcProgressPercent } from "./training-utils";
 import type {
-  AddLearnedPayload,
-  AddLearnedResponse,
-  AllCardsByThemeResponse,
-  CardsToLearnResponse,
-  LearnedQuestionsResponse,
-  RemoveLearnedResponse,
-  ThemesApiPayload,
-  TrainingSection,
-  TrainingSectionMeta,
-  TrainingThemeRow,
-  TrainingTopic,
+  MarkCardLearnedPayload,
+  MarkCardLearnedResponse,
+  SectionBatchResponse,
+  SectionKind,
+  SectionStudyViewResponse,
+  StudyFilter,
+  StudySettingsPayload,
+  StudySettingsResponse,
+  TrainingDirection,
+  TrainingSectionNode,
   TrainingTreeResponse,
-  TrainingSectionsResponse,
 } from "./training-types";
 
-function buildQuery(params: Record<string, string | number | undefined>): string {
-  const search = new URLSearchParams();
-  for (const [key, value] of Object.entries(params)) {
-    if (value === undefined || value === "") continue;
-    search.set(key, String(value));
-  }
-  const query = search.toString();
-  return query ? `?${query}` : "";
-}
-
-function parseThemesPayload(data: ThemesApiPayload): TrainingThemeRow[] {
-  if (Array.isArray(data)) return data;
-  if (data && typeof data === "object" && Array.isArray(data.themes)) {
-    return data.themes;
-  }
-  return [];
-}
-
-async function enrichTopic(
-  studentId: number,
-  theme: TrainingThemeRow,
-): Promise<TrainingTopic> {
-  const stats = await fetchAllCardsByTheme(studentId, theme.id);
-  return {
-    id: theme.id,
-    name: theme.name,
-    section_id: theme.section_id ?? 0,
-    total_cards: stats.total_cards,
-    learned_cards: stats.learned_cards,
-    progress_percent: calcProgressPercent(
-      stats.learned_cards,
-      stats.total_cards,
+function normalizeSectionNode(raw: TrainingSectionNode): TrainingSectionNode {
+  const stats = raw.stats ?? {
+    total: raw.total_cards ?? 0,
+    learned: raw.learned_cards ?? 0,
+    answer_changed: raw.answer_changed_cards ?? 0,
+    unlearned: Math.max(
+      0,
+      (raw.total_cards ?? 0) -
+        (raw.learned_cards ?? 0) -
+        (raw.answer_changed_cards ?? 0),
     ),
   };
-}
-
-function aggregateSection(
-  meta: TrainingSectionMeta,
-  topics: TrainingTopic[],
-): TrainingSection {
-  const total_cards = topics.reduce((sum, t) => sum + t.total_cards, 0);
-  const learned_cards = topics.reduce((sum, t) => sum + t.learned_cards, 0);
   return {
-    id: meta.id,
-    name: meta.name,
-    sort_order: meta.sort_order,
-    topics,
-    total_cards,
-    learned_cards,
-    progress_percent: calcProgressPercent(learned_cards, total_cards),
-  };
-}
-
-function normalizeTopic(raw: TrainingTopic): TrainingTopic {
-  const total = Number(raw.total_cards) || 0;
-  const learned = Number(raw.learned_cards) || 0;
-  return {
-    id: raw.id,
-    name: raw.name,
-    section_id: Number(raw.section_id) || 0,
-    total_cards: total,
-    learned_cards: learned,
+    ...raw,
+    stats: {
+      ...stats,
+      progress_percent:
+        stats.progress_percent ??
+        calcProgressPercent(stats.learned, stats.total),
+    },
+    total_cards: raw.total_cards ?? stats.total,
+    learned_cards: raw.learned_cards ?? stats.learned,
+    answer_changed_cards: raw.answer_changed_cards ?? stats.answer_changed,
     progress_percent:
-      typeof raw.progress_percent === "number"
-        ? raw.progress_percent
-        : calcProgressPercent(learned, total),
+      raw.progress_percent ??
+      calcProgressPercent(stats.learned, stats.total),
   };
 }
 
-/** Дополняет агрегаты раздела, если бэкенд отдал только topics. */
-export function normalizeTrainingSections(
-  sections: TrainingSection[],
-): TrainingSection[] {
-  return sections.map((section) => {
-    const topics = (Array.isArray(section.topics) ? section.topics : []).map(
-      normalizeTopic,
+export function normalizeTrainingDirections(
+  directions: TrainingDirection[],
+): TrainingDirection[] {
+  return directions.map((direction) => {
+    const sections = (direction.sections ?? direction.topics ?? []).map(
+      normalizeSectionNode,
     );
-    const hasAggregates =
-      typeof section.total_cards === "number" &&
-      typeof section.learned_cards === "number" &&
-      typeof section.progress_percent === "number";
-    if (hasAggregates) {
-      return { ...section, topics };
-    }
-    return aggregateSection(
-      {
-        id: section.id,
-        name: section.name,
-        sort_order: section.sort_order ?? 0,
-      },
-      topics,
+    const total_cards = sections.reduce((s, t) => s + t.total_cards, 0);
+    const learned_cards = sections.reduce((s, t) => s + t.learned_cards, 0);
+    const answer_changed_cards = sections.reduce(
+      (s, t) => s + (t.answer_changed_cards ?? 0),
+      0,
     );
+    return {
+      ...direction,
+      sections,
+      topics: sections,
+      total_cards,
+      learned_cards,
+      answer_changed_cards,
+      progress_percent: calcProgressPercent(learned_cards, total_cards),
+    };
   });
 }
 
-/**
- * Предпочтительный источник: GET /get-training-tree/:studentId
- * Если эндпоинт ещё не развёрнут — fallback:
- * GET /get-training-sections + GET /get-themes?section_id=… + прогресс по темам.
- */
 export async function fetchTrainingTree(
   studentId: number,
-): Promise<TrainingSection[]> {
-  try {
-    const data = await apiRequest<TrainingTreeResponse>(
-      `/get-training-tree/${studentId}`,
-    );
-    if (data.success && Array.isArray(data.sections)) {
-      return normalizeTrainingSections(
-        data.sections.sort((a, b) => a.sort_order - b.sort_order),
-      );
-    }
-  } catch (err) {
-    if (!(err instanceof ApiError && (err.status === 404 || err.status === 501))) {
-      throw err;
-    }
-  }
-
-  return fetchTrainingTreeFallback(studentId);
-}
-
-async function fetchTrainingSectionsList(): Promise<TrainingSectionMeta[]> {
-  try {
-    const data = await apiRequest<TrainingSectionsResponse>(
-      "/get-training-sections",
-    );
-    if (data.success && Array.isArray(data.sections)) {
-      return [...data.sections].sort((a, b) => a.sort_order - b.sort_order);
-    }
-  } catch (err) {
-    if (!(err instanceof ApiError && (err.status === 404 || err.status === 501))) {
-      throw err;
-    }
-  }
-  return [];
-}
-
-export async function fetchThemes(
-  sectionId?: number,
-): Promise<TrainingThemeRow[]> {
-  const data = await apiRequest<ThemesApiPayload>(
-    `/get-themes${buildQuery({ section_id: sectionId })}`,
+): Promise<TrainingDirection[]> {
+  const data = await apiRequest<TrainingTreeResponse>(
+    `/get-training-tree/${studentId}`,
   );
-  return parseThemesPayload(data);
+  if (!data.success) {
+    throw new Error("Не удалось загрузить тренировки");
+  }
+  const directions = data.directions ?? data.sections ?? [];
+  return normalizeTrainingDirections(directions);
 }
 
-async function fetchTrainingTreeFallback(
+export async function fetchSectionStudyView(
   studentId: number,
-): Promise<TrainingSection[]> {
-  const sectionMetas = await fetchTrainingSectionsList();
-
-  if (sectionMetas.length > 0) {
-    const sections = await Promise.all(
-      sectionMetas.map(async (meta) => {
-        const themes = await fetchThemes(meta.id);
-        const topics = await Promise.all(
-          themes.map((theme) => enrichTopic(studentId, theme)),
-        );
-        return aggregateSection(meta, topics);
-      }),
-    );
-    return normalizeTrainingSections(sections);
+  sectionKind: SectionKind,
+  sectionRefId: string,
+): Promise<SectionStudyViewResponse> {
+  const data = await apiRequest<SectionStudyViewResponse>(
+    `/section-study/${studentId}/${sectionKind}/${encodeURIComponent(sectionRefId)}`,
+  );
+  if (!data.success) {
+    throw new Error("Не удалось загрузить раздел");
   }
+  return data;
+}
 
-  const allThemes = await fetchThemes();
-  const topics = await Promise.all(
-    allThemes.map((theme) => enrichTopic(studentId, theme)),
+export async function fetchSectionBatch(
+  studentId: number,
+  sectionKind: SectionKind,
+  sectionRefId: string,
+  batchIndex: number,
+  studyMode?: StudyFilter,
+): Promise<SectionBatchResponse> {
+  const query = studyMode ? `?study_mode=${encodeURIComponent(studyMode)}` : "";
+  const data = await apiRequest<SectionBatchResponse>(
+    `/section-batch/${studentId}/${sectionKind}/${encodeURIComponent(sectionRefId)}/${batchIndex}${query}`,
   );
-
-  const bySection = new Map<number, TrainingTopic[]>();
-  for (const topic of topics) {
-    const sid = topic.section_id || 0;
-    const list = bySection.get(sid) ?? [];
-    list.push(topic);
-    bySection.set(sid, list);
+  if (!data.success) {
+    throw new Error("Не удалось загрузить батч");
   }
-
-  if (bySection.size <= 1) {
-    const sid = topics[0]?.section_id ?? 0;
-    return normalizeTrainingSections([
-      aggregateSection(
-        { id: sid || 1, name: "Темы", sort_order: 0 },
-        topics,
-      ),
-    ]);
-  }
-
-  return normalizeTrainingSections(
-    Array.from(bySection.entries())
-      .sort(([a], [b]) => a - b)
-      .map(([sectionId, sectionTopics], index) =>
-        aggregateSection(
-          {
-            id: sectionId,
-            name: `Раздел ${sectionId}`,
-            sort_order: index,
-          },
-          sectionTopics,
-        ),
-      ),
-  );
+  return data;
 }
 
-export async function fetchAllCardsByTheme(
+export async function updateSectionStudySettings(
   studentId: number,
-  themeId: number,
-): Promise<AllCardsByThemeResponse> {
-  return apiRequest<AllCardsByThemeResponse>(
-    `/all-cards-by-theme/${studentId}/${themeId}`,
+  sectionKind: SectionKind,
+  sectionRefId: string,
+  payload: StudySettingsPayload,
+): Promise<StudySettingsResponse> {
+  return apiRequest<StudySettingsResponse>(
+    `/section-study-settings/${studentId}/${sectionKind}/${encodeURIComponent(sectionRefId)}`,
+    {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    },
   );
 }
 
-export async function fetchCardsToLearn(
-  studentId: number,
-  themeId: number,
-): Promise<CardsToLearnResponse> {
-  return apiRequest<CardsToLearnResponse>(
-    `/cadrs-by-theme/${studentId}/${themeId}`,
-  );
-}
-
-export async function fetchLearnedQuestions(
-  studentId: number,
-  themeId: number,
-): Promise<LearnedQuestionsResponse> {
-  return apiRequest<LearnedQuestionsResponse>(
-    `/learned-questions/${studentId}/${themeId}`,
-  );
-}
-
-export async function markQuestionLearned(
-  payload: AddLearnedPayload,
-): Promise<AddLearnedResponse> {
-  return apiRequest<AddLearnedResponse>("/add-learned-question", {
+export async function markCardLearned(
+  payload: MarkCardLearnedPayload,
+): Promise<MarkCardLearnedResponse> {
+  return apiRequest<MarkCardLearnedResponse>("/mark-card-learned", {
     method: "POST",
     body: JSON.stringify(payload),
   });
 }
 
-export async function unmarkQuestionLearned(
+export async function unmarkCardLearned(
   studentId: number,
-  questionId: number,
-): Promise<RemoveLearnedResponse> {
-  return apiRequest<RemoveLearnedResponse>(
-    `/remove-learned-question/${studentId}/${questionId}`,
+  cardRef: string,
+): Promise<MarkCardLearnedResponse> {
+  return apiRequest<MarkCardLearnedResponse>(
+    `/mark-card-learned/${studentId}/${encodeURIComponent(cardRef)}`,
     { method: "DELETE" },
   );
 }

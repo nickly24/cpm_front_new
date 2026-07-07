@@ -2,38 +2,42 @@
 
 import styles from "@/components/student/training/student-training.module.css";
 import { LoadingState } from "@/components/ui/loading-state";
-import type { TrainingSection, TrainingTopic } from "@/lib/training/training-types";
+import type {
+  TrainingDirection,
+  TrainingSectionNode,
+} from "@/lib/training/training-types";
 import { getProgressLabel } from "@/lib/training/training-utils";
+import { cn } from "@/lib/cn";
 
-interface TrainingTopicsViewProps {
-  section: TrainingSection;
+interface TrainingSectionsListViewProps {
+  direction: TrainingDirection;
   loading: boolean;
   error: string | null;
-  onSelectTopic: (topic: TrainingTopic) => void;
+  onSelectSection: (section: TrainingSectionNode) => void;
 }
 
-export function TrainingTopicsView({
-  section,
+export function TrainingSectionsListView({
+  direction,
   loading,
   error,
-  onSelectTopic,
-}: TrainingTopicsViewProps) {
+  onSelectSection,
+}: TrainingSectionsListViewProps) {
   if (loading) {
-    return <LoadingState label="Загрузка тренировок…" variant="panel" />;
+    return <LoadingState label="Загрузка разделов…" variant="panel" />;
   }
 
   if (error) {
     return <p className={styles.alert}>{error}</p>;
   }
 
-  const topics = section.topics;
+  const sections = direction.sections;
 
-  if (topics.length === 0) {
+  if (sections.length === 0) {
     return (
       <div className={styles.emptyState}>
-        <h2 className={styles.emptyTitle}>Тренировок нет</h2>
+        <h2 className={styles.emptyTitle}>Разделов нет</h2>
         <p className={styles.emptyText}>
-          В разделе «{section.name}» пока нет тем с карточками.
+          В направлении «{direction.name}» пока нет карточек.
         </p>
       </div>
     );
@@ -41,29 +45,40 @@ export function TrainingTopicsView({
 
   return (
     <div className={styles.cardGrid}>
-      {topics.map((topic) => (
+      {sections.map((section) => (
         <button
-          key={topic.id}
+          key={`${section.kind}:${section.refId}`}
           type="button"
-          className={styles.topicCard}
-          onClick={() => onSelectTopic(topic)}
+          className={cn(
+            styles.topicCard,
+            section.kind === "test" && styles.topicCardTest,
+          )}
+          onClick={() => onSelectSection(section)}
         >
-          <h3 className={styles.cardName}>{topic.name}</h3>
+          <h3 className={styles.cardName}>{section.name}</h3>
+          {section.kind === "test" && section.sourceTestTitle ? (
+            <p className={styles.cardBadge}>
+              На базе теста: {section.sourceTestTitle}
+            </p>
+          ) : null}
           <p className={styles.cardMeta}>
-            {topic.learned_cards} / {topic.total_cards} выучено
+            {section.learned_cards} / {section.total_cards} выучено
+            {(section.answer_changed_cards ?? 0) > 0
+              ? ` · ${section.answer_changed_cards} с новым ответом`
+              : ""}
           </p>
           <div className={styles.progressRow}>
             <span className={styles.progressLabel}>
-              {getProgressLabel(topic.progress_percent)}
+              {getProgressLabel(section.progress_percent)}
             </span>
             <span className={styles.progressValue}>
-              {topic.progress_percent}%
+              {section.progress_percent}%
             </span>
           </div>
           <div className={styles.progressTrack}>
             <div
               className={styles.progressFill}
-              style={{ width: `${topic.progress_percent}%` }}
+              style={{ width: `${section.progress_percent}%` }}
             />
           </div>
         </button>
@@ -71,3 +86,6 @@ export function TrainingTopicsView({
     </div>
   );
 }
+
+/** @deprecated use TrainingSectionsListView */
+export const TrainingTopicsView = TrainingSectionsListView;

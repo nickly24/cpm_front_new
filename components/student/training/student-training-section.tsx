@@ -2,72 +2,79 @@
 
 import styles from "@/components/student/training/student-training.module.css";
 import { TrainingFlashcards } from "@/components/student/training/training-flashcards";
-import { TrainingSectionsView } from "@/components/student/training/training-sections-view";
-import { TrainingTopicDetail } from "@/components/student/training/training-topic-detail";
-import { TrainingTopicsView } from "@/components/student/training/training-topics-view";
+import { TrainingDirectionsView } from "@/components/student/training/training-sections-view";
+import { TrainingSectionDetail } from "@/components/student/training/training-section-detail";
+import { TrainingSectionsListView } from "@/components/student/training/training-topics-view";
 import { SectionHeroBanner } from "@/components/student/section-hero-banner";
 import heroStyles from "@/components/student/section-hero-banner.module.css";
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchTrainingTree } from "@/lib/training/training-api";
 import { STUDENT_SECTION_BANNERS } from "@/lib/student/section-banners";
 import type {
-  TrainingSection,
-  TrainingTopic,
+  StudyFilter,
+  TrainingDirection,
+  TrainingSectionNode,
 } from "@/lib/training/training-types";
+import { calcProgressPercent } from "@/lib/training/training-utils";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-type TrainingView = "sections" | "topics" | "detail" | "flashcards";
+type TrainingView = "directions" | "sections" | "detail" | "flashcards";
 
-function updateTopicInSection(
-  sections: TrainingSection[],
-  sectionId: number,
-  topic: TrainingTopic,
-): TrainingSection[] {
-  return sections.map((section) => {
-    if (section.id !== sectionId) return section;
-    const topics = section.topics.map((t) =>
-      t.id === topic.id ? topic : t,
+function updateSectionInDirection(
+  directions: TrainingDirection[],
+  directionId: number,
+  section: TrainingSectionNode,
+): TrainingDirection[] {
+  return directions.map((direction) => {
+    if (direction.id !== directionId) return direction;
+    const sections = direction.sections.map((s) =>
+      s.kind === section.kind && s.refId === section.refId ? section : s,
     );
-    const total_cards = topics.reduce((s, t) => s + t.total_cards, 0);
-    const learned_cards = topics.reduce((s, t) => s + t.learned_cards, 0);
-    const progress_percent =
-      total_cards > 0
-        ? Math.round((learned_cards / total_cards) * 100)
-        : 0;
+    const total_cards = sections.reduce((sum, s) => sum + s.total_cards, 0);
+    const learned_cards = sections.reduce((sum, s) => sum + s.learned_cards, 0);
+    const answer_changed_cards = sections.reduce(
+      (sum, s) => sum + (s.answer_changed_cards ?? 0),
+      0,
+    );
     return {
-      ...section,
-      topics,
+      ...direction,
+      sections,
+      topics: sections,
       total_cards,
       learned_cards,
-      progress_percent,
+      answer_changed_cards,
+      progress_percent: calcProgressPercent(learned_cards, total_cards),
     };
   });
 }
 
 export function StudentTrainingSection() {
   const { user } = useAuth();
-  const [view, setView] = useState<TrainingView>("sections");
-  const [sections, setSections] = useState<TrainingSection[]>([]);
+  const [view, setView] = useState<TrainingView>("directions");
+  const [directions, setDirections] = useState<TrainingDirection[]>([]);
+  const [selectedDirection, setSelectedDirection] =
+    useState<TrainingDirection | null>(null);
   const [selectedSection, setSelectedSection] =
-    useState<TrainingSection | null>(null);
-  const [selectedTopic, setSelectedTopic] = useState<TrainingTopic | null>(
-    null,
-  );
+    useState<TrainingSectionNode | null>(null);
+  const [flashBatch, setFlashBatch] = useState(0);
+  const [flashStudyMode, setFlashStudyMode] = useState<StudyFilter>("unlearned");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const loadInFlightRef = useRef(false);
 
-  const applyTree = useCallback((tree: TrainingSection[]) => {
-    setSections(tree);
+  const applyTree = useCallback((tree: TrainingDirection[]) => {
+    setDirections(tree);
+    setSelectedDirection((prev) => {
+      if (!prev) return prev;
+      return tree.find((d) => d.id === prev.id) ?? prev;
+    });
     setSelectedSection((prev) => {
       if (!prev) return prev;
-      return tree.find((s) => s.id === prev.id) ?? prev;
-    });
-    setSelectedTopic((prev) => {
-      if (!prev) return prev;
-      for (const section of tree) {
-        const top = section.topics.find((t) => t.id === prev.id);
-        if (top) return top;
+      for (const direction of tree) {
+        const section = direction.sections.find(
+          (s) => s.kind === prev.kind && s.refId === prev.refId,
+        );
+        if (section) return section;
       }
       return prev;
     });
@@ -80,20 +87,17 @@ export function StudentTrainingSection() {
         setLoading(false);
         return;
       }
-
       if (loadInFlightRef.current) return;
       loadInFlightRef.current = true;
 
-      if (!options?.silent) {
-        setLoading(true);
-      }
+      if (!options?.silent) setLoading(true);
       setError(null);
 
       try {
         const tree = await fetchTrainingTree(user.id);
         applyTree(tree);
       } catch (err) {
-        setSections([]);
+        setDirections([]);
         setError(err instanceof Error ? err.message : "Ошибка загрузки");
       } finally {
         loadInFlightRef.current = false;
@@ -108,94 +112,72 @@ export function StudentTrainingSection() {
     void loadTree();
   }, [user?.id, loadTree]);
 
-  const handleTopicProgress = useCallback(
-    (topic: TrainingTopic) => {
-      setSelectedTopic(topic);
-      setSections((prev) => {
-        const sectionId = topic.section_id || selectedSection?.id;
-        if (!sectionId) return prev;
-        return updateTopicInSection(prev, sectionId, topic);
-      });
-      setSelectedSection((prev) => {
+  const handleSectionProgress = useCallback(
+    (section: TrainingSectionNode) => {
+      setSelectedSection(section);
+      const directionId = selectedDirection?.id;
+      if (!directionId) return;
+      setDirections((prev) => updateSectionInDirection(prev, directionId, section));
+      setSelectedDirection((prev) => {
         if (!prev) return prev;
-        const sectionId = topic.section_id || prev.id;
-        return updateTopicInSection([prev], sectionId, topic)[0];
+        return updateSectionInDirection([prev], directionId, section)[0];
       });
     },
-    [selectedSection?.id],
+    [selectedDirection?.id],
   );
 
-  const handleLearnedCountChange = useCallback(
-    (learned: number, total: number) => {
-      if (!selectedTopic) return;
-      handleTopicProgress({
-        ...selectedTopic,
-        learned_cards: learned,
-        total_cards: total,
-        progress_percent:
-          total > 0 ? Math.round((learned / total) * 100) : 0,
-      });
-    },
-    [handleTopicProgress, selectedTopic],
-  );
-
-  const handleSectionSelect = (section: TrainingSection) => {
-    setSelectedSection(section);
-    setView("topics");
-  };
-
-  const handleTopicSelect = (topic: TrainingTopic) => {
-    setSelectedTopic(topic);
-    setView("detail");
-  };
-
-  const goToSections = () => {
-    setSelectedSection(null);
-    setSelectedTopic(null);
-    setView("sections");
-  };
-
-  const goToTopics = () => {
-    setSelectedTopic(null);
-    setView("topics");
-  };
-
-  if (view === "flashcards" && selectedTopic && user?.id) {
+  if (view === "flashcards" && selectedSection && user?.id) {
     return (
       <TrainingFlashcards
-        topic={selectedTopic}
+        section={selectedSection}
         studentId={user.id}
+        batchIndex={flashBatch}
+        studyMode={flashStudyMode}
         onBack={() => setView("detail")}
-        onLearnedCountChange={handleLearnedCountChange}
+        onLearnedCountChange={(learned, total) => {
+          handleSectionProgress({
+            ...selectedSection,
+            learned_cards: learned,
+            total_cards: total,
+            progress_percent: calcProgressPercent(learned, total),
+          });
+        }}
       />
     );
   }
 
-  if (view === "detail" && selectedTopic && user?.id) {
+  if (view === "detail" && selectedSection && user?.id) {
     return (
-      <TrainingTopicDetail
-        topic={selectedTopic}
+      <TrainingSectionDetail
+        section={selectedSection}
         studentId={user.id}
-        onBack={goToTopics}
-        onStartFlashcards={() => setView("flashcards")}
-        onProgressChange={handleTopicProgress}
+        onBack={() => setView("sections")}
+        onStartFlashcards={(batchIndex, studyMode) => {
+          setFlashBatch(batchIndex);
+          setFlashStudyMode(studyMode);
+          setView("flashcards");
+        }}
+        onProgressChange={handleSectionProgress}
       />
     );
   }
 
   const breadcrumb =
-    view === "topics" && selectedSection ? (
+    view === "sections" && selectedDirection ? (
       <nav className={heroStyles.breadcrumb} aria-label="Навигация">
         <button
           type="button"
           className={heroStyles.breadcrumbLink}
-          onClick={goToSections}
+          onClick={() => {
+            setSelectedDirection(null);
+            setView("directions");
+          }}
         >
-          Темы
+          Направления
         </button>
         <span className={heroStyles.breadcrumbSep}>/</span>
         <span className={heroStyles.breadcrumbCurrent}>
-          {selectedSection.name}
+          {selectedDirection.name}
         </span>
       </nav>
     ) : null;
@@ -206,31 +188,37 @@ export function StudentTrainingSection() {
         imageSrc={STUDENT_SECTION_BANNERS.train}
         eyebrow="Тренировка"
         title={
-          view === "topics" && selectedSection
-            ? selectedSection.name
-            : "Темы"
+          view === "sections" && selectedDirection
+            ? selectedDirection.name
+            : "Направления"
         }
         subtitle={
-          view === "topics"
-            ? "Выберите тренировку и повторяйте карточки"
-            : "Разделы с карточками для запоминания материала"
+          view === "sections"
+            ? "Выберите раздел и учите карточки батчами"
+            : "Предметы с карточками и тестами для запоминания"
         }
         leading={breadcrumb ?? undefined}
       />
 
-      {view === "sections" ? (
-        <TrainingSectionsView
-          sections={sections}
+      {view === "directions" ? (
+        <TrainingDirectionsView
+          directions={directions}
           loading={loading}
           error={error}
-          onSelectSection={handleSectionSelect}
+          onSelectDirection={(direction) => {
+            setSelectedDirection(direction);
+            setView("sections");
+          }}
         />
-      ) : selectedSection ? (
-        <TrainingTopicsView
-          section={selectedSection}
+      ) : selectedDirection ? (
+        <TrainingSectionsListView
+          direction={selectedDirection}
           loading={loading}
           error={error}
-          onSelectTopic={handleTopicSelect}
+          onSelectSection={(section) => {
+            setSelectedSection(section);
+            setView("detail");
+          }}
         />
       ) : null}
     </div>

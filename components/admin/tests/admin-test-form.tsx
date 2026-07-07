@@ -284,24 +284,30 @@ export function AdminTestForm({
           </label>
 
           {!isReadOnly ? (
-            <div className={styles.formToggles}>
-              <Toggle
-                label="Видимость теста для студентов"
-                variant="success"
-                checked={testData.published}
-                onChange={(published) =>
-                  setTestData((prev) => ({ ...prev, published }))
-                }
-              />
-              <Toggle
-                label="Показ правильных ответов после сдачи"
-                variant="success"
-                checked={testData.visible}
-                onChange={(visible) =>
-                  setTestData((prev) => ({ ...prev, visible }))
-                }
-              />
-            </div>
+            <>
+              <div className={styles.formToggles}>
+                <Toggle
+                  label="Видимость теста для студентов"
+                  variant="success"
+                  checked={testData.published}
+                  onChange={(published) =>
+                    setTestData((prev) => ({ ...prev, published }))
+                  }
+                />
+                <Toggle
+                  label="Показ правильных ответов после сдачи"
+                  variant="success"
+                  checked={testData.visible}
+                  onChange={(visible) =>
+                    setTestData((prev) => ({ ...prev, visible }))
+                  }
+                />
+              </div>
+              <p className={styles.readonlyFlags}>
+                При скрытых ответах раздел этого теста в тренировках не
+                отображается у студентов.
+              </p>
+            </>
           ) : (
             <div className={styles.readonlyFlags}>
               <span>

@@ -3,6 +3,7 @@ import type {
   AdminCardsByThemeResponse,
   AdminTrainingCatalogResponse,
   AdminTrainingCardRow,
+  AdminTrainingDirectionRow,
   TrainingMutationResponse,
 } from "./admin-training-types";
 
@@ -13,7 +14,12 @@ export async function fetchAdminTrainingCatalog() {
   if (!data.success) {
     throw new Error(data.error ?? "Не удалось загрузить каталог");
   }
-  return data.sections.sort((a, b) => a.sort_order - b.sort_order);
+  const directions = data.directions ?? data.sections ?? [];
+  return directions.map((d) => ({
+    ...d,
+    sections: d.sections ?? d.topics ?? [],
+    topics: d.topics ?? d.sections ?? [],
+  })) as AdminTrainingDirectionRow[];
 }
 
 export async function fetchAdminCardsByTheme(themeId: number) {
@@ -26,39 +32,9 @@ export async function fetchAdminCardsByTheme(themeId: number) {
   return data.cards;
 }
 
-export async function createTrainingSection(payload: {
-  name: string;
-  sort_order?: number;
-}) {
-  return apiRequest<TrainingMutationResponse>("/create-training-section", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
-}
-
-export async function updateTrainingSection(
-  sectionId: number,
-  payload: { name?: string; sort_order?: number },
-) {
-  return apiRequest<TrainingMutationResponse>(
-    `/training-section/${sectionId}`,
-    {
-      method: "PUT",
-      body: JSON.stringify(payload),
-    },
-  );
-}
-
-export async function deleteTrainingSection(sectionId: number) {
-  return apiRequest<TrainingMutationResponse>(
-    `/training-section/${sectionId}`,
-    { method: "DELETE" },
-  );
-}
-
 export async function createTrainingTheme(payload: {
   name: string;
-  section_id: number;
+  direction_id: number;
 }) {
   return apiRequest<TrainingMutationResponse>("/create-training-theme", {
     method: "POST",
@@ -68,7 +44,7 @@ export async function createTrainingTheme(payload: {
 
 export async function updateTrainingTheme(
   themeId: number,
-  payload: { name?: string; section_id?: number },
+  payload: { name?: string; direction_id?: number },
 ) {
   return apiRequest<TrainingMutationResponse>(`/training-theme/${themeId}`, {
     method: "PUT",
@@ -86,6 +62,7 @@ export async function createTrainingCard(payload: {
   theme_id: number;
   question: string;
   answer: string;
+  sort_order?: number;
 }) {
   return apiRequest<TrainingMutationResponse & AdminTrainingCardRow>(
     "/create-card",
@@ -98,7 +75,7 @@ export async function createTrainingCard(payload: {
 
 export async function updateTrainingCard(
   cardId: number,
-  payload: { question?: string; answer?: string },
+  payload: { question?: string; answer?: string; sort_order?: number },
 ) {
   return apiRequest<TrainingMutationResponse>(`/card/${cardId}`, {
     method: "PUT",

@@ -346,6 +346,107 @@
   background: color-mix(in srgb, var(--ds-success) 6%, var(--ds-surface));
 }
 
+.cardRowStale {
+  background: color-mix(in srgb, var(--ds-warning, #d97706) 8%, var(--ds-surface));
+  border-color: color-mix(in srgb, var(--ds-warning, #d97706) 35%, var(--ds-border));
+}
+
+.cardRowStale .cardRowStatus {
+  background: var(--ds-warning, #d97706);
+}
+
+.topicCardTest {
+  border-color: color-mix(in srgb, var(--ds-accent) 40%, var(--ds-border));
+}
+
+.cardBadge {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ds-accent);
+}
+
+.batchGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 10px;
+  margin: 16px 0;
+}
+
+.batchCard {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-md);
+  background: var(--ds-surface);
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+
+.batchCard:hover {
+  border-color: var(--ds-accent);
+}
+
+.batchCardActive {
+  border-color: var(--ds-accent);
+  box-shadow: 0 0 0 1px var(--ds-accent);
+}
+
+.batchPresetRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.batchPresetBtn {
+  padding: 8px 14px;
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-sm);
+  background: var(--ds-surface);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.batchPresetBtnActive {
+  border-color: var(--ds-accent);
+  background: color-mix(in srgb, var(--ds-accent) 10%, var(--ds-surface));
+}
+
+.filterRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.filterChip {
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--ds-border);
+  background: var(--ds-surface);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.filterChipActive {
+  border-color: var(--ds-accent);
+  background: color-mix(in srgb, var(--ds-accent) 12%, var(--ds-surface));
+}
+
+.statsRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 16px;
+  font-size: 14px;
+  color: var(--ds-text-secondary);
+}
+
 .cardRowMain {
   display: flex;
   flex: 1;
