@@ -2,7 +2,6 @@
 
 import styles from "@/components/student/training/student-training.module.css";
 import { TrainingFlashcards } from "@/components/student/training/training-flashcards";
-import { TrainingDirectionsView } from "@/components/student/training/training-sections-view";
 import { TrainingSectionDetail } from "@/components/student/training/training-section-detail";
 import { TrainingSectionsListView } from "@/components/student/training/training-topics-view";
 import { SectionHeroBanner } from "@/components/student/section-hero-banner";
@@ -10,6 +9,7 @@ import heroStyles from "@/components/student/section-hero-banner.module.css";
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchTrainingTree } from "@/lib/training/training-api";
 import { STUDENT_SECTION_BANNERS } from "@/lib/student/section-banners";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type {
   StudyFilter,
   TrainingDirection,
@@ -18,7 +18,7 @@ import type {
 import { calcProgressPercent } from "@/lib/training/training-utils";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-type TrainingView = "directions" | "sections" | "detail" | "flashcards";
+type TrainingView = "sections" | "detail" | "flashcards";
 
 function updateSectionInDirection(
   directions: TrainingDirection[],
@@ -48,9 +48,26 @@ function updateSectionInDirection(
   });
 }
 
+function sectionProgressEqual(
+  a: TrainingSectionNode,
+  b: TrainingSectionNode,
+): boolean {
+  return (
+    a.kind === b.kind &&
+    a.refId === b.refId &&
+    a.total_cards === b.total_cards &&
+    a.learned_cards === b.learned_cards &&
+    a.answer_changed_cards === b.answer_changed_cards &&
+    a.progress_percent === b.progress_percent
+  );
+}
+
 export function StudentTrainingSection() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { user } = useAuth();
-  const [view, setView] = useState<TrainingView>("directions");
+  const [view, setView] = useState<TrainingView>("sections");
   const [directions, setDirections] = useState<TrainingDirection[]>([]);
   const [selectedDirection, setSelectedDirection] =
     useState<TrainingDirection | null>(null);
@@ -61,6 +78,7 @@ export function StudentTrainingSection() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const loadInFlightRef = useRef(false);
+  const restoredFromUrlRef = useRef(false);
 
   const applyTree = useCallback((tree: TrainingDirection[]) => {
     setDirections(tree);
@@ -96,6 +114,52 @@ export function StudentTrainingSection() {
       try {
         const tree = await fetchTrainingTree(user.id);
         applyTree(tree);
+
+        if (!restoredFromUrlRef.current) {
+          const urlView = searchParams.get("view") as TrainingView | null;
+          const directionId = Number(searchParams.get("direction"));
+          const sectionKind = searchParams.get("sectionKind");
+          const sectionRef = searchParams.get("sectionRef");
+          const batchIndexRaw = searchParams.get("batch");
+          const studyModeRaw = searchParams.get("mode") as StudyFilter | null;
+
+          const direction = Number.isFinite(directionId)
+            ? tree.find((item) => item.id === directionId) ?? null
+            : null;
+
+          if (direction) {
+            setSelectedDirection(direction);
+          }
+
+          if (direction && sectionKind && sectionRef) {
+            const section =
+              direction.sections.find(
+                (item) => item.kind === sectionKind && item.refId === sectionRef,
+              ) ?? null;
+            if (section) {
+              setSelectedSection(section);
+
+              if (urlView === "flashcards") {
+                const parsedBatch = Number(batchIndexRaw ?? "0");
+                setFlashBatch(Number.isFinite(parsedBatch) ? parsedBatch : 0);
+                setFlashStudyMode(studyModeRaw ?? "unlearned");
+                setView("flashcards");
+              } else if (urlView === "detail") {
+                setView("detail");
+              } else {
+                setView("sections");
+              }
+            } else {
+              setView("sections");
+            }
+          } else if (direction && urlView === "sections") {
+            setView("sections");
+          } else {
+            setView("sections");
+          }
+
+          restoredFromUrlRef.current = true;
+        }
       } catch (err) {
         setDirections([]);
         setError(err instanceof Error ? err.message : "Ошибка загрузки");
@@ -104,7 +168,7 @@ export function StudentTrainingSection() {
         setLoading(false);
       }
     },
-    [applyTree, user?.id],
+    [applyTree, searchParams, user?.id],
   );
 
   useEffect(() => {
@@ -114,17 +178,75 @@ export function StudentTrainingSection() {
 
   const handleSectionProgress = useCallback(
     (section: TrainingSectionNode) => {
-      setSelectedSection(section);
+      setSelectedSection((prev) => {
+        if (prev && sectionProgressEqual(prev, section)) return prev;
+        return section;
+      });
       const directionId = selectedDirection?.id;
       if (!directionId) return;
-      setDirections((prev) => updateSectionInDirection(prev, directionId, section));
+      setDirections((prev) => {
+        const direction = prev.find((d) => d.id === directionId);
+        const prevSection = direction?.sections.find(
+          (s) => s.kind === section.kind && s.refId === section.refId,
+        );
+        if (prevSection && sectionProgressEqual(prevSection, section)) return prev;
+        return updateSectionInDirection(prev, directionId, section);
+      });
       setSelectedDirection((prev) => {
         if (!prev) return prev;
+        const prevSection = prev.sections.find(
+          (s) => s.kind === section.kind && s.refId === section.refId,
+        );
+        if (prevSection && sectionProgressEqual(prevSection, section)) return prev;
         return updateSectionInDirection([prev], directionId, section)[0];
       });
     },
     [selectedDirection?.id],
   );
+
+  useEffect(() => {
+    if (!restoredFromUrlRef.current) return;
+
+    const params = new URLSearchParams();
+    if (view === "sections" && selectedDirection) {
+      params.set("view", "sections");
+      params.set("direction", String(selectedDirection.id));
+    } else if (view === "detail" && selectedDirection && selectedSection) {
+      params.set("view", "detail");
+      params.set("direction", String(selectedDirection.id));
+      params.set("sectionKind", selectedSection.kind);
+      params.set("sectionRef", selectedSection.refId);
+    } else if (view === "flashcards" && selectedDirection && selectedSection) {
+      params.set("view", "flashcards");
+      params.set("direction", String(selectedDirection.id));
+      params.set("sectionKind", selectedSection.kind);
+      params.set("sectionRef", selectedSection.refId);
+      params.set("batch", String(flashBatch));
+      params.set("mode", flashStudyMode);
+    }
+
+    const nextQuery = params.toString();
+    const currentQuery = searchParams.toString();
+    if (nextQuery === currentQuery) return;
+
+    router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname, {
+      scroll: false,
+    });
+  }, [
+    flashBatch,
+    flashStudyMode,
+    pathname,
+    router,
+    searchParams,
+    selectedDirection,
+    selectedSection,
+    view,
+  ]);
+
+  useEffect(() => {
+    if (selectedDirection || directions.length === 0) return;
+    setSelectedDirection(directions[0]);
+  }, [directions, selectedDirection]);
 
   if (view === "flashcards" && selectedSection && user?.id) {
     return (
@@ -165,20 +287,7 @@ export function StudentTrainingSection() {
   const breadcrumb =
     view === "sections" && selectedDirection ? (
       <nav className={heroStyles.breadcrumb} aria-label="Навигация">
-        <button
-          type="button"
-          className={heroStyles.breadcrumbLink}
-          onClick={() => {
-            setSelectedDirection(null);
-            setView("directions");
-          }}
-        >
-          Направления
-        </button>
-        <span className={heroStyles.breadcrumbSep}>/</span>
-        <span className={heroStyles.breadcrumbCurrent}>
-          {selectedDirection.name}
-        </span>
+        <span className={heroStyles.breadcrumbCurrent}>{selectedDirection.name}</span>
       </nav>
     ) : null;
 
@@ -186,33 +295,31 @@ export function StudentTrainingSection() {
     <div className={styles.page}>
       <SectionHeroBanner
         imageSrc={STUDENT_SECTION_BANNERS.train}
-        eyebrow="Тренировка"
+        eyebrow="Карточки"
         title={
-          view === "sections" && selectedDirection
-            ? selectedDirection.name
-            : "Направления"
+          view === "sections" && selectedDirection ? selectedDirection.name : "Карточки"
         }
         subtitle={
           view === "sections"
             ? "Выберите раздел и учите карточки батчами"
-            : "Предметы с карточками и тестами для запоминания"
+            : "Разделы с карточками для заучивания"
         }
         leading={breadcrumb ?? undefined}
       />
 
-      {view === "directions" ? (
-        <TrainingDirectionsView
+      {selectedDirection ? (
+        <TrainingSectionsListView
           directions={directions}
-          loading={loading}
-          error={error}
-          onSelectDirection={(direction) => {
-            setSelectedDirection(direction);
+          direction={selectedDirection}
+          selectedDirectionId={selectedDirection.id}
+          onSelectDirection={(directionId) => {
+            const next = directions.find((item) => item.id === directionId);
+            if (!next) return;
+            setSelectedDirection(next);
+            setSelectedSection(null);
             setView("sections");
           }}
-        />
-      ) : selectedDirection ? (
-        <TrainingSectionsListView
-          direction={selectedDirection}
+          studentId={user.id}
           loading={loading}
           error={error}
           onSelectSection={(section) => {

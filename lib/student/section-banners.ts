@@ -6,6 +6,8 @@ export const STUDENT_SECTION_BANNERS = {
   exams: "/arts/exam.png",
   attendance: "/arts/poseshaemost.png",
   train: "/arts/train.png",
+  /** Новый баннер тренировок (карточки) — подключить при редизайне */
+  trainFlashcards: "/arts/train-flashcards.png",
   zaps: "/arts/zaps.png",
 } as const;
 

@@ -10,6 +10,7 @@ import type {
   StudySettingsPayload,
   StudySettingsResponse,
   TrainingDirection,
+  TrainingSectionsResponse,
   TrainingSectionNode,
   TrainingTreeResponse,
 } from "./training-types";
@@ -79,6 +80,36 @@ export async function fetchTrainingTree(
   }
   const directions = data.directions ?? data.sections ?? [];
   return normalizeTrainingDirections(directions);
+}
+
+export async function fetchTrainingSectionsByDirection(
+  studentId: number,
+  directionId: number,
+  params?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    kind?: "all" | "manual" | "test";
+    progress?: "all" | "in_progress" | "learned";
+  },
+): Promise<TrainingSectionsResponse> {
+  const query = new URLSearchParams();
+  if (params?.page) query.set("page", String(params.page));
+  if (params?.limit) query.set("limit", String(params.limit));
+  if (params?.search) query.set("search", params.search);
+  if (params?.kind) query.set("kind", params.kind);
+  if (params?.progress) query.set("progress", params.progress);
+
+  const data = await apiRequest<TrainingSectionsResponse>(
+    `/training-sections/${studentId}/${directionId}${query.toString() ? `?${query.toString()}` : ""}`,
+  );
+  if (!data.success) {
+    throw new Error("Не удалось загрузить разделы");
+  }
+  return {
+    ...data,
+    sections: (data.sections ?? []).map(normalizeSectionNode),
+  };
 }
 
 export async function fetchSectionStudyView(

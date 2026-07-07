@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { LoadingState } from "@/components/ui/loading-state";
 import { useCabinetChrome } from "@/contexts/cabinet-chrome-context";
 import {
+  fetchSectionStudyView,
   fetchSectionBatch,
   markCardLearned,
 } from "@/lib/training/training-api";
@@ -21,6 +22,7 @@ import {
 import { cn } from "@/lib/cn";
 import { ArrowLeft, ArrowRight, Check, RotateCcw } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 
 type AnimationState =
   | "idle"
@@ -52,7 +54,6 @@ export function TrainingFlashcards({
   const [cards, setCards] = useState<TrainingCard[]>([]);
   const [learnedCount, setLearnedCount] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
-  const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
   const [animationState, setAnimationState] = useState<AnimationState>("idle");
   const [swipeOffset, setSwipeOffset] = useState(0);
@@ -91,24 +92,46 @@ export function TrainingFlashcards({
   const loadDeck = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await fetchSectionBatch(
-        studentId,
-        sectionKind,
-        sectionRefId,
-        batchIndex,
-        studyMode,
-      );
-      const shuffled = shuffleCards(data.cards);
-      setCards(shuffled);
-      const batchStats = data.batch.stats;
-      setLearnedCount(batchStats.learned);
-      setTotalCount(batchStats.total);
-      setCurrentIndex(0);
+      const cardsByMode = (source: TrainingCard[]) => {
+        if (studyMode === "all") return source;
+        if (studyMode === "learned") {
+          return source.filter((card) => card.status === "learned");
+        }
+        if (studyMode === "stale") {
+          return source.filter((card) => card.status === "answer_changed");
+        }
+        return source.filter((card) => card.status === "unlearned");
+      };
+
+      let nextLearned = 0;
+      let nextTotal = 0;
+      if (batchIndex === -1) {
+        const view = await fetchSectionStudyView(studentId, sectionKind, sectionRefId);
+        const filtered = cardsByMode(view.cards);
+        const shuffled = shuffleCards(filtered);
+        setCards(shuffled);
+        nextLearned = filtered.filter((card) => card.status === "learned").length;
+        nextTotal = filtered.length;
+        setLearnedCount(nextLearned);
+        setTotalCount(nextTotal);
+      } else {
+        const data = await fetchSectionBatch(
+          studentId,
+          sectionKind,
+          sectionRefId,
+          batchIndex,
+          studyMode,
+        );
+        const shuffled = shuffleCards(data.cards);
+        setCards(shuffled);
+        const batchStats = data.batch.stats;
+        nextLearned = batchStats.learned;
+        nextTotal = batchStats.total;
+        setLearnedCount(nextLearned);
+        setTotalCount(nextTotal);
+      }
       setIsFlipped(false);
-      onLearnedCountChangeRef.current?.(
-        batchStats.learned,
-        batchStats.total,
-      );
+      onLearnedCountChangeRef.current?.(nextLearned, nextTotal);
     } catch {
       setCards([]);
     } finally {
@@ -132,10 +155,14 @@ export function TrainingFlashcards({
   const animateTransition = (direction: "left" | "right") =>
     new Promise<void>((resolve) => {
       setAnimationState(direction === "left" ? "swiping-left" : "swiping-right");
-      window.setTimeout(() => {
-        setAnimationState("idle");
-        resolve();
-      }, 320);
+      const targetOffset =
+        direction === "left"
+          ? -Math.max(window.innerWidth, 600)
+          : Math.max(window.innerWidth, 600);
+      requestAnimationFrame(() => {
+        setSwipe(targetOffset);
+      });
+      window.setTimeout(resolve, 320);
     });
 
   const handleFlip = () => {
@@ -152,19 +179,25 @@ export function TrainingFlashcards({
   const handleSkip = async () => {
     if (animationState !== "idle" || cards.length === 0) return;
     setIsFlipped(false);
-    setSwipe(0);
     await animateTransition("left");
-    setCurrentIndex((prev) => (prev + 1) % cards.length);
+    flushSync(() => {
+      setAnimationState("idle");
+      setSwipe(0);
+    });
+    setCards((prev) => {
+      if (prev.length <= 1) return prev;
+      const [first, ...rest] = prev;
+      return [...rest, first];
+    });
     setIsFlipped(false);
   };
 
   const handleRemember = async () => {
     if (animationState !== "idle" || cards.length === 0) return;
-    const card = cards[currentIndex];
+    const card = cards[0];
     if (!card) return;
 
     setIsFlipped(false);
-    setSwipe(0);
 
     try {
       await animateTransition("right");
@@ -180,11 +213,13 @@ export function TrainingFlashcards({
       setLearnedCount(nextLearned);
       onLearnedCountChangeRef.current?.(nextLearned, totalCount);
 
+      flushSync(() => {
+        setAnimationState("idle");
+        setSwipe(0);
+      });
       setCards((prev) => {
-        const next = prev.filter((_, i) => i !== currentIndex);
-        if (next.length === 0) return next;
-        setCurrentIndex((idx) => (idx >= next.length ? 0 : idx));
-        return next;
+        if (prev.length <= 1) return [];
+        return prev.slice(1);
       });
       setIsFlipped(false);
     } catch {
@@ -265,18 +300,15 @@ export function TrainingFlashcards({
     );
   }
 
-  const currentCard = cards[currentIndex];
-  const nextCard = cards[(currentIndex + 1) % cards.length];
+  const currentCard = cards[0];
+  const nextCard = cards[1];
   const total = totalCount || learnedCount + cards.length;
   const progressPercent =
     total > 0 ? Math.round((learnedCount / total) * 100) : 0;
   const rotation = Math.max(-15, Math.min(15, swipeOffset / 15));
   const rememberOpacity = Math.min(1, Math.max(0, swipeOffset / 140));
   const repeatOpacity = Math.min(1, Math.max(0, -swipeOffset / 140));
-  const cardTransform =
-    animationState === "idle" && swipeOffset
-      ? `translateX(${swipeOffset}px) rotate(${rotation}deg)`
-      : undefined;
+  const cardTransform = `translateX(${swipeOffset}px) rotate(${rotation}deg)`;
 
   return (
     <div className={styles.flashShell}>
@@ -326,7 +358,7 @@ export function TrainingFlashcards({
       </p>
 
       <div className={styles.cardsWrapper}>
-        {animationState === "idle" && nextCard && cards.length > 1 ? (
+        {nextCard && cards.length > 1 ? (
           <div className={cn(styles.flashcard, styles.flashcardNext)}>
             <div className={styles.flashcardInner}>
               <div className={styles.flashcardFace}>
@@ -338,12 +370,12 @@ export function TrainingFlashcards({
         ) : null}
 
         <div
+          key={currentCard.card_ref}
           className={cn(
             styles.flashcard,
             styles.flashcardCurrent,
+            animationState !== "idle" && styles.flashcardAnimatingOut,
             isFlipped && styles.flashcardFlipped,
-            animationState === "swiping-left" && styles.swipeLeft,
-            animationState === "swiping-right" && styles.swipeRight,
           )}
           style={{ transform: cardTransform }}
           onClick={handleFlip}

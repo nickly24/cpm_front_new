@@ -82,6 +82,24 @@ export interface TrainingTreeResponse {
   sections?: TrainingDirection[];
 }
 
+export interface TrainingSectionsPagination {
+  page: number;
+  limit: number;
+  total: number;
+  pages: number;
+  has_next: boolean;
+  has_prev: boolean;
+}
+
+export interface TrainingSectionsResponse {
+  success: boolean;
+  student_id: number;
+  direction_id: number;
+  direction_name: string;
+  sections: TrainingSectionNode[];
+  pagination: TrainingSectionsPagination;
+}
+
 export interface SectionStudyViewResponse {
   success: boolean;
   student_id: number;
