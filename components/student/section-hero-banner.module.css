@@ -137,20 +137,20 @@
 }
 
 .heroDarkText .heroTitle {
-  color: var(--ds-text);
+  color: #1a1d26;
 }
 
 .heroDarkText .heroSubtitle {
-  color: var(--ds-text-secondary);
+  color: #6b7280;
   font-weight: 500;
 }
 
 .heroDarkText .heroFooter {
-  color: var(--ds-text-secondary);
+  color: #6b7280;
 }
 
 .heroDarkText .heroFooter strong {
-  color: var(--ds-text);
+  color: #1a1d26;
 }
 
 .heroDarkText .breadcrumbLink,
@@ -165,11 +165,11 @@
 
 .heroDarkText .breadcrumbSep,
 .heroDarkText .heroLeading :global(span) {
-  color: var(--ds-text-muted);
+  color: #9ca3af;
 }
 
 .heroDarkText .breadcrumbCurrent {
-  color: var(--ds-text);
+  color: #1a1d26;
 }
 
 @media (max-width: 768px) {

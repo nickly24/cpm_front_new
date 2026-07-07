@@ -49,7 +49,9 @@ export function trainingStudyPath(
 }
 
 function segmentMatchesName(segment: string, name: string): boolean {
-  return decodeTrainingSegment(segment) === name.trim();
+  const left = decodeTrainingSegment(segment).trim().replace(/\s+/g, " ");
+  const right = name.trim().replace(/\s+/g, " ");
+  return left === right;
 }
 
 export function findTrainingDirection(
@@ -64,7 +66,16 @@ export function findTrainingSection(
   segment: string,
 ): TrainingSectionNode | null {
   const sections = direction.sections ?? direction.topics ?? [];
-  return sections.find((item) => segmentMatchesName(segment, item.name)) ?? null;
+  const direct =
+    sections.find((item) => segmentMatchesName(segment, item.name)) ?? null;
+  if (direct) return direct;
+
+  const decoded = decodeTrainingSegment(segment).trim();
+  return (
+    sections.find((item) => item.name.trim() === decoded) ??
+    sections.find((item) => encodeTrainingSegment(item.name) === segment) ??
+    null
+  );
 }
 
 export type TrainingPathView = "sections" | "detail" | "flashcards";

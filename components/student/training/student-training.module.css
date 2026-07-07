@@ -20,6 +20,24 @@
   background-repeat: no-repeat;
   background-size: 112% auto;
   box-shadow: var(--ds-shadow-sm);
+  color: #1a1d26;
+}
+
+.header .title,
+.header .detailProgressMeta strong,
+.header .breadcrumbCurrent {
+  color: #1a1d26;
+}
+
+.header .subtitle,
+.header .detailProgressMeta,
+.header .detailProgressTicks,
+.header .breadcrumb {
+  color: #6b7280;
+}
+
+.header .breadcrumbSep {
+  color: #9ca3af;
 }
 
 .eyebrow {
@@ -379,12 +397,12 @@
 }
 
 .cardRowLearned {
-  background: #eaf9ef !important;
+  background: color-mix(in srgb, var(--ds-success) 10%, var(--ds-surface)) !important;
   box-shadow: none;
 }
 
 .cardRowStale {
-  background: color-mix(in srgb, var(--ds-warning, #d97706) 6%, transparent);
+  background: color-mix(in srgb, var(--ds-warning, #f97316) 12%, var(--ds-surface));
 }
 
 .cardRowStale .cardRowStatus {
@@ -684,9 +702,15 @@
   text-transform: uppercase;
 }
 
+.header .sectionKindBadge,
+.header .sectionKindBadgeTest {
+  background: rgba(255, 122, 89, 0.16);
+  color: #e85d3a;
+}
+
 .sectionKindBadgeTest {
-  background: color-mix(in srgb, #6366f1 14%, var(--ds-surface));
-  color: #6366f1;
+  background: rgba(255, 122, 89, 0.16);
+  color: #ff7a59;
 }
 
 .statGrid {
@@ -1401,7 +1425,10 @@
 }
 
 .cardRowBody {
-  display: block;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 6px;
   flex: 1 1 auto;
   line-height: 1.4;
   min-width: 0;
@@ -1878,4 +1905,107 @@
 .completeBox h3 {
   margin: 0 0 16px;
   font-size: 22px;
+}
+
+@media (max-width: 640px) {
+  .cardsPanel {
+    gap: 12px;
+    padding: 12px;
+  }
+
+  .cardsList {
+    gap: 8px;
+  }
+
+  .cardRow {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 36px;
+    grid-template-areas:
+      "body toggle"
+      "meta toggle";
+    gap: 8px 10px;
+    align-items: start;
+    padding: 12px;
+    border: 1px solid var(--ds-border);
+    border-radius: var(--ds-radius-md);
+    background: var(--ds-surface-muted, var(--ds-surface));
+  }
+
+  .cardRow:last-child {
+    border-bottom: 1px solid var(--ds-border);
+  }
+
+  .cardRowMain {
+    display: contents;
+    padding: 0;
+  }
+
+  .cardRowBody {
+    grid-area: body;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    flex-wrap: nowrap;
+    gap: 6px;
+    width: 100%;
+  }
+
+  .cardRowQuestion {
+    display: block;
+    width: 100%;
+    font-size: 14px;
+    line-height: 1.35;
+  }
+
+  .cardRowSeparator {
+    display: none;
+  }
+
+  .cardRowAnswer {
+    display: block;
+    width: 100%;
+    font-size: 13px;
+    line-height: 1.4;
+  }
+
+  .cardRowMain .cardMeta {
+    grid-area: meta;
+    align-self: start;
+    margin-left: 0;
+    white-space: normal;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--ds-border) 55%, var(--ds-surface));
+    color: var(--ds-text-secondary);
+  }
+
+  .cardRowLearned .cardMeta {
+    background: color-mix(in srgb, var(--ds-success) 18%, var(--ds-surface));
+    color: var(--ds-success);
+  }
+
+  .cardRowStale .cardMeta {
+    background: color-mix(in srgb, var(--ds-warning, #f97316) 20%, var(--ds-surface));
+    color: var(--ds-warning, #f97316);
+  }
+
+  .cardRowToggle {
+    grid-area: toggle;
+    align-self: center;
+    width: 32px;
+    height: 32px;
+    margin: 0;
+  }
+
+  .cardRowLearned {
+    border-color: color-mix(in srgb, var(--ds-success) 28%, var(--ds-border));
+  }
+
+  .cardRowStale {
+    border-color: color-mix(in srgb, var(--ds-warning, #f97316) 32%, var(--ds-border));
+  }
 }

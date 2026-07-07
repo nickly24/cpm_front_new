@@ -23,7 +23,7 @@ import type {
 } from "@/lib/training/training-types";
 import { calcProgressPercent } from "@/lib/training/training-utils";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type TrainingView = "sections" | "detail" | "flashcards";
 
@@ -74,12 +74,22 @@ function sectionProgressEqual(
   );
 }
 
+function sectionIdentityEqual(
+  a: TrainingSectionNode | null,
+  b: TrainingSectionNode | null,
+): boolean {
+  if (!a || !b) return a === b;
+  return a.kind === b.kind && a.refId === b.refId;
+}
+
 export function StudentTrainingSection({
   role,
   pathSegments,
 }: StudentTrainingSectionProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const searchParamsString = searchParams.toString();
+  const pathSegmentsKey = pathSegments.join("/");
   const { user } = useAuth();
   const [view, setView] = useState<TrainingView>("sections");
   const [directions, setDirections] = useState<TrainingDirection[]>([]);
@@ -91,11 +101,22 @@ export function StudentTrainingSection({
   const [flashStudyMode, setFlashStudyMode] = useState<StudyFilter>("unlearned");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [treeReady, setTreeReady] = useState(false);
   const loadInFlightRef = useRef(false);
   const invalidPathHandledRef = useRef<string | null>(null);
+  const directionsRef = useRef<TrainingDirection[]>([]);
+
+  const pathSearchParams = useMemo(
+    () => new URLSearchParams(searchParamsString),
+    [searchParamsString],
+  );
+
+  directionsRef.current = directions;
 
   const applyTree = useCallback((tree: TrainingDirection[]) => {
+    directionsRef.current = tree;
     setDirections(tree);
+    setTreeReady(tree.length > 0);
     setSelectedDirection((prev) => {
       if (!prev) return prev;
       return tree.find((d) => d.id === prev.id) ?? prev;
@@ -127,7 +148,9 @@ export function StudentTrainingSection({
       const tree = await fetchTrainingTree(user.id);
       applyTree(tree);
     } catch (err) {
+      directionsRef.current = [];
       setDirections([]);
+      setTreeReady(false);
       setError(err instanceof Error ? err.message : "Ошибка загрузки");
     } finally {
       loadInFlightRef.current = false;
@@ -141,28 +164,55 @@ export function StudentTrainingSection({
   }, [user?.id, loadTree]);
 
   useEffect(() => {
-    if (directions.length === 0) return;
+    if (!treeReady || directionsRef.current.length === 0) return;
 
-    const parsed = parseTrainingPath(pathSegments, directions, searchParams);
-    const pathKey = `${pathSegments.join("/")}?${searchParams.toString()}`;
+    const parsed = parseTrainingPath(
+      pathSegments,
+      directionsRef.current,
+      pathSearchParams,
+    );
+    const pathKey = `${pathSegmentsKey}?${searchParamsString}`;
 
-    if (!parsed.isValid && invalidPathHandledRef.current !== pathKey) {
-      invalidPathHandledRef.current = pathKey;
-      if (pathSegments.length >= 2 && parsed.direction) {
-        router.replace(trainingDirectionPath(role, parsed.direction));
-      } else {
-        router.replace(trainingBasePath(role));
+    if (!parsed.isValid) {
+      if (invalidPathHandledRef.current !== pathKey) {
+        invalidPathHandledRef.current = pathKey;
+        if (pathSegments.length >= 2 && parsed.direction) {
+          router.replace(trainingDirectionPath(role, parsed.direction));
+        } else {
+          router.replace(trainingBasePath(role));
+        }
       }
       return;
     }
 
     invalidPathHandledRef.current = null;
-    setView(parsed.view);
-    setSelectedDirection(parsed.direction);
-    setSelectedSection(parsed.section);
-    setFlashBatch(parsed.batch);
-    setFlashStudyMode(parsed.studyMode);
-  }, [directions, pathSegments, role, router, searchParams]);
+
+    setView((prev) => (prev === parsed.view ? prev : parsed.view));
+    setFlashBatch((prev) => (prev === parsed.batch ? prev : parsed.batch));
+    setFlashStudyMode((prev) =>
+      prev === parsed.studyMode ? prev : parsed.studyMode,
+    );
+    setSelectedDirection((prev) => {
+      const next = parsed.direction;
+      if (!next) return null;
+      if (prev?.id === next.id) return prev;
+      return next;
+    });
+    setSelectedSection((prev) => {
+      const next = parsed.section;
+      if (!next) return null;
+      if (sectionIdentityEqual(prev, next)) return prev;
+      return next;
+    });
+  }, [
+    pathSegments,
+    pathSegmentsKey,
+    pathSearchParams,
+    role,
+    router,
+    searchParamsString,
+    treeReady,
+  ]);
 
   const handleSectionProgress = useCallback(
     (section: TrainingSectionNode) => {
@@ -178,7 +228,9 @@ export function StudentTrainingSection({
           (s) => s.kind === section.kind && s.refId === section.refId,
         );
         if (prevSection && sectionProgressEqual(prevSection, section)) return prev;
-        return updateSectionInDirection(prev, directionId, section);
+        const next = updateSectionInDirection(prev, directionId, section);
+        directionsRef.current = next;
+        return next;
       });
       setSelectedDirection((prev) => {
         if (!prev) return prev;
@@ -227,9 +279,15 @@ export function StudentTrainingSection({
     [role, router],
   );
 
+  const sectionDetailKey =
+    selectedSection != null
+      ? `${selectedSection.kind}:${selectedSection.refId}`
+      : "none";
+
   if (view === "flashcards" && selectedSection && selectedDirection && user?.id) {
     return (
       <TrainingFlashcards
+        key={sectionDetailKey}
         section={selectedSection}
         studentId={user.id}
         batchIndex={flashBatch}
@@ -250,6 +308,7 @@ export function StudentTrainingSection({
   if (view === "detail" && selectedSection && selectedDirection && user?.id) {
     return (
       <TrainingSectionDetail
+        key={sectionDetailKey}
         section={selectedSection}
         studentId={user.id}
         onBack={() => navigateToCatalog(selectedDirection)}

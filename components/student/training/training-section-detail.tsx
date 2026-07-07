@@ -152,14 +152,23 @@ export function TrainingSectionDetail({
       setStudyMode(data.settings.study_mode ?? "unlearned");
       setSelectedBatch(data.settings.last_batch_index ?? 0);
       setStats(data.stats);
-      onProgressChangeRef.current?.({
-        ...sectionSnapshotRef.current,
+      const snapshot = sectionSnapshotRef.current;
+      const nextSection = {
+        ...snapshot,
         stats: data.stats,
         total_cards: data.stats.total,
         learned_cards: data.stats.learned,
         answer_changed_cards: data.stats.answer_changed,
         progress_percent: data.stats.progress_percent ?? 0,
-      });
+      };
+      if (
+        snapshot.total_cards !== nextSection.total_cards ||
+        snapshot.learned_cards !== nextSection.learned_cards ||
+        snapshot.answer_changed_cards !== nextSection.answer_changed_cards ||
+        snapshot.progress_percent !== nextSection.progress_percent
+      ) {
+        onProgressChangeRef.current?.(nextSection);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Ошибка загрузки");
     } finally {
