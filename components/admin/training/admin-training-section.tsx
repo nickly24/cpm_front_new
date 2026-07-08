@@ -207,14 +207,20 @@ function FormModal({
           });
           break;
         case "section-edit":
-          if (!state.section) return;
+          if (!state.section?.id) {
+            throw new Error("Раздел не найден");
+          }
+          if (!name.trim()) throw new Error("Укажите название");
+          if (!directionId) throw new Error("Выберите направление");
           res = await updateTrainingTheme(state.section.id, {
             name: name.trim(),
             direction_id: Number(directionId),
           });
           break;
         case "card-create":
-          if (!state.section) return;
+          if (!state.section?.id) {
+            throw new Error("Раздел не найден");
+          }
           if (!question.trim() || !answer.trim()) {
             throw new Error("Заполните вопрос и ответ");
           }
@@ -474,7 +480,7 @@ export function AdminTrainingSection() {
       const res = await deleteTrainingCard(card.id);
       if (!res.success) throw new Error(res.error);
       refresh();
-      if (selectedSection) void loadCards(selectedSection.id);
+      if (selectedSection?.id) void loadCards(selectedSection.id);
     } catch (err) {
       window.alert(err instanceof Error ? err.message : "Ошибка удаления");
     }
@@ -856,7 +862,7 @@ export function AdminTrainingSection() {
           onSaved={() => {
             setModal(null);
             refresh();
-            if (view === "cards" && selectedSection) {
+            if (view === "cards" && selectedSection?.id) {
               void loadCards(selectedSection.id);
             }
           }}

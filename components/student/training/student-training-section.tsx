@@ -334,7 +334,7 @@ export function StudentTrainingSection({
         subtitle="Выберите направление и раздел, учите карточки батчами"
       />
 
-      {selectedDirection ? (
+      {selectedDirection && user?.id ? (
         <TrainingSectionsListView
           directions={directions}
           direction={selectedDirection}
