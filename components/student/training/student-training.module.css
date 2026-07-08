@@ -6,6 +6,11 @@
 }
 
 .header {
+  --header-bg: #fff3eb;
+  --header-bg-soft: #fff8f4;
+  --header-accent-glow: rgba(255, 122, 89, 0.16);
+  position: relative;
+  overflow: hidden;
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
@@ -14,13 +19,48 @@
   padding: 24px 28px;
   border: 1px solid var(--ds-border);
   border-radius: var(--ds-radius-lg);
-  background-color: #fff3eb;
-  background-image: url("/arts/train-flashcards.png");
-  background-position: center;
-  background-repeat: no-repeat;
-  background-size: 112% auto;
+  background-color: var(--header-bg);
   box-shadow: var(--ds-shadow-sm);
   color: #1a1d26;
+}
+
+.header::before {
+  content: "";
+  position: absolute;
+  top: -14%;
+  right: -20%;
+  bottom: -14%;
+  left: 28%;
+  z-index: 0;
+  background-color: transparent;
+  background-image: url("/arts/train-flashcards.png");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: cover;
+  transform: scale(1.22);
+  transform-origin: center right;
+  pointer-events: none;
+}
+
+.header::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: linear-gradient(
+    94deg,
+    var(--header-bg) 0%,
+    var(--header-bg) 36%,
+    color-mix(in srgb, var(--header-bg) 86%, transparent) 50%,
+    color-mix(in srgb, var(--header-bg) 32%, transparent) 64%,
+    transparent 84%
+  );
+  pointer-events: none;
+}
+
+.header > * {
+  position: relative;
+  z-index: 1;
 }
 
 .header .title,
@@ -38,6 +78,55 @@
 
 .header .breadcrumbSep {
   color: #9ca3af;
+}
+
+:global(html.dark) .header {
+  --header-bg: #19191a;
+  --header-bg-soft: #222222;
+  --header-accent-glow: rgba(255, 122, 89, 0.14);
+  border-color: transparent;
+  box-shadow: none;
+  color: #ffffff;
+}
+
+:global(html.dark) .header::before {
+  background-image: url("/arts/train-flashcards-dark.png");
+  left: 20%;
+  right: -24%;
+  transform: scale(1.32);
+}
+
+:global(html.dark) .header::after {
+  background: linear-gradient(
+    94deg,
+    var(--header-bg) 0%,
+    var(--header-bg) 42%,
+    color-mix(in srgb, var(--header-bg) 88%, transparent) 56%,
+    color-mix(in srgb, var(--header-bg) 36%, transparent) 72%,
+    transparent 90%
+  );
+}
+
+:global(html.dark) .header .title,
+:global(html.dark) .header .detailProgressMeta strong {
+  color: #ffffff;
+}
+
+:global(html.dark) .header .subtitle,
+:global(html.dark) .header .detailProgressMeta,
+:global(html.dark) .header .detailProgressTicks,
+:global(html.dark) .header .breadcrumb {
+  color: #939393;
+}
+
+:global(html.dark) .header .breadcrumbSep {
+  color: #76787a;
+}
+
+:global(html.dark) .header .sectionKindBadge,
+:global(html.dark) .header .sectionKindBadgeTest {
+  background: rgba(255, 122, 89, 0.18);
+  color: #ff7a59;
 }
 
 .eyebrow {
@@ -1303,8 +1392,19 @@
 
 @media (max-width: 980px) {
   .header {
-    background-position: center;
-    background-size: cover;
+    padding: 20px 18px;
+  }
+
+  .header::before {
+    left: 34%;
+    right: -28%;
+    transform: scale(1.34);
+  }
+
+  :global(html.dark) .header::before {
+    left: 26%;
+    right: -32%;
+    transform: scale(1.4);
   }
 
   .toolbarRow {
@@ -1334,6 +1434,46 @@
 
   .filterList {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .header {
+    padding: 16px;
+    border-radius: var(--ds-radius-md);
+  }
+
+  .header::before {
+    opacity: 0;
+  }
+
+  .header::after {
+    background:
+      radial-gradient(
+        ellipse 110% 72% at 100% -8%,
+        var(--header-accent-glow) 0%,
+        transparent 62%
+      ),
+      linear-gradient(
+        168deg,
+        var(--header-bg-soft) 0%,
+        var(--header-bg) 56%,
+        color-mix(in srgb, var(--header-accent-glow) 55%, var(--header-bg)) 100%
+      );
+  }
+
+  .detailHeaderMain {
+    width: 100%;
+  }
+
+  .detailProgressBlock {
+    width: 100%;
+    max-width: none;
+  }
+
+  .title {
+    font-size: clamp(20px, 5.6vw, 26px);
+    line-height: 1.25;
   }
 }
 

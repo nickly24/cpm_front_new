@@ -20,6 +20,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 type AdminTestDraftFlowOverlayProps = {
   canvas: DraftCanvasModel;
   hidden?: boolean;
+  restrictInsertToEnd?: boolean;
   onInsertAt: (insertIndex: number) => void;
 };
 
@@ -103,6 +104,7 @@ function applySpreadForSlot(
 export function AdminTestDraftFlowOverlay({
   canvas,
   hidden = false,
+  restrictInsertToEnd = false,
   onInsertAt,
 }: AdminTestDraftFlowOverlayProps) {
   const questions = canvas.questions;
@@ -136,10 +138,14 @@ export function AdminTestDraftFlowOverlay({
     () => buildInsertSlots(questions, layout, metrics),
     [layout, metrics, questions],
   );
+  const visibleSlots = useMemo(() => {
+    if (!restrictInsertToEnd) return slots;
+    return slots.filter((slot) => slot.insertIndex === questions.length);
+  }, [questions.length, restrictInsertToEnd, slots]);
 
   const hoveredSlot = useMemo(
-    () => slots.find((slot) => slot.id === hoveredSlotId) ?? null,
-    [hoveredSlotId, slots],
+    () => visibleSlots.find((slot) => slot.id === hoveredSlotId) ?? null,
+    [hoveredSlotId, visibleSlots],
   );
 
   const visibleLinks = useMemo(() => {
@@ -196,7 +202,7 @@ export function AdminTestDraftFlowOverlay({
         </svg>
 
         <div className={styles.slots}>
-          {slots.map((slot) => (
+          {visibleSlots.map((slot) => (
             <button
               key={slot.id}
               type="button"

@@ -21,9 +21,9 @@ import {
   isAdminExternalTest,
   patchAdminTestFields,
 } from "@/lib/admin/admin-tests-api";
+import { testDetailToCanvasState } from "@/lib/admin/admin-test-canvas-adapter";
 import {
   createAdminTestDraft,
-  createAdminTestDraftFromTest,
   deleteAdminTestDraft,
   fetchAdminTestDrafts,
 } from "@/lib/admin/admin-test-drafts-api";
@@ -89,6 +89,10 @@ export function AdminTestsSection() {
   const [toggleBusy, setToggleBusy] = useState<string | null>(null);
   const [workspaceTestId, setWorkspaceTestId] = useState<string | null>(null);
   const [editingDraft, setEditingDraft] = useState<AdminTestDraft | null>(null);
+  const [editingTestId, setEditingTestId] = useState<string | null>(null);
+  const [draftEditorMode, setDraftEditorMode] = useState<"draft" | "testEdit">(
+    "draft",
+  );
   const [deletingDraftId, setDeletingDraftId] = useState<string | null>(null);
   const [externalDeleteTarget, setExternalDeleteTarget] =
     useState<AdminTestListItem | null>(null);
@@ -226,6 +230,7 @@ export function AdminTestsSection() {
         direction: directionName,
       });
       setEditingDraft(draft);
+      setDraftEditorMode("draft");
       setView("draftEditor");
       await loadDrafts();
     } catch (err) {
@@ -237,13 +242,14 @@ export function AdminTestsSection() {
 
   const openDraftFromTest = async (testId: string) => {
     try {
-      const draft = await createAdminTestDraftFromTest(testId);
-      setEditingDraft(draft);
+      const detail = await fetchAdminTestById(testId);
+      setEditingDraft(testDetailToCanvasState(detail));
+      setEditingTestId(testId);
+      setDraftEditorMode("testEdit");
       setView("draftEditor");
-      await loadDrafts();
     } catch (err) {
       window.alert(
-        err instanceof Error ? err.message : "Не удалось создать драфт из теста",
+        err instanceof Error ? err.message : "Не удалось открыть тест в редакторе",
       );
     }
   };
@@ -404,26 +410,43 @@ export function AdminTestsSection() {
           setEditingTest(test);
           setView("edit");
         }}
+          onEditInNew={(testId) => {
+            void openDraftFromTest(testId);
+          }}
       />
     );
   }
 
   if (view === "draftEditor" && editingDraft) {
+    const isTestEdit = draftEditorMode === "testEdit" && editingTestId;
+
     return (
       <AdminTestDraftEditor
         draft={editingDraft}
         directions={directions}
+        persistenceMode={isTestEdit ? "test" : "draft"}
+        sourceTestId={isTestEdit ? editingTestId : undefined}
+        disableQuestionReorder={Boolean(isTestEdit)}
         onBack={() => {
           setView("list");
           setEditingDraft(null);
-          loadDrafts();
+          setEditingTestId(null);
+          setDraftEditorMode("draft");
+          if (!isTestEdit) {
+            loadDrafts();
+          }
         }}
         onPublished={(testId) => {
           setView("list");
           setEditingDraft(null);
+          setEditingTestId(null);
+          setDraftEditorMode("draft");
           loadDrafts();
           loadTests(directionName);
           openWorkspace(testId);
+        }}
+        onTestSaved={() => {
+          loadTests(directionName);
         }}
       />
     );
@@ -531,12 +554,14 @@ export function AdminTestsSection() {
                 className={styles.draftItemCard}
                 onClick={() => {
                   setEditingDraft(draft);
+                  setDraftEditorMode("draft");
                   setView("draftEditor");
                 }}
                 onKeyDown={(event) => {
                   if (event.key === "Enter" || event.key === " ") {
                     event.preventDefault();
                     setEditingDraft(draft);
+                    setDraftEditorMode("draft");
                     setView("draftEditor");
                   }
                 }}
@@ -806,7 +831,7 @@ export function AdminTestsSection() {
                           className={styles.actionBtn}
                           onClick={() => openDraftFromTest(testId)}
                         >
-                          Драфт в новом редакторе
+                          Редактировать в новом интерфейсе
                         </button>
                         <button
                           type="button"

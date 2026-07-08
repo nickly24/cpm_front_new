@@ -2,10 +2,12 @@ import { apiRequest } from "@/lib/api/client";
 import type {
   AdminExternalTestDeletePreview,
   AdminExternalTestDeleteResponse,
+  AdminTestChangesResponse,
   Direction,
 } from "@/lib/admin/admin-tests-types";
 import type {
   AdminExternalTestFormData,
+  AdminTestChangeEventType,
   AdminTestDetail,
   AdminTestFormData,
   AdminTestListItem,
@@ -107,5 +109,25 @@ export async function deleteExternalAdminTest(
   return apiRequest<AdminExternalTestDeleteResponse>(
     `/external-tests/${encodeURIComponent(testId)}`,
     { method: "DELETE" },
+  );
+}
+
+export async function fetchAdminTestChanges(
+  testId: string,
+  params: {
+    page?: number;
+    limit?: number;
+    questionId?: number;
+    eventType?: AdminTestChangeEventType;
+  } = {},
+): Promise<AdminTestChangesResponse> {
+  const search = new URLSearchParams();
+  if (params.page) search.set("page", String(params.page));
+  if (params.limit) search.set("limit", String(params.limit));
+  if (params.questionId != null) search.set("questionId", String(params.questionId));
+  if (params.eventType) search.set("eventType", params.eventType);
+  const query = search.toString();
+  return apiRequest<AdminTestChangesResponse>(
+    `/test/${encodeURIComponent(testId)}/changes${query ? `?${query}` : ""}`,
   );
 }

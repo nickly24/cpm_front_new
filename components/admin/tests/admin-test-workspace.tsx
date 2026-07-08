@@ -19,6 +19,7 @@ interface AdminTestWorkspaceProps {
   directions: Direction[];
   onBack: () => void;
   onEdit: (test: AdminTestDetail) => void;
+  onEditInNew: (testId: string) => void;
 }
 
 export function AdminTestWorkspace({
@@ -26,6 +27,7 @@ export function AdminTestWorkspace({
   directions,
   onBack,
   onEdit,
+  onEditInNew,
 }: AdminTestWorkspaceProps) {
   const [tab, setTab] = useState<WorkspaceTab>("test");
   const [title, setTitle] = useState("Тест");
@@ -76,6 +78,14 @@ export function AdminTestWorkspace({
               disabled={!testDetail}
             >
               Редактировать
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => onEditInNew(testId)}
+            >
+              Редактировать в новом интерфейсе
             </Button>
             <Button type="button" variant="ghost" size="sm" onClick={loadMeta}>
               Обновить

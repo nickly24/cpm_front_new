@@ -61,6 +61,57 @@ export interface AdminTestDetail extends AdminTestFormData {
   updatedAt?: string;
 }
 
+export type AdminTestChangeEventType =
+  | "question_added"
+  | "question_removed"
+  | "question_updated"
+  | "question_reordered"
+  | "metadata_updated";
+
+export interface AdminTestChangeActor {
+  userId?: number | null;
+  role?: string | null;
+  fullName?: string | null;
+}
+
+export interface AdminTestChangeLogItem {
+  id: string;
+  testId: string;
+  questionId: number | null;
+  changeKey: string;
+  eventType: AdminTestChangeEventType;
+  actor: AdminTestChangeActor;
+  changedAt: string;
+  revision: number;
+  before: Record<string, unknown> | null;
+  after: Record<string, unknown> | null;
+  diff: Record<string, unknown>;
+  context?: { source?: string };
+}
+
+export interface AdminTestChangesPagination {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+  hasNext: boolean;
+  hasPrev: boolean;
+}
+
+export interface AdminTestChangesResponse {
+  success: boolean;
+  items: AdminTestChangeLogItem[];
+  pagination: AdminTestChangesPagination;
+}
+
+export interface AdminTestChangeCommit {
+  id: string;
+  changedAt: string;
+  actorName: string;
+  source?: string;
+  events: AdminTestChangeLogItem[];
+}
+
 export type AdminTestsView =
   | "list"
   | "create"

@@ -8,6 +8,7 @@ export const STUDENT_SECTION_BANNERS = {
   train: "/arts/train.png",
   /** Новый баннер тренировок (карточки) — подключить при редизайне */
   trainFlashcards: "/arts/train-flashcards.png",
+  trainFlashcardsDark: "/arts/train-flashcards-dark.png",
   zaps: "/arts/zaps.png",
 } as const;
 

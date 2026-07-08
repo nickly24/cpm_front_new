@@ -43,6 +43,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AdminTestDraftFlowOverlay } from "@/components/admin/tests/admin-test-draft-flow-overlay";
+import { AdminTestChangeHistoryPanel } from "@/components/admin/tests/admin-test-change-history-panel";
 import { AdminTestDraftQuestionSearch } from "@/components/admin/tests/admin-test-draft-question-search";
 import {
   CARD_MIN_HEIGHT,
@@ -56,6 +57,7 @@ import {
   sortQuestions,
 } from "@/components/admin/tests/admin-test-draft-flow-layout";
 import styles from "@/components/admin/tests/admin-test-draft-editor.module.css";
+import { canvasStateToTestFormData, parseQuestionIdFromCanvasId } from "@/lib/admin/admin-test-canvas-adapter";
 import {
   deleteAdminTestDraft,
   lockAdminTestDraft,
@@ -63,6 +65,7 @@ import {
   unlockAdminTestDraft,
   updateAdminTestDraft,
 } from "@/lib/admin/admin-test-drafts-api";
+import { updateAdminTest } from "@/lib/admin/admin-tests-api";
 import type {
   AdminTestDraft,
   DraftAnswerNode,
@@ -160,6 +163,21 @@ function autosaveSnapshot(draft: AdminTestDraft) {
     published: draft.published,
     visible: draft.visible,
     canvas: normalizeCanvas(draft.canvas),
+  });
+}
+
+function questionSnapshot(question: DraftQuestionNode) {
+  return JSON.stringify({
+    id: question.id,
+    type: question.type,
+    text: question.text,
+    points: question.points,
+    answers: question.answers.map((answer) => ({
+      id: answer.id,
+      kind: answer.kind,
+      text: answer.text,
+      isCorrect: answer.isCorrect,
+    })),
   });
 }
 
@@ -796,6 +814,8 @@ function QuestionNode(props: NodeProps) {
     onChangeQuestionType: (questionId: string, type: AdminTestQuestionType) => void;
     onUpdateQuestionPoints: (questionId: string, points: number) => void;
     onToggleAnswerCorrect: (questionId: string, answerId: string) => void;
+    isQuestionDirty: boolean;
+    disableQuestionReorder: boolean;
     areaSelectionPreview: {
       mode: "questions" | "answers";
       questionId: string | null;
@@ -850,6 +870,12 @@ function QuestionNode(props: NodeProps) {
     if (target.closest("[data-inline-editable='true']")) return;
     if (target.closest("[data-answer-insert='true']")) return;
     if (target.closest("[data-question-meta='true']")) return;
+    if (data.disableQuestionReorder) {
+      event.stopPropagation();
+      event.preventDefault();
+      data.onSelectQuestion(data.question.id);
+      return;
+    }
     event.stopPropagation();
     event.preventDefault();
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -926,7 +952,7 @@ function QuestionNode(props: NodeProps) {
   return (
     <div
       data-question-id={data.question.id}
-      className={`nopan ${styles.questionNode} ${questionSelected ? styles.questionNodeSelected : ""} ${copied ? styles.questionNodeCopied : ""} ${hasDropError ? styles.questionNodeDropError : ""} ${previewQuestionSelected ? styles.questionNodePreviewSelected : ""}`}
+      className={`nopan ${styles.questionNode} ${questionSelected ? styles.questionNodeSelected : ""} ${copied ? styles.questionNodeCopied : ""} ${hasDropError ? styles.questionNodeDropError : ""} ${previewQuestionSelected ? styles.questionNodePreviewSelected : ""} ${data.isQuestionDirty ? styles.questionNodeDirty : ""}`}
       onPointerDown={onPointerDown}
       onClick={(event) => {
         event.stopPropagation();
@@ -1082,11 +1108,17 @@ function QuestionNode(props: NodeProps) {
 
 const nodeTypes = { question: QuestionNode };
 
+type EditorPersistenceMode = "draft" | "test";
+
 interface AdminTestDraftEditorProps {
   draft: AdminTestDraft;
   directions: Direction[];
+  persistenceMode?: EditorPersistenceMode;
+  sourceTestId?: string;
+  disableQuestionReorder?: boolean;
   onBack: () => void;
-  onPublished: (testId: string) => void;
+  onPublished?: (testId: string) => void;
+  onTestSaved?: (testId: string) => void;
 }
 
 export function AdminTestDraftEditor(props: AdminTestDraftEditorProps) {
@@ -1100,8 +1132,12 @@ export function AdminTestDraftEditor(props: AdminTestDraftEditorProps) {
 function AdminTestDraftEditorInner({
   draft: initialDraft,
   directions,
+  persistenceMode = "draft",
+  sourceTestId,
+  disableQuestionReorder = false,
   onBack,
   onPublished,
+  onTestSaved,
 }: AdminTestDraftEditorProps) {
   const { user } = useAuth();
   const { screenToFlowPosition, getViewport, setViewport, setCenter } = useReactFlow();
@@ -1133,8 +1169,14 @@ function AdminTestDraftEditorInner({
   const [history, setHistory] = useState<DraftCanvasModel[]>([normalizeCanvas(initialDraft.canvas)]);
   const [historyIndex, setHistoryIndex] = useState(0);
   const [inspectorCollapsed, setInspectorCollapsed] = useState(true);
+  const [inspectorTab, setInspectorTab] = useState<"properties" | "history">("properties");
+  const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
   const [questionGrabActive, setQuestionGrabActive] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [committing, setCommitting] = useState(false);
+  const [savedDraft, setSavedDraft] = useState<AdminTestDraft>({
+    ...normalizedInitialDraft,
+  });
   const lastSavedSnapshotRef = useRef(autosaveSnapshot(normalizedInitialDraft));
   const canvasRef = useRef<HTMLDivElement | null>(null);
   const horizontalScrollRef = useRef<HTMLDivElement | null>(null);
@@ -1220,8 +1262,29 @@ function AdminTestDraftEditorInner({
     () => visibleIssues.filter((issue) => !questionIdForIssue(draft.canvas, issue)),
     [draft.canvas, visibleIssues],
   );
-  const canEdit = !draft.lockedBy || String(draft.lockedBy) === String(user?.id);
+  const isTestPersistence = persistenceMode === "test";
+  const canEdit =
+    isTestPersistence || !draft.lockedBy || String(draft.lockedBy) === String(user?.id);
+  const requireExplicitSave = isTestPersistence;
   const currentAutosaveSnapshot = useMemo(() => autosaveSnapshot(draft), [draft]);
+  const hasUnsavedChanges =
+    currentAutosaveSnapshot !== autosaveSnapshot(savedDraft);
+  const savedQuestionSnapshotById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const question of savedDraft.canvas.questions) {
+      map.set(question.id, questionSnapshot(question));
+    }
+    return map;
+  }, [savedDraft.canvas.questions]);
+  const changedQuestionIds = useMemo(() => {
+    const result = new Set<string>();
+    for (const question of draft.canvas.questions) {
+      const current = questionSnapshot(question);
+      const saved = savedQuestionSnapshotById.get(question.id);
+      if (!saved || saved !== current) result.add(question.id);
+    }
+    return result;
+  }, [draft.canvas.questions, savedQuestionSnapshotById]);
 
   const syncSelection = useCallback(
     (questionIds: string[], questionId: string | null, answerIds: string[]) => {
@@ -1558,6 +1621,10 @@ function AdminTestDraftEditorInner({
   }, [appendAnswerToQuestion, selectedQuestion]);
 
   const deleteSelection = useCallback(() => {
+    if (requireExplicitSave) {
+      window.alert("Удаление в этом режиме отключено.");
+      return;
+    }
     if (selectedAnswerIds.length > 0 && selectedQuestion) {
       const selectedAnswerSet = new Set(selectedAnswerIds);
       updateQuestion(selectedQuestion.id, {
@@ -1578,7 +1645,7 @@ function AdminTestDraftEditorInner({
       });
       clearSelection();
     }
-  }, [clearSelection, mutateCanvas, selectQuestionOnly, selectedAnswerIds, selectedQuestion, selectedQuestionId, updateQuestion]);
+  }, [clearSelection, mutateCanvas, requireExplicitSave, selectQuestionOnly, selectedAnswerIds, selectedQuestion, selectedQuestionId, updateQuestion]);
 
   const copySelection = useCallback(async () => {
     if (selectedAnswers.length > 0) {
@@ -1746,6 +1813,7 @@ function AdminTestDraftEditorInner({
   }, []);
 
   const handleQuestionDragStart = useCallback((questionId: string) => {
+    if (disableQuestionReorder) return;
     const groupIds =
       selectedQuestionIds.length > 1 && selectedQuestionIds.includes(questionId)
         ? selectedQuestionIds
@@ -1792,7 +1860,7 @@ function AdminTestDraftEditorInner({
         item.nodeEl.setAttribute("data-drag-count", String(items.length));
       }
     });
-  }, [draft.canvas.layout, selectedQuestionIds]);
+  }, [disableQuestionReorder, draft.canvas.layout, selectedQuestionIds]);
 
   const handleQuestionDragMove = useCallback(
     (
@@ -1802,6 +1870,7 @@ function AdminTestDraftEditorInner({
       grabOffsetX: number,
       grabOffsetY: number,
     ) => {
+      if (disableQuestionReorder) return;
       const flowPosition = screenToFlowPosition({
         x: clientX - grabOffsetX,
         y: clientY - grabOffsetY,
@@ -1822,7 +1891,7 @@ function AdminTestDraftEditorInner({
         });
       });
     },
-    [screenToFlowPosition],
+    [disableQuestionReorder, screenToFlowPosition],
   );
 
   const clearDragSessionStyles = useCallback((session: NonNullable<typeof dragSessionRef.current>) => {
@@ -1849,6 +1918,7 @@ function AdminTestDraftEditorInner({
       grabOffsetX: number,
       grabOffsetY: number,
     ) => {
+      if (disableQuestionReorder) return;
       const flowPosition = screenToFlowPosition({
         x: clientX - grabOffsetX,
         y: clientY - grabOffsetY,
@@ -1887,7 +1957,14 @@ function AdminTestDraftEditorInner({
         }));
       }
     },
-    [clearAllCardTransforms, clearDragSessionStyles, draft.canvas, mutateCanvas, screenToFlowPosition],
+    [
+      clearAllCardTransforms,
+      clearDragSessionStyles,
+      disableQuestionReorder,
+      draft.canvas,
+      mutateCanvas,
+      screenToFlowPosition,
+    ],
   );
 
   useEffect(() => {
@@ -2338,6 +2415,38 @@ function AdminTestDraftEditorInner({
     return () => window.cancelAnimationFrame(frame);
   }, [getViewport, renderHorizontalScrollThumb, sortedQuestions.length, syncHorizontalScrollFromViewport]);
 
+  const saveWithConfirm = useCallback(
+    async () => {
+      if (!canEdit || !isTestPersistence || !sourceTestId) return;
+      if (!hasUnsavedChanges) return;
+
+      const errors = validateDraft(draft);
+      setValidationErrors(errors);
+      if (errors.length > 0) return;
+
+      const confirmed = window.confirm(
+        "Вы точно уверены? Данные запишутся в историю, а также обнулят все выученные карточки по изменённым вопросам.",
+      );
+      if (!confirmed) return;
+
+      setCommitting(true);
+      setAutosaveState("saving");
+      try {
+        await updateAdminTest(sourceTestId, canvasStateToTestFormData(draft));
+        setSavedDraft({ ...draft });
+        lastSavedSnapshotRef.current = autosaveSnapshot(draft);
+        setAutosaveState("saved");
+        setHistoryRefreshKey((prev) => prev + 1);
+        onTestSaved?.(sourceTestId);
+      } catch {
+        setAutosaveState("error");
+      } finally {
+        setCommitting(false);
+      }
+    },
+    [canEdit, draft, hasUnsavedChanges, isTestPersistence, onTestSaved, sourceTestId],
+  );
+
   const nodes: Node[] = useMemo(() => {
     const stableOrdered = sortQuestions(draft.canvas);
     return stableOrdered.map((question, index) => ({
@@ -2389,6 +2498,8 @@ function AdminTestDraftEditorInner({
         onChangeQuestionType: changeQuestionType,
         onUpdateQuestionPoints: updateQuestionPoints,
         onToggleAnswerCorrect: toggleAnswerCorrect,
+        isQuestionDirty: changedQuestionIds.has(question.id),
+        disableQuestionReorder,
         areaSelectionPreview,
         selectedQuestionIds,
         shiftKeyHeld,
@@ -2405,6 +2516,7 @@ function AdminTestDraftEditorInner({
     copiedAnswerIds,
     copiedIds,
     draft.canvas,
+    disableQuestionReorder,
     endQuestionGrab,
     handleQuestionDragEnd,
     handleQuestionDragMove,
@@ -2416,6 +2528,7 @@ function AdminTestDraftEditorInner({
     selectQuestionFromClick,
     selectedAnswerIds,
     selectedQuestionIds,
+    changedQuestionIds,
     shiftKeyHeld,
     toggleAnswerCorrect,
     updateInlineEditDraft,
@@ -2445,10 +2558,13 @@ function AdminTestDraftEditorInner({
   }, [history]);
 
   useEffect(() => {
+    if (isTestPersistence) return;
+
     void lockAdminTestDraft(draft.id)
       .then((res) => {
         const nextDraft = { ...res.draft, canvas: normalizeCanvas(res.draft.canvas) };
         lastSavedSnapshotRef.current = autosaveSnapshot(nextDraft);
+        setSavedDraft({ ...nextDraft });
         setDraft((prev) => ({ ...prev, ...nextDraft }));
         setLockWarning(null);
       })
@@ -2462,10 +2578,11 @@ function AdminTestDraftEditorInner({
       window.clearInterval(interval);
       void unlockAdminTestDraft(draft.id).catch(() => {});
     };
-  }, [draft.id]);
+  }, [draft.id, isTestPersistence]);
 
   useEffect(() => {
     if (!canEdit) return;
+    if (requireExplicitSave) return;
     if (currentAutosaveSnapshot === lastSavedSnapshotRef.current) return;
     const timeout = window.setTimeout(() => {
       const snapshotAtSaveStart = currentAutosaveSnapshot;
@@ -2474,6 +2591,7 @@ function AdminTestDraftEditorInner({
         .then((saved) => {
           lastSavedSnapshotRef.current = snapshotAtSaveStart;
           const nextDraft = { ...saved, canvas: normalizeCanvas(saved.canvas) };
+          setSavedDraft({ ...nextDraft });
           const nextSnapshot = autosaveSnapshot(nextDraft);
           setDraft((prev) => (nextSnapshot === snapshotAtSaveStart ? prev : { ...prev, ...nextDraft }));
           setAutosaveState("saved");
@@ -2481,7 +2599,7 @@ function AdminTestDraftEditorInner({
         .catch(() => setAutosaveState("error"));
     }, 800);
     return () => window.clearTimeout(timeout);
-  }, [canEdit, currentAutosaveSnapshot, draft]);
+  }, [canEdit, currentAutosaveSnapshot, draft, requireExplicitSave]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -2532,13 +2650,14 @@ function AdminTestDraftEditorInner({
   }, [cancelAreaSelection, copySelection, pasteSelection, redo, selectAllAnswersInQuestion, selectedQuestionId, undo]);
 
   const publish = async () => {
+    if (isTestPersistence) return;
     const errors = validateDraft(draft);
     setValidationErrors(errors);
     if (errors.length > 0) return;
     try {
       await updateAdminTestDraft(draft.id, draft);
       const result = await publishAdminTestDraft(draft.id);
-      if (result.testId) onPublished(result.testId);
+      if (result.testId) onPublished?.(result.testId);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Не удалось опубликовать драфт";
       setValidationErrors([{ targetId: "publish", message }]);
@@ -2546,6 +2665,7 @@ function AdminTestDraftEditorInner({
   };
 
   const deleteDraft = async () => {
+    if (isTestPersistence) return;
     const title = draft.title?.trim() || "Без названия";
     if (
       !window.confirm(
@@ -2567,8 +2687,22 @@ function AdminTestDraftEditorInner({
     }
   };
 
-  const autosaveLabel =
-    autosaveState === "saving" ? "Сохраняем..." : autosaveState === "error" ? "Ошибка автосейва" : "Сохранено";
+  const autosaveLabel = isTestPersistence
+    ? hasUnsavedChanges
+      ? "Есть несохраненные изменения"
+      : "Изменения сохранены"
+    : autosaveState === "saving"
+      ? "Сохраняем..."
+      : autosaveState === "error"
+        ? "Ошибка автосейва"
+        : "Сохранено";
+
+  const selectedQuestionNumber = selectedQuestionId
+    ? parseQuestionIdFromCanvasId(
+        selectedQuestionId,
+        sortedQuestions.findIndex((question) => question.id === selectedQuestionId),
+      )
+    : null;
 
   return (
     <div
@@ -2592,6 +2726,7 @@ function AdminTestDraftEditorInner({
           <div className={styles.titleBlock}>
             <h1>{draft.title || "Без названия"}</h1>
             <p>
+              {isTestPersistence ? "Редактирование теста · " : ""}
               {sortedQuestions.length} вопросов ·{" "}
               {draft.direction || "направление не выбрано"}
             </p>
@@ -2604,19 +2739,31 @@ function AdminTestDraftEditorInner({
             <Button type="button" variant="ghost" size="sm" onClick={() => void pasteSelection()}>
               Вставить
             </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className={styles.deleteDraftButton}
-              disabled={deleting || !canEdit}
-              onClick={() => void deleteDraft()}
-            >
-              <Trash2 size={16} /> {deleting ? "Удаляем..." : "Удалить драфт"}
-            </Button>
-            <Button type="button" onClick={publish}>
-              <Save size={16} /> Сохранить как тест
-            </Button>
+            {!isTestPersistence ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className={styles.deleteDraftButton}
+                disabled={deleting || !canEdit}
+                onClick={() => void deleteDraft()}
+              >
+                <Trash2 size={16} /> {deleting ? "Удаляем..." : "Удалить драфт"}
+              </Button>
+            ) : null}
+            {isTestPersistence ? (
+              <Button
+                type="button"
+                disabled={!canEdit || !hasUnsavedChanges || committing}
+                onClick={() => void saveWithConfirm()}
+              >
+                <Save size={16} /> {committing ? "Сохраняем..." : "Сохранить изменения"}
+              </Button>
+            ) : (
+              <Button type="button" onClick={publish}>
+                <Save size={16} /> Сохранить как тест
+              </Button>
+            )}
           </div>
         </header>
 
@@ -2674,7 +2821,13 @@ function AdminTestDraftEditorInner({
             <AdminTestDraftFlowOverlay
               canvas={draft.canvas}
               hidden={questionGrabActive}
-              onInsertAt={(insertIndex) => insertQuestionAt(insertIndex, DEFAULT_NEW_QUESTION_TYPE)}
+              restrictInsertToEnd={disableQuestionReorder}
+              onInsertAt={(insertIndex) =>
+                insertQuestionAt(
+                  disableQuestionReorder ? sortedQuestions.length : insertIndex,
+                  DEFAULT_NEW_QUESTION_TYPE,
+                )
+              }
             />
             <Controls position="bottom-left" showInteractive={false} />
           </ReactFlow>
@@ -2747,11 +2900,53 @@ function AdminTestDraftEditorInner({
             </button>
             <div className={styles.inspectorPanel}>
               <div className={styles.inspectorHeader}>
-                <h2>{selectedQuestion ? "Свойства вопроса" : "Настройки теста"}</h2>
-                <p>{selectedAnswer ? "Выбран ответ — редактирование в карточке" : "Автосейв включён"}</p>
+                <h2>
+                  {isTestPersistence && inspectorTab === "history"
+                    ? "История изменений"
+                    : selectedQuestion
+                      ? "Свойства вопроса"
+                      : "Настройки теста"}
+                </h2>
+                <p>
+                  {isTestPersistence && inspectorTab === "history"
+                    ? "Сохранённые коммиты с сервера"
+                    : selectedAnswer
+                      ? "Выбран ответ — редактирование в карточке"
+                      : isTestPersistence
+                        ? "Изменения сохраняются вручную"
+                        : "Автосейв включён"}
+                </p>
+                {isTestPersistence && sourceTestId ? (
+                  <div className={styles.inspectorTabs}>
+                    <button
+                      type="button"
+                      className={`${styles.inspectorTab} ${inspectorTab === "properties" ? styles.inspectorTabActive : ""}`}
+                      onClick={() => setInspectorTab("properties")}
+                    >
+                      Свойства
+                    </button>
+                    <button
+                      type="button"
+                      className={`${styles.inspectorTab} ${inspectorTab === "history" ? styles.inspectorTabActive : ""}`}
+                      onClick={() => setInspectorTab("history")}
+                    >
+                      История
+                    </button>
+                  </div>
+                ) : null}
               </div>
               <div className={styles.inspectorBody}>
-          {selectedQuestion ? (
+          {isTestPersistence && inspectorTab === "history" && sourceTestId ? (
+            <AdminTestChangeHistoryPanel
+              key={`${sourceTestId}-${selectedQuestionNumber ?? "all"}-${historyRefreshKey}`}
+              testId={sourceTestId}
+              selectedQuestionId={selectedQuestionNumber}
+              refreshKey={historyRefreshKey}
+              onSelectQuestion={(questionId) => {
+                void focusQuestionOnCanvas(questionId);
+              }}
+            />
+          ) : selectedQuestion ? (
             <>
               <label className={styles.field}>
                 <span>Тип вопроса</span>
@@ -2787,7 +2982,9 @@ function AdminTestDraftEditorInner({
                   />
                 </label>
               ) : null}
-              <Button type="button" variant="ghost" onClick={deleteSelection}>Удалить выбранное</Button>
+              <Button type="button" variant="ghost" onClick={deleteSelection} disabled={requireExplicitSave}>
+                Удалить выбранное
+              </Button>
             </>
           ) : (
             <>
@@ -2853,7 +3050,7 @@ function AdminTestDraftEditorInner({
         <div className={styles.contextMenu} style={{ left: contextMenu.x, top: contextMenu.y }}>
           <button type="button" onClick={() => void copySelection()}>Копировать</button>
           <button type="button" onClick={() => void pasteSelection()}>Вставить</button>
-          <button type="button" onClick={deleteSelection}>Удалить</button>
+          {!requireExplicitSave ? <button type="button" onClick={deleteSelection}>Удалить</button> : null}
         </div>
       ) : null}
     </div>

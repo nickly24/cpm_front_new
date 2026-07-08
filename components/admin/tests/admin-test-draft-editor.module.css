@@ -684,6 +684,15 @@
   backface-visibility: hidden;
 }
 
+.questionNodeDirty {
+  border-color: rgba(245, 158, 11, 0.9);
+  box-shadow:
+    0 0 0 2px rgba(251, 191, 36, 0.36),
+    0 0 18px rgba(251, 191, 36, 0.34),
+    0 18px 42px rgba(15, 23, 42, 0.12);
+  animation: unsavedGlowPulse 1.8s ease-in-out infinite;
+}
+
 .questionNodeSelected,
 .questionNodePreviewSelected {
   border-color: #2563eb;
@@ -816,6 +825,29 @@
   }
 }
 
+@keyframes unsavedGlowPulse {
+  0% {
+    box-shadow:
+      0 0 0 2px rgba(251, 191, 36, 0.24),
+      0 0 10px rgba(251, 191, 36, 0.2),
+      0 18px 42px rgba(15, 23, 42, 0.12);
+  }
+
+  55% {
+    box-shadow:
+      0 0 0 3px rgba(251, 191, 36, 0.42),
+      0 0 22px rgba(251, 191, 36, 0.46),
+      0 18px 42px rgba(15, 23, 42, 0.12);
+  }
+
+  100% {
+    box-shadow:
+      0 0 0 2px rgba(251, 191, 36, 0.24),
+      0 0 10px rgba(251, 191, 36, 0.2),
+      0 18px 42px rgba(15, 23, 42, 0.12);
+  }
+}
+
 .questionHead {
   display: flex;
   align-items: center;
@@ -840,6 +872,32 @@
   gap: 10px;
   margin-left: auto;
   flex: 0 0 auto;
+}
+
+.questionSaveButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid rgba(37, 99, 235, 0.34);
+  border-radius: 9px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 140ms ease, border-color 140ms ease, color 140ms ease;
+}
+
+.questionSaveButton:hover:not(:disabled) {
+  border-color: rgba(30, 64, 175, 0.46);
+  background: #dbeafe;
+}
+
+.questionSaveButton:disabled {
+  opacity: 0.7;
+  cursor: default;
 }
 
 .questionNumber {
@@ -1474,6 +1532,36 @@
   margin: 5px 0 0;
   font-size: 12px;
   color: #64748b;
+}
+
+.inspectorTabs {
+  display: flex;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.inspectorTab {
+  flex: 1;
+  min-height: 34px;
+  padding: 0 10px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 10px;
+  background: #fff;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.inspectorTab:hover {
+  border-color: rgba(37, 99, 235, 0.28);
+  color: #2563eb;
+}
+
+.inspectorTabActive {
+  border-color: rgba(37, 99, 235, 0.34);
+  background: #eff6ff;
+  color: #1d4ed8;
 }
 
 .inspectorBody {
