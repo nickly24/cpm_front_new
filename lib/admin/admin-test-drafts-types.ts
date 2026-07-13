@@ -37,6 +37,12 @@ export interface AdminTestDraft {
   visible: boolean;
   canvas: DraftCanvasModel;
   status: DraftStatus;
+  source?: {
+    kind?: string;
+    themeId?: number;
+    themeName?: string;
+    cardIds?: number[];
+  } | null;
   createdAt?: string;
   updatedAt?: string;
   createdBy?: number | null;

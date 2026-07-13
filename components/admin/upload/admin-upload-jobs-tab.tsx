@@ -20,6 +20,8 @@ const STATUS_LABEL: Record<UserImportJobStatus, string> = {
 const IMPORT_TYPE_LABEL: Record<string, string> = {
   users: "Пользователи",
   external_test_results: "Результаты тестов",
+  cards: "Карточки",
+  cards_to_draft: "Карточки → драфт",
 };
 
 function statusClass(status: UserImportJobStatus): string {

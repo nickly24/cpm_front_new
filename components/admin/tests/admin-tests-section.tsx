@@ -569,6 +569,11 @@ export function AdminTestsSection() {
                 tabIndex={0}
               >
                 <strong>{draft.title || "Без названия"}</strong>
+                {draft.source?.kind === "manual_cards" ? (
+                  <span className={`${styles.badge} ${styles.badgeUpcoming}`}>
+                    Из карточек: {draft.source.themeName || "раздел"}
+                  </span>
+                ) : null}
                 <span>
                   {draft.canvas?.questions?.length ?? 0} вопросов ·{" "}
                   {draft.direction || "направление не выбрано"}

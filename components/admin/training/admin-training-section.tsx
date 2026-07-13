@@ -1,5 +1,6 @@
 "use client";
 
+import { AdminCardsToDraftModal } from "@/components/admin/training/admin-cards-to-draft-modal";
 import styles from "@/components/admin/training/admin-training.module.css";
 import { SectionHeroBanner } from "@/components/student/section-hero-banner";
 import heroStyles from "@/components/student/section-hero-banner.module.css";
@@ -37,6 +38,7 @@ import {
   Plus,
   Search,
   Trash2,
+  Wand2,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -348,6 +350,7 @@ export function AdminTrainingSection() {
   const [cardsLoading, setCardsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [modal, setModal] = useState<ModalState | null>(null);
+  const [transformModalOpen, setTransformModalOpen] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const [searchTerm, setSearchTerm] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
@@ -787,6 +790,15 @@ export function AdminTrainingSection() {
         selectedSection.kind === "manual" ? (
         <>
           <div className={cn(styles.catalogHeader, styles.catalogHeaderEnd)}>
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={cards.length === 0}
+              onClick={() => setTransformModalOpen(true)}
+            >
+              <Wand2 size={16} aria-hidden />
+              Трансформировать в тест
+            </Button>
             <AdminSearchPopover
               value={searchTerm}
               onChange={setSearchTerm}
@@ -866,6 +878,14 @@ export function AdminTrainingSection() {
               void loadCards(selectedSection.id);
             }
           }}
+        />
+      ) : null}
+
+      {transformModalOpen && selectedSection?.kind === "manual" ? (
+        <AdminCardsToDraftModal
+          section={selectedSection}
+          cards={cards}
+          onClose={() => setTransformModalOpen(false)}
         />
       ) : null}
     </div>

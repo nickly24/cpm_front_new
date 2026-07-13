@@ -3,6 +3,9 @@ import type {
   ExternalTestOption,
   ExternalTestResultsImportPreview,
   ExternalTestResultsImportSession,
+  CardImportPreview,
+  CardImportSession,
+  CardTransformPreview,
   UserImportJob,
   UserImportPreview,
   UserImportReport,
@@ -109,6 +112,68 @@ export async function commitExternalTestResultsSession(sessionId: number): Promi
   job: UserImportJob;
 }> {
   return apiRequest(`/api/external-test-results-import/sessions/${sessionId}/commit`, {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+}
+
+export async function parseCardImportFile(
+  file: File,
+  directionId: number,
+  themeId: number,
+): Promise<{
+  status: boolean;
+  session_id: number;
+  preview: CardImportPreview;
+}> {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("direction_id", String(directionId));
+  formData.append("theme_id", String(themeId));
+  return apiFormRequest("/api/card-import/parse", formData);
+}
+
+export async function updateCardImportSession(
+  sessionId: number,
+  preview: CardImportPreview,
+): Promise<CardImportSession> {
+  return apiRequest(`/api/card-import/sessions/${sessionId}`, {
+    method: "PUT",
+    body: JSON.stringify({ preview }),
+  });
+}
+
+export async function commitCardImportSession(sessionId: number): Promise<{
+  status: boolean;
+  message?: string;
+  job: UserImportJob;
+}> {
+  return apiRequest(`/api/card-import/sessions/${sessionId}/commit`, {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+}
+
+export async function createCardTransformSession(
+  themeId: number,
+  cardIds: number[],
+): Promise<{
+  status: boolean;
+  session_id: number;
+  preview: CardTransformPreview;
+}> {
+  return apiRequest("/api/card-transform/sessions", {
+    method: "POST",
+    body: JSON.stringify({ theme_id: themeId, card_ids: cardIds }),
+  });
+}
+
+export async function commitCardTransformSession(sessionId: number): Promise<{
+  status: boolean;
+  message?: string;
+  job: UserImportJob;
+}> {
+  return apiRequest(`/api/card-transform/sessions/${sessionId}/commit`, {
     method: "POST",
     body: JSON.stringify({}),
   });

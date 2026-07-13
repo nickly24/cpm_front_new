@@ -1,4 +1,6 @@
 import type {
+  CardImportReportRow,
+  CardTransformReportRow,
   ExternalTestResultImportReportRow,
   UserImportReport,
   UserImportReportRow,
@@ -75,6 +77,21 @@ export function downloadUserImportTemplate(): void {
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, sheet, "Ученики");
   XLSX.writeFile(workbook, "shablon_import_uchenikov.xlsx");
+}
+
+const CARD_TEMPLATE_HEADERS = ["Вопрос", "Ответ"];
+
+export function downloadCardsImportTemplate(): void {
+  const sheet = XLSX.utils.aoa_to_sheet([
+    CARD_TEMPLATE_HEADERS,
+    ["Столица Франции?", "Париж"],
+    ["Назовите типы Python", "str; list; dict"],
+    ["Функция вывода", "print / print()"],
+    ["Пример с запятой", "вариант1, вариант2"],
+  ]);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, sheet, "Карточки");
+  XLSX.writeFile(workbook, "shablon_import_kartochek.xlsx");
 }
 
 const REPORT_STATUS_LABEL: Record<string, string> = {
@@ -160,10 +177,69 @@ function exportExternalTestResultsReportExcel(
   XLSX.writeFile(workbook, `import_external_test_results_job_${jobId}.xlsx`);
 }
 
+function exportCardsImportReportExcel(rows: CardImportReportRow[], jobId: number): void {
+  const header = ["Строка", "Вопрос", "Ответ", "ID карточки", "Статус", "Комментарий"];
+  const body = rows.map((row) => [
+    row.row,
+    row.question,
+    row.answer,
+    row.card_id ?? "",
+    row.status === "created" ? "Создана" : row.status === "skipped" ? "Пропущена" : row.status,
+    row.message ?? "",
+  ]);
+  const sheet = XLSX.utils.aoa_to_sheet([header, ...body]);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, sheet, "Карточки");
+  XLSX.writeFile(workbook, `import_cards_job_${jobId}.xlsx`);
+}
+
+function exportCardsToDraftReportExcel(
+  rows: CardTransformReportRow[],
+  jobId: number,
+): void {
+  const header = [
+    "Строка",
+    "Вопрос",
+    "Ответ",
+    "ID карточки",
+    "ID драфта",
+    "Раздел",
+    "Направление",
+    "Статус",
+    "Комментарий",
+  ];
+  const body = rows.map((row) => [
+    row.row,
+    row.question,
+    row.answer,
+    row.card_id ?? "",
+    row.draft_id ?? "",
+    row.theme_name ?? "",
+    row.direction_name ?? "",
+    row.status === "transformed" ? "Трансформирована" : row.status,
+    row.message ?? "",
+  ]);
+  const sheet = XLSX.utils.aoa_to_sheet([header, ...body]);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, sheet, "Карточки → драфт");
+  XLSX.writeFile(workbook, `cards_to_draft_job_${jobId}.xlsx`);
+}
+
 export function exportImportReportExcel(report: UserImportReport): void {
   if (report.import_type === "external_test_results") {
     exportExternalTestResultsReportExcel(
       report.rows as ExternalTestResultImportReportRow[],
+      report.job_id,
+    );
+    return;
+  }
+  if (report.import_type === "cards") {
+    exportCardsImportReportExcel(report.rows as CardImportReportRow[], report.job_id);
+    return;
+  }
+  if (report.import_type === "cards_to_draft") {
+    exportCardsToDraftReportExcel(
+      report.rows as CardTransformReportRow[],
       report.job_id,
     );
     return;

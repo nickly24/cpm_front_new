@@ -3,6 +3,7 @@
 import { AdminUploadJobsTab } from "@/components/admin/upload/admin-upload-jobs-tab";
 import { AdminUploadPreview } from "@/components/admin/upload/admin-upload-preview";
 import { AdminUploadReportWorkspace } from "@/components/admin/upload/admin-upload-report-workspace";
+import { AdminCardsUploadPanel } from "@/components/admin/upload/admin-cards-upload-panel";
 import { AdminExternalResultsUploadPanel } from "@/components/admin/upload/admin-external-results-upload-panel";
 import { AdminTestUploadPanel } from "@/components/admin/upload/admin-test-upload-panel";
 import styles from "@/components/admin/upload/admin-upload.module.css";
@@ -61,7 +62,10 @@ export function AdminUploadSection() {
   const [reportJobId, setReportJobId] = useState<number | null>(null);
   const saveTimerRef = useRef<number | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const showJournalTabs = uploadTypeId === "users" || uploadTypeId === "externalResults";
+  const showJournalTabs =
+    uploadTypeId === "users" ||
+    uploadTypeId === "externalResults" ||
+    uploadTypeId === "cards";
 
   const resetUpload = () => {
     setFile(null);
@@ -204,7 +208,7 @@ export function AdminUploadSection() {
         <div>
           <h1 className={styles.pageTitle}>Загрузка</h1>
           <p className={styles.hint}>
-            Массовый импорт данных: пользователи из Excel, внутренние тесты из JSON и результаты внешних тестов.
+            Массовый импорт данных: пользователи, карточки и тесты из Excel/JSON, результаты внешних тестов.
           </p>
         </div>
       </header>
@@ -256,6 +260,22 @@ export function AdminUploadSection() {
 
       {uploadTypeId === "tests" ? (
         <AdminTestUploadPanel />
+      ) : uploadTypeId === "cards" ? (
+        tab === "jobs" ? (
+          <AdminUploadJobsTab
+            refreshToken={jobsRefreshToken}
+            onActiveChange={setHasActiveJob}
+            onOpenReport={(jobId) => setReportJobId(jobId)}
+          />
+        ) : (
+          <AdminCardsUploadPanel
+            onCommitted={() => {
+              setJobsRefreshToken((value) => value + 1);
+              setTab("jobs");
+              setHasActiveJob(true);
+            }}
+          />
+        )
       ) : uploadTypeId === "externalResults" ? (
         tab === "jobs" ? (
           <AdminUploadJobsTab

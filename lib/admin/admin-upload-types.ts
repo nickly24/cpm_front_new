@@ -55,6 +55,22 @@ export const ADMIN_UPLOAD_TYPES: AdminUploadType[] = [
       "Запустите загрузку только после preview без ошибок.",
     ],
   },
+  {
+    id: "cards",
+    label: "Карточки",
+    description:
+      "Импорт manual-карточек из Excel в существующий раздел: вопрос и ответ в двух колонках.",
+    acceptedLabel: ".xlsx",
+    status: "ready",
+    instructions: [
+      "Скачайте шаблон Excel с колонками «Вопрос» и «Ответ».",
+      "Выберите направление и существующий manual-раздел (разделы «из теста» недоступны).",
+      "Каждая строка — одна карточка. Пустые строки в файле не допускаются.",
+      "Несколько вариантов ответа пишите в одной ячейке через ;, / или запятую — текст сохранится целиком.",
+      "Проверьте preview: исправьте ошибки и при необходимости исключите строки с предупреждениями.",
+      "Запустите загрузку и откройте отчёт в журнале.",
+    ],
+  },
 ];
 
 export const ADMIN_UPLOAD_ACCEPT =
@@ -251,16 +267,118 @@ export interface UserImportReport {
   job_id: number;
   status: string;
   import_type?: string | null;
-  summary?: UserImportPreviewSummary | ExternalTestResultsImportSummary | null;
+  summary?: UserImportPreviewSummary | ExternalTestResultsImportSummary | CardImportPreviewSummary | CardTransformPreviewSummary | null;
   successful: number;
   skipped: number;
   failed: number;
-  rows: UserImportReportRow[] | ExternalTestResultImportReportRow[];
+  rows:
+    | UserImportReportRow[]
+    | ExternalTestResultImportReportRow[]
+    | CardImportReportRow[]
+    | CardTransformReportRow[];
 }
 
 export type AdminUploadTab = "upload" | "jobs";
 
-export type AdminUploadTypeId = "users" | "tests" | "externalResults";
+export type AdminUploadTypeId = "users" | "tests" | "externalResults" | "cards";
+
+export type CardImportCardAction = "create" | "warning" | "skip" | "error";
+
+export interface CardImportPreviewCard {
+  row: number;
+  question: string;
+  answer: string;
+  action: CardImportCardAction;
+  warnings: string[];
+  errors: string[];
+  message?: string | null;
+}
+
+export interface CardImportPreviewSummary {
+  total_rows: number;
+  cards_create: number;
+  cards_warning: number;
+  cards_skip: number;
+  cards_to_import: number;
+  row_errors: number;
+}
+
+export interface CardImportPreview {
+  direction_id: number;
+  direction_name?: string;
+  theme_id: number;
+  theme_name?: string;
+  cards: CardImportPreviewCard[];
+  summary: CardImportPreviewSummary;
+  source_sheet?: string;
+  source_rows?: Array<{ row: number; question: string; answer: string }>;
+}
+
+export interface CardImportSession {
+  status?: boolean;
+  session_id: number;
+  import_type?: string;
+  source_filename?: string | null;
+  preview: CardImportPreview;
+}
+
+export type CardImportReportRowStatus = "created" | "skipped" | "error" | string;
+
+export interface CardImportReportRow {
+  row: number;
+  question: string;
+  answer: string;
+  theme_id?: number | null;
+  theme_name?: string | null;
+  direction_name?: string | null;
+  card_id?: number | null;
+  status: CardImportReportRowStatus;
+  message?: string | null;
+}
+
+export interface CardTransformPreviewSummary {
+  total_rows: number;
+  cards_selected: number;
+  row_errors: number;
+  draft_id?: string;
+  draft_title?: string;
+}
+
+export interface CardTransformPreviewCard {
+  id: number;
+  question: string;
+  answer: string;
+  sort_order: number;
+}
+
+export interface CardTransformPreview {
+  theme_id: number;
+  theme_name?: string;
+  direction_id: number;
+  direction_name?: string;
+  card_ids: number[];
+  cards: CardTransformPreviewCard[];
+  draft_defaults: {
+    title: string;
+    direction: string;
+  };
+  summary: CardTransformPreviewSummary;
+}
+
+export type CardTransformReportRowStatus = "transformed" | "error" | string;
+
+export interface CardTransformReportRow {
+  row: number;
+  card_id?: number | null;
+  question: string;
+  answer: string;
+  theme_id?: number | null;
+  theme_name?: string | null;
+  direction_name?: string | null;
+  draft_id?: string | null;
+  status: CardTransformReportRowStatus;
+  message?: string | null;
+}
 
 export type ExternalTestResultReportStatus = "imported" | "error" | string;
 
