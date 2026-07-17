@@ -325,13 +325,21 @@ export function OfficialTestAttemptScreen(props: OfficialAttemptProps) {
 
   return <div className={styles.attemptOverlay}>
     {dialog ? <TestAttemptSubmitDialog mode={dialog} isPractice={false} timeExpired={isSealed} loading={false} errorDescription={error} descriptionOverride={dialog === "confirm" ? `Будет зафиксировано ответов: ${questions.length - unanswered} из ${questions.length}. Пропущено: ${unanswered}. После завершения изменить ответы нельзя.` : null} onCancel={() => setDialog(null)} onConfirm={() => void confirmFinish()} onRetry={() => void upload()} /> : null}
-    <header className={styles.attemptHeader}><button className={styles.attemptBackBtn} onClick={() => void exit()}><ArrowLeft size={16}/>В систему</button><div><strong>{props.testTitle}</strong><div className={styles.attemptTimer}>{formatRemainingSeconds(remainingSeconds)}</div><small>Дедлайн: {new Date(bundle.time.answerDeadlineEpochMs).toLocaleString("ru-RU", { timeZone: "Europe/Moscow" })} МСК</small></div>{!isSealed ? <button className={styles.attemptBackBtn} onClick={requestFinish}>Завершить</button> : null}<button className={styles.attemptQueueMenuBtn} onClick={() => setQueueOpen(true)}><Cloud size={16}/></button></header>
+    <header className={`${styles.attemptHeader} ${styles.officialAttemptHeader}`.trim()}>
+      <button className={styles.attemptBackBtn} onClick={() => void exit()}><ArrowLeft size={16}/><span className={styles.attemptBackBtnLabel}>В систему</span></button>
+      <div className={styles.officialAttemptHeaderMain}>
+        <strong className={styles.officialAttemptTitle}>{props.testTitle}</strong>
+        <div className={styles.officialAttemptTimeRow}>
+          <div className={styles.attemptTimer}>{formatRemainingSeconds(remainingSeconds)}</div>
+          <small>До {new Date(bundle.time.answerDeadlineEpochMs).toLocaleString("ru-RU", { timeZone: "Europe/Moscow" })} МСК</small>
+        </div>
+      </div>
+      <div className={styles.officialAttemptHeaderActions}>
+        {!isSealed ? <button className={`${styles.attemptBackBtn} ${styles.officialAttemptFinish}`.trim()} onClick={requestFinish}>Завершить</button> : null}
+        <button className={styles.attemptQueueMenuBtn} onClick={() => setQueueOpen(true)} aria-label="Состояние сохранения"><Cloud size={16}/></button>
+      </div>
+    </header>
     <main className={styles.attemptMain}>
-      <section className={styles.attemptQuestionNav}><div className={styles.attemptQuestionGrid}>{questions.map((q, index) => {
-        const ready = Boolean(bundle.committedByQuestion[String(q.questionId)]);
-        const accessible = ready || q.questionId === bundle.currentQuestionId;
-        return <button key={q.questionId} disabled={!accessible} className={`${styles.attemptQuestionPill} ${index === currentIndex ? styles.attemptQuestionPillCurrent : ""} ${ready ? styles.attemptQuestionPillSynced : ""}`.trim()} onClick={() => { if (accessible) setViewQuestionId(q.questionId); }}>{index + 1}</button>;
-      })}</div></section>
       <section className={styles.attemptQuestionCard}><div className={styles.attemptQuestionMeta}>Вопрос {currentIndex + 1} из {questions.length}</div><h2 className={styles.attemptQuestionText}>{currentQuestion.text}</h2>
         {currentQuestion.type === "text" ? <textarea className={styles.attemptTextInput} value={draft.type === "text" ? draft.textAnswer : ""} disabled={clockBlocked || committed || isSealed} onChange={(e) => changeDraft({ type: "text", textAnswer: e.target.value }, false)} onBlur={() => void persistCurrentDraft()} placeholder="Введите ответ..."/> : <div className={styles.attemptOptions}>{(currentQuestion.answers ?? []).map((option) => {
           const selected = currentQuestion.type === "single" ? draft.type === "single" && draft.selectedAnswer === option.id : draft.type === "multiple" && draft.selectedAnswers.includes(option.id);
@@ -339,6 +347,14 @@ export function OfficialTestAttemptScreen(props: OfficialAttemptProps) {
         })}</div>}
         <p className={styles.attemptQuestionStatus}>{clockBlocked ? "Системное время изменилось. Новые ответы заблокированы до сверки с сервером." : committed ? "Ответ зафиксирован — изменить нельзя" : isSealed ? "Попытка завершена" : "Ответ можно менять до нажатия «Далее»"}</p>
         {!isSealed ? <button className={styles.attemptNextBtn} disabled={clockBlocked || !isDraftValid(draft) || committed} onClick={() => isLast ? requestFinish() : void handleNext()}>{isLast ? "Завершить тест" : "Далее"}</button> : uploadWindowClosed ? <button className={`${styles.attemptSubmitBtn} ${styles.attemptExpiredSubmitBtn}`.trim()} onClick={() => setQueueOpen(true)}>Требуется помощь администратора</button> : <button className={`${styles.attemptSubmitBtn} ${styles.attemptExpiredSubmitBtn}`.trim()} onClick={() => void upload()}><Send size={16}/>Отправить сохранённые ответы</button>}
+      </section>
+      <section className={`${styles.attemptQuestionNav} ${styles.officialAttemptNav}`.trim()}>
+        <span className={styles.officialAttemptNavTitle}>Навигация по вопросам</span>
+        <div className={styles.attemptQuestionGrid}>{questions.map((q, index) => {
+          const ready = Boolean(bundle.committedByQuestion[String(q.questionId)]);
+          const accessible = ready || q.questionId === bundle.currentQuestionId;
+          return <button key={q.questionId} disabled={!accessible} className={`${styles.attemptQuestionPill} ${index === currentIndex ? styles.attemptQuestionPillCurrent : ""} ${ready ? styles.attemptQuestionPillSynced : ""}`.trim()} onClick={() => { if (accessible) setViewQuestionId(q.questionId); }}>{index + 1}</button>;
+        })}</div>
       </section>
     </main>
     {queueOpen ? <div className={styles.attemptQueueOverlay} onClick={() => setQueueOpen(false)}><aside className={styles.attemptQueuePanel} onClick={(e) => e.stopPropagation()}><button className={styles.attemptQuestionNavClose} onClick={() => setQueueOpen(false)}><X size={18}/></button><h3>Сохранение ответов</h3><p>{syncText}</p><p>Локально зафиксировано: {committedCount}</p><p>Сервер подтвердил: {bundle.syncSummary.serverAnswerCount}</p><p>Последняя попытка: {bundle.syncSummary.lastAttemptAtMoscow ?? "—"}</p>{bundle.syncSummary.lastError ? <p>{bundle.syncSummary.lastError}</p> : null}<button className={styles.attemptSubmitBtn} disabled={!pending || bundle.syncSummary.syncing} onClick={() => void syncOfficialNow(bundle.attemptId, true).then((next) => next && setBundle(next))}>Попробовать синхронизировать</button></aside></div> : null}

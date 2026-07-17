@@ -20,6 +20,64 @@
   box-shadow: var(--ds-shadow-sm);
 }
 
+.officialAttemptHeader {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  flex-wrap: nowrap;
+}
+
+.officialAttemptHeaderMain {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  text-align: center;
+}
+
+.officialAttemptTitle {
+  width: 100%;
+  overflow: hidden;
+  font-size: 16px;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.officialAttemptTimeRow,
+.officialAttemptHeaderActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.officialAttemptTimeRow small {
+  color: var(--ds-text-secondary);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.attemptQuestionNav.officialAttemptNav {
+  width: 100%;
+  max-width: 820px;
+  margin: 24px auto 0;
+  padding: 14px 16px;
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-md);
+  box-shadow: none;
+}
+
+.officialAttemptNavTitle {
+  color: var(--ds-text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.officialAttemptNav .attemptQuestionGrid {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+}
+
 .attemptHeaderLeft,
 .attemptHeaderRight {
   display: flex;
@@ -942,6 +1000,65 @@
     align-items: center;
     gap: 6px 10px;
     padding: 8px 10px;
+  }
+
+  .officialAttemptHeader {
+    grid-template-columns: 40px minmax(0, 1fr) 40px;
+    gap: 8px;
+    padding: 8px 10px;
+  }
+
+  .officialAttemptHeaderMain {
+    align-items: flex-start;
+    gap: 3px;
+    text-align: left;
+  }
+
+  .officialAttemptTitle {
+    font-size: 14px;
+  }
+
+  .officialAttemptTimeRow {
+    width: 100%;
+    gap: 6px;
+  }
+
+  .officialAttemptTimeRow small {
+    overflow: hidden;
+    font-size: 10px;
+    text-overflow: ellipsis;
+  }
+
+  .officialAttemptHeaderActions {
+    justify-content: flex-end;
+  }
+
+  .officialAttemptFinish {
+    display: none;
+  }
+
+  .officialAttemptHeader .attemptQueueMenuBtn {
+    width: 40px;
+    height: 40px;
+    justify-content: center;
+    padding: 0;
+  }
+
+  .attemptQuestionNav.officialAttemptNav {
+    flex-shrink: 0;
+    gap: 10px;
+    margin-top: 20px;
+    padding: 12px;
+  }
+
+  .officialAttemptNav .attemptQuestionGrid {
+    flex-wrap: nowrap;
+    gap: 8px;
+    overflow-x: auto;
+  }
+
+  .officialAttemptNav .attemptQuestionPill {
+    flex: 0 0 40px;
   }
 
   .attemptHeaderLeft {
