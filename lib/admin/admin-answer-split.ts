@@ -229,3 +229,98 @@ export function applyAnswerSplitToQuestion(
     answers,
   };
 }
+
+export interface BulkSplitCandidate {
+  question: DraftQuestionNode;
+  answerId: string;
+  sourceText: string;
+}
+
+export interface BulkSplitPreviewRow {
+  questionId: string;
+  answerId: string;
+  questionText: string;
+  sourceText: string;
+  parts: string[];
+  splitOk: boolean;
+  delimiter: string;
+}
+
+export function findBulkSplitCandidates(
+  questions: DraftQuestionNode[],
+): BulkSplitCandidate[] {
+  const result: BulkSplitCandidate[] = [];
+  for (const question of questions) {
+    if (question.type !== "text") {
+      continue;
+    }
+    const textAnswers = question.answers.filter(
+      (answer) => answer.kind === "textAnswer",
+    );
+    if (textAnswers.length !== 1) {
+      continue;
+    }
+    const answer = textAnswers[0];
+    result.push({
+      question,
+      answerId: answer.id,
+      sourceText: answer.text ?? "",
+    });
+  }
+  return result;
+}
+
+export function buildBulkSplitPreview(
+  candidates: BulkSplitCandidate[],
+  mode: AnswerSplitDelimiter,
+  customDelimiter = "",
+): BulkSplitPreviewRow[] {
+  return candidates.map((candidate) => {
+    const { delimiter, parts } = splitAnswerWithMode(
+      candidate.sourceText,
+      mode,
+      customDelimiter,
+    );
+    const normalizedParts =
+      parts.length > 0
+        ? parts
+        : [candidate.sourceText.trim()].filter(Boolean);
+    return {
+      questionId: candidate.question.id,
+      answerId: candidate.answerId,
+      questionText: candidate.question.text ?? "",
+      sourceText: candidate.sourceText,
+      parts: normalizedParts,
+      splitOk: normalizedParts.length > 1,
+      delimiter,
+    };
+  });
+}
+
+export function applyBulkAnswerSplit(
+  questions: DraftQuestionNode[],
+  rows: Array<Pick<BulkSplitPreviewRow, "questionId" | "answerId" | "parts" | "splitOk">>,
+  targetType: AdminTestQuestionType,
+  uid: UidFactory,
+): DraftQuestionNode[] {
+  const byId = new Map(rows.map((row) => [row.questionId, row]));
+  return questions.map((question) => {
+    const row = byId.get(question.id);
+    if (!row || !row.splitOk) {
+      return question;
+    }
+    const cleanedParts = row.parts
+      .map((part) => part.replace(/\s+/g, " ").trim())
+      .filter(Boolean);
+    if (cleanedParts.length <= 1) {
+      return question;
+    }
+    return applyAnswerSplitToQuestion(
+      question,
+      row.answerId,
+      cleanedParts,
+      targetType,
+      uid,
+    );
+  });
+}

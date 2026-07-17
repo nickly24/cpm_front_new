@@ -43,6 +43,7 @@ import {
   Type,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { AdminAnswerBulkSplitModal } from "@/components/admin/tests/admin-answer-bulk-split-modal";
 import { AdminAnswerSplitModal } from "@/components/admin/tests/admin-answer-split-modal";
 import { AdminTestDraftFlowOverlay } from "@/components/admin/tests/admin-test-draft-flow-overlay";
 import { AdminTestChangeHistoryPanel } from "@/components/admin/tests/admin-test-change-history-panel";
@@ -78,7 +79,13 @@ import type {
   AutosaveState,
   Direction,
 } from "@/lib/admin/admin-test-drafts-types";
-import { applyAnswerSplitToQuestion } from "@/lib/admin/admin-answer-split";
+import {
+  applyAnswerSplitToQuestion,
+  applyBulkAnswerSplit,
+  findBulkSplitCandidates,
+  type BulkSplitCandidate,
+  type BulkSplitPreviewRow,
+} from "@/lib/admin/admin-answer-split";
 import { convertQuestionAnswersOnTypeChange } from "@/lib/admin/admin-test-draft-convert";
 import type { AdminTestQuestionType } from "@/lib/admin/admin-tests-types";
 import { useAuth } from "@/contexts/AuthContext";
@@ -1192,6 +1199,9 @@ function AdminTestDraftEditorInner({
     questionId: string;
     answerId: string;
   } | null>(null);
+  const [bulkSplitCandidates, setBulkSplitCandidates] = useState<
+    BulkSplitCandidate[] | null
+  >(null);
   const [history, setHistory] = useState<DraftCanvasModel[]>([normalizeCanvas(initialDraft.canvas)]);
   const [historyIndex, setHistoryIndex] = useState(0);
   const [inspectorCollapsed, setInspectorCollapsed] = useState(true);
@@ -1682,6 +1692,26 @@ function AdminTestDraftEditorInner({
       selectQuestionOnly,
       updateQuestion,
     ],
+  );
+
+  const openBulkAnswerSplit = useCallback(() => {
+    const candidates = findBulkSplitCandidates(draft.canvas.questions);
+    if (candidates.length === 0) {
+      window.alert("Нет text-вопросов с одним ответом для расшифровки");
+      return;
+    }
+    setBulkSplitCandidates(candidates);
+  }, [draft.canvas.questions]);
+
+  const applyBulkAnswerSplitBatch = useCallback(
+    (rows: BulkSplitPreviewRow[], targetType: AdminTestQuestionType) => {
+      mutateCanvas((canvas) => ({
+        ...canvas,
+        questions: applyBulkAnswerSplit(canvas.questions, rows, targetType, uid),
+      }));
+      setBulkSplitCandidates(null);
+    },
+    [mutateCanvas],
   );
 
   const addAnswer = useCallback((kind: "answer" | "textAnswer") => {
@@ -2810,6 +2840,15 @@ function AdminTestDraftEditorInner({
             <Button type="button" variant="ghost" size="sm" onClick={() => void pasteSelection()}>
               Вставить
             </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={openBulkAnswerSplit}
+            >
+              <Scissors size={16} aria-hidden />
+              Расшифровать
+            </Button>
             {!isTestPersistence ? (
               <Button
                 type="button"
@@ -3149,6 +3188,14 @@ function AdminTestDraftEditorInner({
           }
           onClose={() => setAnswerSplitTarget(null)}
           onApply={applyAnswerSplit}
+        />
+      ) : null}
+
+      {bulkSplitCandidates ? (
+        <AdminAnswerBulkSplitModal
+          candidates={bulkSplitCandidates}
+          onClose={() => setBulkSplitCandidates(null)}
+          onApply={applyBulkAnswerSplitBatch}
         />
       ) : null}
     </div>
