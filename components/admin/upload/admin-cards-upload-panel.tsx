@@ -44,7 +44,9 @@ export function AdminCardsUploadPanel({ onCommitted }: AdminCardsUploadPanelProp
   const [directions, setDirections] = useState<Direction[]>([]);
   const [sections, setSections] = useState<AdminTrainingSectionRow[]>([]);
   const [selectedDirectionId, setSelectedDirectionId] = useState("");
+  const [sectionMode, setSectionMode] = useState<"existing" | "new">("existing");
   const [selectedThemeId, setSelectedThemeId] = useState("");
+  const [newThemeName, setNewThemeName] = useState("");
   const [catalogLoading, setCatalogLoading] = useState(true);
 
   const [file, setFile] = useState<File | null>(null);
@@ -109,8 +111,9 @@ export function AdminCardsUploadPanel({ onCommitted }: AdminCardsUploadPanelProp
 
   const canUploadFile =
     Boolean(selectedDirectionId) &&
-    Boolean(selectedThemeId) &&
-    manualSectionsForDirection.length > 0;
+    (sectionMode === "existing"
+      ? Boolean(selectedThemeId)
+      : Boolean(newThemeName.trim()));
 
   const resetUpload = () => {
     setFile(null);
@@ -177,8 +180,16 @@ export function AdminCardsUploadPanel({ onCommitted }: AdminCardsUploadPanelProp
       window.alert("Выберите файл .xlsx");
       return;
     }
-    if (!selectedDirectionId || !selectedThemeId) {
-      window.alert("Выберите направление и раздел");
+    if (!selectedDirectionId) {
+      window.alert("Выберите направление");
+      return;
+    }
+    if (sectionMode === "existing" && !selectedThemeId) {
+      window.alert("Выберите раздел");
+      return;
+    }
+    if (sectionMode === "new" && !newThemeName.trim()) {
+      window.alert("Укажите название нового раздела");
       return;
     }
 
@@ -188,7 +199,9 @@ export function AdminCardsUploadPanel({ onCommitted }: AdminCardsUploadPanelProp
       const response = await parseCardImportFile(
         nextFile,
         Number(selectedDirectionId),
-        Number(selectedThemeId),
+        sectionMode === "new"
+          ? { createNewTheme: true, newThemeName: newThemeName.trim() }
+          : { themeId: Number(selectedThemeId) },
       );
       if (!response.status) {
         throw new Error("Не удалось разобрать файл");
@@ -246,7 +259,8 @@ export function AdminCardsUploadPanel({ onCommitted }: AdminCardsUploadPanelProp
         <div>
           <h2 className={styles.mainTitle}>Карточки</h2>
           <p className={styles.mainDesc}>
-            Импорт manual-карточек в существующий раздел выбранного направления.
+            Импорт manual-карточек в существующий или новый раздел выбранного
+            направления. Новый раздел создаётся при запуске загрузки.
           </p>
         </div>
       </div>
@@ -275,33 +289,79 @@ export function AdminCardsUploadPanel({ onCommitted }: AdminCardsUploadPanelProp
           </select>
         </label>
 
-        <label className={styles.fieldGroup}>
-          <span className={styles.blockTitle}>Раздел (manual)</span>
-          <select
-            className={testStyles.searchInput}
-            value={selectedThemeId}
-            disabled={!selectedDirectionId || catalogLoading}
-            onChange={(event) => {
-              setSelectedThemeId(event.target.value);
-              resetUpload();
-            }}
-          >
-            <option value="">
-              {selectedDirectionId ? "Выберите раздел" : "Сначала выберите направление"}
-            </option>
-            {manualSectionsForDirection.map((section) => (
-              <option key={section.id} value={section.id}>
-                {section.name}
-                {section.cards_count != null ? ` (${section.cards_count})` : ""}
+        <div className={styles.fieldGroup}>
+          <span className={styles.blockTitle}>Раздел</span>
+          <div className={styles.radioRow}>
+            <label className={styles.radioLabel}>
+              <input
+                type="radio"
+                name="section-mode"
+                checked={sectionMode === "existing"}
+                onChange={() => {
+                  setSectionMode("existing");
+                  resetUpload();
+                }}
+              />
+              Существующий
+            </label>
+            <label className={styles.radioLabel}>
+              <input
+                type="radio"
+                name="section-mode"
+                checked={sectionMode === "new"}
+                onChange={() => {
+                  setSectionMode("new");
+                  setSelectedThemeId("");
+                  resetUpload();
+                }}
+              />
+              Новый
+            </label>
+          </div>
+          {sectionMode === "existing" ? (
+            <select
+              className={testStyles.searchInput}
+              value={selectedThemeId}
+              disabled={!selectedDirectionId || catalogLoading}
+              onChange={(event) => {
+                setSelectedThemeId(event.target.value);
+                resetUpload();
+              }}
+            >
+              <option value="">
+                {selectedDirectionId
+                  ? "Выберите раздел"
+                  : "Сначала выберите направление"}
               </option>
-            ))}
-          </select>
-        </label>
+              {manualSectionsForDirection.map((section) => (
+                <option key={section.id} value={section.id}>
+                  {section.name}
+                  {section.cards_count != null ? ` (${section.cards_count})` : ""}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <input
+              type="text"
+              className={testStyles.searchInput}
+              placeholder="Название нового раздела"
+              value={newThemeName}
+              disabled={!selectedDirectionId || catalogLoading}
+              onChange={(event) => {
+                setNewThemeName(event.target.value);
+                resetUpload();
+              }}
+            />
+          )}
+        </div>
       </div>
 
-      {selectedDirectionId && manualSectionsForDirection.length === 0 ? (
+      {sectionMode === "existing" &&
+      selectedDirectionId &&
+      manualSectionsForDirection.length === 0 ? (
         <div className={styles.notice}>
-          В этом направлении нет manual-разделов. Создайте раздел в разделе «Карточки».
+          В этом направлении нет manual-разделов. Выберите режим «Новый» или
+          создайте раздел в «Карточки».
         </div>
       ) : null}
 
@@ -371,7 +431,9 @@ export function AdminCardsUploadPanel({ onCommitted }: AdminCardsUploadPanelProp
           <p className={styles.dropzoneTitle}>
             {canUploadFile
               ? "Перетащите .xlsx или выберите файл"
-              : "Сначала выберите направление и раздел"}
+              : sectionMode === "new"
+                ? "Сначала выберите направление и укажите название раздела"
+                : "Сначала выберите направление и раздел"}
           </p>
           <p className={styles.dropzoneText}>Колонки: Вопрос, Ответ</p>
         </div>

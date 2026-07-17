@@ -1329,6 +1329,26 @@
   cursor: grab;
 }
 
+.answerSplitButton {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  margin-right: 4px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ds-text-secondary);
+  cursor: pointer;
+}
+
+.answerSplitButton:hover {
+  background: color-mix(in srgb, var(--ds-accent) 14%, transparent);
+  color: var(--ds-accent);
+}
+
 .answerText {
   flex: 1;
   min-width: 0;

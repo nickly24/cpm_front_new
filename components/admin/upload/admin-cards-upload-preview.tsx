@@ -82,7 +82,19 @@ export function AdminCardsUploadPreview({
           </p>
           <p className={styles.hint}>
             {preview.direction_name} · {preview.theme_name}
+            {preview.create_new_theme && !preview.theme_name_collision
+              ? " (новый)"
+              : ""}
           </p>
+          {preview.theme_message ? (
+            <p
+              className={
+                preview.theme_name_collision ? styles.notice : styles.hint
+              }
+            >
+              {preview.theme_message}
+            </p>
+          ) : null}
         </div>
         <div className={styles.actions}>
           <Button type="button" variant="ghost" onClick={onReset}>

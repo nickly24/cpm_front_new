@@ -391,6 +391,21 @@
   gap: var(--ds-space-2);
 }
 
+.radioRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ds-space-3);
+}
+
+.radioLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--ds-text);
+  cursor: pointer;
+}
+
 .metaEditor {
   display: flex;
   flex-direction: column;

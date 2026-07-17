@@ -120,7 +120,11 @@ export async function commitExternalTestResultsSession(sessionId: number): Promi
 export async function parseCardImportFile(
   file: File,
   directionId: number,
-  themeId: number,
+  options: {
+    themeId?: number | null;
+    createNewTheme?: boolean;
+    newThemeName?: string;
+  },
 ): Promise<{
   status: boolean;
   session_id: number;
@@ -129,7 +133,12 @@ export async function parseCardImportFile(
   const formData = new FormData();
   formData.append("file", file);
   formData.append("direction_id", String(directionId));
-  formData.append("theme_id", String(themeId));
+  if (options.createNewTheme) {
+    formData.append("create_new_theme", "1");
+    formData.append("new_theme_name", options.newThemeName?.trim() || "");
+  } else if (options.themeId != null) {
+    formData.append("theme_id", String(options.themeId));
+  }
   return apiFormRequest("/api/card-import/parse", formData);
 }
 

@@ -306,8 +306,12 @@ export interface CardImportPreviewSummary {
 export interface CardImportPreview {
   direction_id: number;
   direction_name?: string;
-  theme_id: number;
+  theme_id?: number | null;
   theme_name?: string;
+  create_new_theme?: boolean;
+  new_theme_name?: string | null;
+  theme_name_collision?: boolean;
+  theme_message?: string | null;
   cards: CardImportPreviewCard[];
   summary: CardImportPreviewSummary;
   source_sheet?: string;

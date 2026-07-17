@@ -34,6 +34,7 @@ import {
   Redo2,
   Save,
   Settings,
+  Scissors,
   Trash2,
   Undo2,
   CircleDot,
@@ -42,6 +43,7 @@ import {
   Type,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { AdminAnswerSplitModal } from "@/components/admin/tests/admin-answer-split-modal";
 import { AdminTestDraftFlowOverlay } from "@/components/admin/tests/admin-test-draft-flow-overlay";
 import { AdminTestChangeHistoryPanel } from "@/components/admin/tests/admin-test-change-history-panel";
 import { AdminTestDraftQuestionSearch } from "@/components/admin/tests/admin-test-draft-question-search";
@@ -76,6 +78,7 @@ import type {
   AutosaveState,
   Direction,
 } from "@/lib/admin/admin-test-drafts-types";
+import { applyAnswerSplitToQuestion } from "@/lib/admin/admin-answer-split";
 import { convertQuestionAnswersOnTypeChange } from "@/lib/admin/admin-test-draft-convert";
 import type { AdminTestQuestionType } from "@/lib/admin/admin-tests-types";
 import { useAuth } from "@/contexts/AuthContext";
@@ -659,6 +662,7 @@ function SortableAnswer({
   onDraftChange,
   onCommitEdit,
   onToggleCorrect,
+  onSplit,
 }: {
   answer: DraftAnswerNode;
   questionType: AdminTestQuestionType;
@@ -673,6 +677,7 @@ function SortableAnswer({
   onDraftChange: (value: string) => void;
   onCommitEdit: () => void;
   onToggleCorrect: () => void;
+  onSplit: () => void;
 }) {
   const placeholder =
     answer.kind === "textAnswer" ? TEXT_ANSWER_PLACEHOLDER : ANSWER_TEXT_PLACEHOLDER;
@@ -769,6 +774,21 @@ function SortableAnswer({
           onCommit={onCommitEdit}
         />
       </div>
+      {selected && !editing ? (
+        <button
+          type="button"
+          className={styles.answerSplitButton}
+          aria-label="Разобрать ответ"
+          title="Разобрать ответ"
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={(event) => {
+            event.stopPropagation();
+            onSplit();
+          }}
+        >
+          <Scissors size={13} strokeWidth={2} aria-hidden="true" />
+        </button>
+      ) : null}
     </div>
   );
 }
@@ -802,6 +822,7 @@ function QuestionNode(props: NodeProps) {
     onReorderAnswers: (questionId: string, activeId: string, overId: string) => void;
     onDropAnswer: (targetQuestionId: string, answerIds: string[]) => void;
     onAddAnswer: (questionId: string) => void;
+    onSplitAnswer: (questionId: string, answerId: string) => void;
     onQuestionGrabStart: () => void;
     onQuestionGrabEnd: () => void;
     editingQuestion: boolean;
@@ -1088,6 +1109,7 @@ function QuestionNode(props: NodeProps) {
                     onToggleCorrect={() =>
                       data.onToggleAnswerCorrect(data.question.id, answer.id)
                     }
+                    onSplit={() => data.onSplitAnswer(data.question.id, answer.id)}
                   />
                 ))
               )}
@@ -1166,6 +1188,10 @@ function AdminTestDraftEditorInner({
   const [copiedIds, setCopiedIds] = useState<string[]>([]);
   const [copiedAnswerIds, setCopiedAnswerIds] = useState<string[]>([]);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+  const [answerSplitTarget, setAnswerSplitTarget] = useState<{
+    questionId: string;
+    answerId: string;
+  } | null>(null);
   const [history, setHistory] = useState<DraftCanvasModel[]>([normalizeCanvas(initialDraft.canvas)]);
   const [historyIndex, setHistoryIndex] = useState(0);
   const [inspectorCollapsed, setInspectorCollapsed] = useState(true);
@@ -1613,6 +1639,49 @@ function AdminTestDraftEditorInner({
       appendAnswerToQuestion(questionId, question.type === "text" ? "textAnswer" : "answer");
     },
     [appendAnswerToQuestion, draft.canvas.questions],
+  );
+
+  const openAnswerSplit = useCallback((questionId: string, answerId: string) => {
+    setAnswerSplitTarget({ questionId, answerId });
+  }, []);
+
+  const applyAnswerSplit = useCallback(
+    (parts: string[], targetType: AdminTestQuestionType) => {
+      if (!answerSplitTarget) {
+        return;
+      }
+      const { questionId, answerId } = answerSplitTarget;
+      const question = draft.canvas.questions.find((item) => item.id === questionId);
+      if (!question) {
+        setAnswerSplitTarget(null);
+        return;
+      }
+      const nextQuestion = applyAnswerSplitToQuestion(
+        question,
+        answerId,
+        parts,
+        targetType,
+        uid,
+      );
+      updateQuestion(questionId, {
+        type: nextQuestion.type,
+        answers: nextQuestion.answers,
+      });
+      const firstNewId = nextQuestion.answers[0]?.id;
+      if (firstNewId) {
+        selectAnswerOnly(questionId, firstNewId, false);
+      } else {
+        selectQuestionOnly(questionId);
+      }
+      setAnswerSplitTarget(null);
+    },
+    [
+      answerSplitTarget,
+      draft.canvas.questions,
+      selectAnswerOnly,
+      selectQuestionOnly,
+      updateQuestion,
+    ],
   );
 
   const addAnswer = useCallback((kind: "answer" | "textAnswer") => {
@@ -2479,6 +2548,7 @@ function AdminTestDraftEditorInner({
         onReorderAnswers: reorderAnswers,
         onDropAnswer: moveAnswerToQuestion,
         onAddAnswer: addAnswerToQuestion,
+        onSplitAnswer: openAnswerSplit,
         editingQuestion:
           inlineEdit?.kind === "question" && inlineEdit.questionId === question.id,
         editingAnswerId:
@@ -2523,6 +2593,7 @@ function AdminTestDraftEditorInner({
     handleQuestionDragStart,
     inlineEdit,
     moveAnswerToQuestion,
+    openAnswerSplit,
     reorderAnswers,
     selectAnswerOnly,
     selectQuestionFromClick,
@@ -2982,6 +3053,16 @@ function AdminTestDraftEditorInner({
                   />
                 </label>
               ) : null}
+              {selectedAnswer ? (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => openAnswerSplit(selectedQuestion.id, selectedAnswer.id)}
+                >
+                  <Scissors size={16} aria-hidden />
+                  Разобрать ответ
+                </Button>
+              ) : null}
               <Button type="button" variant="ghost" onClick={deleteSelection} disabled={requireExplicitSave}>
                 Удалить выбранное
               </Button>
@@ -3052,6 +3133,23 @@ function AdminTestDraftEditorInner({
           <button type="button" onClick={() => void pasteSelection()}>Вставить</button>
           {!requireExplicitSave ? <button type="button" onClick={deleteSelection}>Удалить</button> : null}
         </div>
+      ) : null}
+
+      {answerSplitTarget ? (
+        <AdminAnswerSplitModal
+          sourceText={
+            draft.canvas.questions
+              .find((question) => question.id === answerSplitTarget.questionId)
+              ?.answers.find((answer) => answer.id === answerSplitTarget.answerId)?.text ?? ""
+          }
+          currentQuestionType={
+            draft.canvas.questions.find(
+              (question) => question.id === answerSplitTarget.questionId,
+            )?.type ?? "text"
+          }
+          onClose={() => setAnswerSplitTarget(null)}
+          onApply={applyAnswerSplit}
+        />
       ) : null}
     </div>
   );
