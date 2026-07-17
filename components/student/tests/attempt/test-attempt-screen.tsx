@@ -53,10 +53,12 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { TouchEvent } from "react";
+import { OfficialTestAttemptScreen } from "./official-test-attempt-screen";
 
 interface TestAttemptScreenProps {
   testId: string;
   testTitle: string;
+  timeLimitMinutes?: number | null;
   resumeAttemptId?: string;
   isPractice?: boolean;
   onExit: () => void;
@@ -93,7 +95,14 @@ const isSwipeIgnoredTarget = (target: EventTarget | null) => {
   );
 };
 
-export function TestAttemptScreen({
+export function TestAttemptScreen(props: TestAttemptScreenProps) {
+  if (!props.isPractice) {
+    return <OfficialTestAttemptScreen {...props} />;
+  }
+  return <LegacyTestAttemptScreen {...props} />;
+}
+
+function LegacyTestAttemptScreen({
   testId,
   testTitle,
   resumeAttemptId,

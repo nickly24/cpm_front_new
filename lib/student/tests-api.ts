@@ -166,6 +166,7 @@ export function formatTestDate(value: string | null | undefined): string {
   }
 
   return date.toLocaleDateString("ru-RU", {
+    timeZone: "Europe/Moscow",
     day: "numeric",
     month: "long",
     year: "numeric",
@@ -183,6 +184,7 @@ export function formatTestDateCompact(value: string | null | undefined): string 
   }
 
   return date.toLocaleDateString("ru-RU", {
+    timeZone: "Europe/Moscow",
     day: "numeric",
     month: "short",
     year: "numeric",

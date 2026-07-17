@@ -174,7 +174,7 @@ export function mergeAttemptFromServer(
 
 export function toggleMultipleAnswer(
   draft: Extract<AnswerDraft, { type: "multiple" }>,
-  optionId: number,
+  optionId: string,
 ): AnswerDraft {
   const selected = new Set(draft.selectedAnswers);
 

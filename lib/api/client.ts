@@ -11,6 +11,25 @@ export class ApiError extends Error {
   }
 }
 
+function requestTimeoutMs(path: string): number {
+  if (path.includes("/finalize")) return 30_000;
+  if (path.includes("/test-attempt")) return 15_000;
+  return 10_000;
+}
+
+async function fetchWithTimeout(url: string, path: string, options: RequestInit) {
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), requestTimeoutMs(path));
+  const abort = () => controller.abort();
+  options.signal?.addEventListener("abort", abort, { once: true });
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    window.clearTimeout(timer);
+    options.signal?.removeEventListener("abort", abort);
+  }
+}
+
 export async function apiRequest<T>(
   path: string,
   options: RequestInit = {},
@@ -28,7 +47,7 @@ export async function apiRequest<T>(
 
   let response: Response;
   try {
-    response = await fetch(`${API_BASE_URL}${path}`, {
+    response = await fetchWithTimeout(`${API_BASE_URL}${path}`, path, {
       ...options,
       headers,
       credentials: "include",
@@ -80,7 +99,7 @@ export async function apiFormRequest<T>(
 
   let response: Response;
   try {
-    response = await fetch(`${API_BASE_URL}${path}`, {
+    response = await fetchWithTimeout(`${API_BASE_URL}${path}`, path, {
       ...options,
       method: options.method ?? "POST",
       headers,

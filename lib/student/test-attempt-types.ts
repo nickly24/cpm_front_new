@@ -1,7 +1,8 @@
 export type QuestionType = "single" | "multiple" | "text";
+export type AnswerOptionId = string;
 
 export interface AttemptAnswerOption {
-  id: number;
+  id: AnswerOptionId;
   text: string;
 }
 
@@ -17,8 +18,8 @@ export interface AttemptQuestion {
 export interface StoredAttemptAnswer {
   questionId: number;
   type: QuestionType;
-  selectedAnswer?: number;
-  selectedAnswers?: number[];
+  selectedAnswer?: AnswerOptionId;
+  selectedAnswers?: AnswerOptionId[];
   textAnswer?: string;
 }
 
@@ -37,6 +38,16 @@ export interface TestAttempt {
   answers: StoredAttemptAnswer[];
   answeredCount: number;
   totalQuestions: number;
+  schemaVersion?: number;
+  testVersionId?: string;
+  serverNowMoscow?: string;
+  serverNowEpochMs?: number;
+  startedAtMoscow?: string;
+  startedAtEpochMs?: number;
+  answerDeadlineMoscow?: string;
+  answerDeadlineEpochMs?: number;
+  uploadDeadlineMoscow?: string;
+  uploadDeadlineEpochMs?: number;
 }
 
 export interface AttemptEnvelope {
@@ -66,6 +77,6 @@ export interface SubmitAttemptResponse {
 }
 
 export type AnswerDraft =
-  | { type: "single"; selectedAnswer: number | null }
-  | { type: "multiple"; selectedAnswers: number[] }
+  | { type: "single"; selectedAnswer: AnswerOptionId | null }
+  | { type: "multiple"; selectedAnswers: AnswerOptionId[] }
   | { type: "text"; textAnswer: string };

@@ -50,6 +50,7 @@ export function formatAdminTestDate(value?: string | null): string {
   }
 
   return new Date(value).toLocaleString("ru-RU", {
+    timeZone: "Europe/Moscow",
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
@@ -84,8 +85,13 @@ export function toDatetimeLocalValue(value?: string | null): string {
     return "";
   }
 
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  const parts = new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "Europe/Moscow",
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", hour12: false,
+  }).formatToParts(date);
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}T${values.hour}:${values.minute}`;
 }
 
 export function filterAdminTestsBySearch(
@@ -162,7 +168,11 @@ export function testDetailToFormData(test: AdminTestDetail): AdminTestFormData {
   const processedQuestions = (test.questions || []).map((question) => ({
     ...question,
     answers: question.answers
-      ? question.answers.map(({ pointValue: _pv, ...answer }) => answer)
+      ? question.answers.map((answer) => {
+          const normalized = { ...answer };
+          delete normalized.pointValue;
+          return normalized;
+        })
       : [],
     correctAnswers: question.correctAnswers || [],
   }));

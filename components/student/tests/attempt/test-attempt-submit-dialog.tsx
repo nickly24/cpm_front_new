@@ -11,6 +11,7 @@ interface TestAttemptSubmitDialogProps {
   timeExpired: boolean;
   loading?: boolean;
   errorDescription?: string | null;
+  descriptionOverride?: string | null;
   onCancel: () => void;
   onConfirm: () => void;
   onRetry: () => void;
@@ -22,6 +23,7 @@ export function TestAttemptSubmitDialog({
   timeExpired,
   loading = false,
   errorDescription,
+  descriptionOverride,
   onCancel,
   onConfirm,
   onRetry,
@@ -36,14 +38,14 @@ export function TestAttemptSubmitDialog({
         : "Завершить тест?"
     : "Не удалось отправить";
 
-  const description = isConfirm
+  const description = descriptionOverride || (isConfirm
     ? isPractice
       ? "Результат тренировки не засчитается в официальный балл."
       : timeExpired
         ? "Новые ответы добавить уже нельзя. На проверку уйдут ответы, сохранённые на устройстве и на сервере."
         : "После отправки изменить ответы будет нельзя. Сначала все ответы синхронизируются с сервером."
     : errorDescription ||
-      "Попытка сохранена на устройстве. Очередь ответов переотправляется автоматически каждые 10 секунд; детали видны под списком вопросов. Отвечать заново не нужно.";
+      "Все ответы и итоговый результат сохранены на этом устройстве. Отвечать заново не нужно." );
 
   return (
     <div

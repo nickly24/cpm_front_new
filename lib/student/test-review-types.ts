@@ -1,7 +1,7 @@
-import type { QuestionType } from "./test-attempt-types";
+import type { AnswerOptionId, QuestionType } from "./test-attempt-types";
 
 export interface ReviewAnswerOption {
-  id: number;
+  id: AnswerOptionId;
   text: string;
   isCorrect?: boolean;
 }
@@ -17,14 +17,14 @@ export interface ReviewQuestion {
 export interface ReviewStudentAnswer {
   type: QuestionType;
   questionId: number;
-  selectedAnswer?: number | null;
-  selectedAnswers?: number[];
+  selectedAnswer?: AnswerOptionId | null;
+  selectedAnswers?: AnswerOptionId[];
   textAnswer?: string;
 }
 
 export interface ReviewCorrectPayload {
   correctAnswers?: string[];
-  correctOptionIds?: number[];
+  correctOptionIds?: AnswerOptionId[];
   answers?: ReviewAnswerOption[];
 }
 

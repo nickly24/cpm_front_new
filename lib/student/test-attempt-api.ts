@@ -15,7 +15,39 @@ export async function startTestAttempt(
     body: JSON.stringify({
       testId,
       isPractice: Boolean(options?.practice),
+      clientSchemaVersion: options?.practice ? 1 : 2,
     }),
+  });
+}
+
+export interface CommitSyncResponse {
+  success: boolean;
+  ackedCommitIds?: string[];
+  conflicts?: Array<{ questionId?: number; commitId?: string; error: string }>;
+  errors?: Array<{ questionId?: number; commitId?: string; error: string }>;
+  serverAnswerCount?: number;
+  serverNowMoscow?: string;
+  serverNowEpochMs?: number;
+  error?: string;
+}
+
+export async function syncTestAttemptCommits(
+  attemptId: string,
+  commits: Array<StoredAttemptAnswer & { commitId: string; sequence: number; committedAtMoscow: string }>,
+): Promise<CommitSyncResponse> {
+  return apiRequest(`/test-attempt/${attemptId}/commits`, {
+    method: "POST",
+    body: JSON.stringify({ commits }),
+  });
+}
+
+export async function finalizeTestAttemptV2(
+  attemptId: string,
+  snapshot: unknown,
+): Promise<SubmitAttemptResponse & { alreadyFinalized?: boolean }> {
+  return apiRequest(`/test-attempt/${attemptId}/finalize`, {
+    method: "POST",
+    body: JSON.stringify({ snapshot }),
   });
 }
 
@@ -109,6 +141,11 @@ export function getAttemptErrorMessage(code: string): string {
       "Ответы сохранены на устройстве, но не все дошли до сервера. Подключитесь к сети и повторите отправку.",
     empty_attempt_answers:
       "Сервер ещё не получил сохранённые ответы. Подключитесь к сети и повторите отправку.",
+    upload_window_closed: "Срок самостоятельной отправки истёк. Обратитесь к администратору.",
+    invalid_snapshot: "Локальный слепок содержит некорректные ответы",
+    test_version_mismatch: "Версия теста не совпадает. Локальные данные сохранены — обратитесь к администратору.",
+    snapshot_hash_mismatch: "Локальный слепок повреждён. Данные не удалены — обратитесь к администратору.",
+    corrupted_local_bundle: "Локальные данные попытки повреждены. Они не удалены и не будут смешаны с новой попыткой.",
   };
 
   return messages[code] ?? code;

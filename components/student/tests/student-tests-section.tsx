@@ -32,6 +32,7 @@ import type {
 } from "@/lib/student/tests-types";
 import { useMediaQuery } from "@/lib/hooks/use-media-query";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { listV2Bundles } from "@/lib/student/test-attempt-v2-store";
 
 type TestsViewMode = "overview" | "catalog";
 
@@ -59,6 +60,7 @@ export function StudentTestsSection() {
   const [attemptLaunch, setAttemptLaunch] = useState<{
     testId: string;
     testTitle: string;
+    timeLimitMinutes?: number | null;
     resumeAttemptId?: string;
     isPractice?: boolean;
   } | null>(null);
@@ -136,7 +138,52 @@ export function StudentTestsSection() {
           return;
         }
 
-        setTests(Array.isArray(response.tests) ? response.tests : []);
+        let loadedTests = Array.isArray(response.tests) ? response.tests : [];
+        if (viewMode === "overview") {
+          const localBundles = await listV2Bundles().catch(() => []);
+          const byTest = new Map(localBundles.map((bundle) => [bundle.testId, bundle]));
+          loadedTests = loadedTests.map((test) => {
+            const local = byTest.get(String(test.id));
+            if (!local || local.localStatus === "uploaded") return test;
+            const sealed = local.localStatus === "sealed_pending_upload" || local.localStatus === "upload_window_closed";
+            return {
+              ...test,
+              canStart: false,
+              canResume: !sealed,
+              canSubmitExpired: sealed,
+              activeAttempt: {
+                id: local.attemptId,
+                expiresAt: local.time.answerDeadlineMoscow,
+                remainingSeconds: Math.max(0, Math.floor((local.time.answerDeadlineEpochMs - Date.now() - local.time.serverOffsetMs) / 1000)),
+                answeredCount: Object.keys(local.committedByQuestion).length,
+                totalQuestions: local.questions.length,
+                expired: sealed,
+              },
+            };
+          });
+          const loadedIds = new Set(loadedTests.map((test) => String(test.id)));
+          for (const local of localBundles) {
+            if (loadedIds.has(local.testId) || local.localStatus === "uploaded") continue;
+            const sealed = local.localStatus === "sealed_pending_upload" || local.localStatus === "upload_window_closed";
+            loadedTests.push({
+              id: local.testId,
+              title: local.testTitle,
+              status: sealed ? "missed" : "available",
+              canStart: false,
+              canResume: !sealed,
+              canSubmitExpired: sealed,
+              activeAttempt: {
+                id: local.attemptId,
+                expiresAt: local.time.answerDeadlineMoscow,
+                remainingSeconds: Math.max(0, Math.floor((local.time.answerDeadlineEpochMs - Date.now() - local.time.serverOffsetMs) / 1000)),
+                answeredCount: Object.keys(local.committedByQuestion).length,
+                totalQuestions: local.questions.length,
+                expired: sealed,
+              },
+            });
+          }
+        }
+        setTests(loadedTests);
         setSessions(Array.isArray(response.sessions) ? response.sessions : []);
         setPagination(response.pagination ?? null);
       } catch (err) {
@@ -260,6 +307,7 @@ export function StudentTestsSection() {
       setAttemptLaunch({
         testId,
         testTitle: getTestTitle(test),
+        timeLimitMinutes: test.timeLimitMinutes,
       });
     },
     [tests],
@@ -276,6 +324,7 @@ export function StudentTestsSection() {
       setAttemptLaunch({
         testId,
         testTitle: getTestTitle(test),
+        timeLimitMinutes: test.timeLimitMinutes,
         resumeAttemptId: attemptId,
       });
     },
@@ -293,6 +342,7 @@ export function StudentTestsSection() {
       setAttemptLaunch({
         testId,
         testTitle: getTestTitle(test),
+        timeLimitMinutes: test.timeLimitMinutes,
         isPractice: true,
       });
     },
@@ -385,6 +435,7 @@ export function StudentTestsSection() {
         <TestAttemptScreen
           testId={attemptLaunch.testId}
           testTitle={attemptLaunch.testTitle}
+          timeLimitMinutes={attemptLaunch.timeLimitMinutes}
           resumeAttemptId={attemptLaunch.resumeAttemptId}
           isPractice={attemptLaunch.isPractice}
           onExit={() => setAttemptLaunch(null)}
