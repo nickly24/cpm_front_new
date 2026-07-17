@@ -357,6 +357,20 @@ export function OfficialTestAttemptScreen(props: OfficialAttemptProps) {
         })}</div>
       </section>
     </main>
-    {queueOpen ? <div className={styles.attemptQueueOverlay} onClick={() => setQueueOpen(false)}><aside className={styles.attemptQueuePanel} onClick={(e) => e.stopPropagation()}><button className={styles.attemptQuestionNavClose} onClick={() => setQueueOpen(false)}><X size={18}/></button><h3>Сохранение ответов</h3><p>{syncText}</p><p>Локально зафиксировано: {committedCount}</p><p>Сервер подтвердил: {bundle.syncSummary.serverAnswerCount}</p><p>Последняя попытка: {bundle.syncSummary.lastAttemptAtMoscow ?? "—"}</p>{bundle.syncSummary.lastError ? <p>{bundle.syncSummary.lastError}</p> : null}<button className={styles.attemptSubmitBtn} disabled={!pending || bundle.syncSummary.syncing} onClick={() => void syncOfficialNow(bundle.attemptId, true).then((next) => next && setBundle(next))}>Попробовать синхронизировать</button></aside></div> : null}
+    {queueOpen ? <button type="button" className={styles.attemptQueueBackdrop} onClick={() => setQueueOpen(false)} aria-label="Закрыть состояние сохранения"/> : null}
+    {queueOpen ? <aside className={`${styles.attemptQueueDrawer} ${styles.attemptQueueDrawerOpen}`.trim()}>
+      <div className={styles.attemptQueueDrawerHead}>
+        <div><p className={styles.attemptSidebarTitle}>Сохранение ответов</p><p className={styles.attemptQueueSummary}>{syncText}</p></div>
+        <button type="button" className={styles.attemptQueueClose} onClick={() => setQueueOpen(false)} aria-label="Закрыть"><X size={18}/></button>
+      </div>
+      <ul className={styles.attemptQueueList}>
+        <li className={styles.attemptQueueItem}><div className={styles.attemptQueueItemTop}><span className={styles.attemptQueueQuestion}>Локально зафиксировано</span><strong className={styles.officialAttemptQueueValue}>{committedCount}</strong></div></li>
+        <li className={styles.attemptQueueItem}><div className={styles.attemptQueueItemTop}><span className={styles.attemptQueueQuestion}>Сервер подтвердил</span><strong className={styles.officialAttemptQueueValue}>{bundle.syncSummary.serverAnswerCount}</strong></div></li>
+        <li className={styles.attemptQueueItem}><div className={styles.attemptQueueItemTop}><span className={styles.attemptQueueQuestion}>Ожидают сервера</span><strong className={styles.officialAttemptQueueValue}>{pending}</strong></div></li>
+      </ul>
+      <p className={styles.attemptQueueSummary}>Последняя попытка по Москве: {bundle.syncSummary.lastAttemptAtMoscow ?? "—"}</p>
+      {bundle.syncSummary.lastError ? <p className={styles.attemptQueueError}>{bundle.syncSummary.lastError}</p> : null}
+      <button className={`${styles.attemptSubmitBtn} ${styles.officialAttemptSyncButton}`.trim()} disabled={!pending || bundle.syncSummary.syncing} onClick={() => void syncOfficialNow(bundle.attemptId, true).then((next) => next && setBundle(next))}>Попробовать синхронизировать</button>
+    </aside> : null}
   </div>;
 }

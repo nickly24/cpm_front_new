@@ -73,6 +73,18 @@
   font-weight: 700;
 }
 
+.officialAttemptQueueValue {
+  color: var(--ds-text);
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.officialAttemptSyncButton {
+  width: 100%;
+  margin-top: auto;
+  justify-content: center;
+}
+
 .officialAttemptNav .attemptQuestionGrid {
   flex-wrap: nowrap;
   overflow-x: auto;
