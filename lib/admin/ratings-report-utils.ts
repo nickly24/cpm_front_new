@@ -28,9 +28,10 @@ export function uniqueFilterOptions(students: RatingsReportStudent[]) {
       const value = String(student.class);
       classes.set(value, value);
     }
-    if (student.school_short_name) {
-      const value = String(student.school_id ?? student.school_short_name);
-      schools.set(value, student.school_short_name);
+    const schoolLabel = student.school_short_name || student.school_name;
+    if (schoolLabel) {
+      const value = String(student.school_id ?? schoolLabel);
+      schools.set(value, schoolLabel);
     }
     if (student.group_name) {
       const value = String(student.group_id ?? student.group_name);
@@ -71,7 +72,7 @@ export function filterReportStudents(
     }
     if (
       schoolFilter !== "all" &&
-      String(student.school_id ?? student.school_short_name ?? "") !== schoolFilter
+      String(student.school_id ?? student.school_short_name ?? student.school_name ?? "") !== schoolFilter
     ) {
       return false;
     }
@@ -106,7 +107,10 @@ export function sortReportStudents(
     } else if (sortKey === "group") {
       cmp = (a.group_name ?? "").localeCompare(b.group_name ?? "", "ru");
     } else if (sortKey === "school") {
-      cmp = (a.school_short_name ?? "").localeCompare(b.school_short_name ?? "", "ru");
+      cmp = (a.school_short_name ?? a.school_name ?? "").localeCompare(
+        b.school_short_name ?? b.school_name ?? "",
+        "ru",
+      );
     } else if (sortKey === "final") {
       cmp = a.final - b.final;
     }

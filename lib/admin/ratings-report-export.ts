@@ -16,6 +16,9 @@ function fixedHeaders(): { key: string; title: string }[] {
 }
 
 function columnTitle(column: RatingsReportColumn): string {
+  if (column.group_label) {
+    return `${column.group_label}: ${column.label}`;
+  }
   if (column.subtitle) {
     return `${column.label} (${column.subtitle})`;
   }
@@ -43,7 +46,7 @@ export function exportRatingsReportExcel(
     const row: (string | number)[] = [
       student.group_name ?? "",
       student.class ?? "",
-      student.school_short_name ?? "",
+      student.school_short_name ?? student.school_name ?? "",
       student.full_name,
     ];
 

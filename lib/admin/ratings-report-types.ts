@@ -22,6 +22,7 @@ export interface RatingsReportStudent {
   group_id: number | null;
   group_name: string | null;
   school_id: number | null;
+  school_name: string | null;
   school_short_name: string | null;
   homework: number;
   exams: number;

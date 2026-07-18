@@ -348,7 +348,7 @@ export function RatingsReportGrid({
                     </td>
                     <td className={`${reportStyles.colSchool} ${reportStyles.frozenCellMuted}`}>
                       <span className={reportStyles.frozenCellInner}>
-                        {student.school_short_name ?? "—"}
+                        {student.school_short_name ?? student.school_name ?? "—"}
                       </span>
                     </td>
                     <td className={`${reportStyles.colFio} ${reportStyles.frozenCellFio}`} title={student.full_name}>
