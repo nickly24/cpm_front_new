@@ -4,10 +4,8 @@ import type {
   TestAttempt,
 } from "./test-attempt-types";
 import { draftToStoredAnswer, isDraftValid } from "./test-attempt-utils";
+import { OFFICIAL_ATTEMPT_STORE as STORE, openAttemptDb } from "./test-attempt-db";
 
-const DB_NAME = "cpm_test_attempts";
-const DB_VERSION = 2;
-const STORE = "bundles_v2";
 
 export type LocalAttemptStatus =
   | "initializing"
@@ -87,23 +85,6 @@ export function hasSeriousClockRollback(
   return clientNowEpochMs + time.serverOffsetMs < time.lastEffectiveNowEpochMs - 60_000;
 }
 
-function openDb(): Promise<IDBDatabase> {
-  if (typeof indexedDB === "undefined") {
-    return Promise.reject(new Error("indexeddb_unsupported"));
-  }
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
-    request.onerror = () => reject(request.error);
-    request.onsuccess = () => resolve(request.result);
-    request.onupgradeneeded = () => {
-      const db = request.result;
-      if (!db.objectStoreNames.contains(STORE)) {
-        db.createObjectStore(STORE, { keyPath: "attemptId" });
-      }
-    };
-  });
-}
-
 export function moscowNowIso(epochMs = Date.now()): string {
   const parts = new Intl.DateTimeFormat("sv-SE", {
     timeZone: "Europe/Moscow", year: "numeric", month: "2-digit", day: "2-digit",
@@ -120,7 +101,7 @@ export async function preflightAttemptStorage(): Promise<void> {
       throw new Error("insufficient_local_storage");
     }
   }
-  const db = await openDb();
+  const db = await openAttemptDb();
   const key = `__preflight_${crypto.randomUUID()}`;
   await new Promise<void>((resolve, reject) => {
     const tx = db.transaction(STORE, "readwrite");
@@ -137,7 +118,7 @@ export async function preflightAttemptStorage(): Promise<void> {
 }
 
 export async function saveV2Bundle(bundle: AttemptV2Bundle): Promise<void> {
-  const db = await openDb();
+  const db = await openAttemptDb();
   await new Promise<void>((resolve, reject) => {
     const tx = db.transaction(STORE, "readwrite");
     tx.objectStore(STORE).put(bundle);
@@ -148,7 +129,7 @@ export async function saveV2Bundle(bundle: AttemptV2Bundle): Promise<void> {
 }
 
 export async function loadV2Bundle(attemptId: string): Promise<AttemptV2Bundle | null> {
-  const db = await openDb();
+  const db = await openAttemptDb();
   const value = await new Promise<AttemptV2Bundle | null>((resolve, reject) => {
     const tx = db.transaction(STORE, "readonly");
     const request = tx.objectStore(STORE).get(attemptId);
@@ -169,7 +150,7 @@ export async function loadV2Bundle(attemptId: string): Promise<AttemptV2Bundle |
 }
 
 export async function listV2Bundles(): Promise<AttemptV2Bundle[]> {
-  const db = await openDb();
+  const db = await openAttemptDb();
   const values = await new Promise<AttemptV2Bundle[]>((resolve, reject) => {
     const tx = db.transaction(STORE, "readonly");
     const request = tx.objectStore(STORE).getAll();
@@ -190,7 +171,7 @@ async function mutateBundle(
   attemptId: string,
   mutate: (bundle: AttemptV2Bundle) => AttemptV2Bundle,
 ): Promise<AttemptV2Bundle> {
-  const db = await openDb();
+  const db = await openAttemptDb();
   const result = await new Promise<AttemptV2Bundle>((resolve, reject) => {
     const tx = db.transaction(STORE, "readwrite");
     const store = tx.objectStore(STORE);

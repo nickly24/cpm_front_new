@@ -1,8 +1,6 @@
 import type { StoredAttemptAnswer, TestAttempt } from "./test-attempt-types";
+import { LEGACY_ATTEMPT_STORE as STORE, openAttemptDb } from "./test-attempt-db";
 
-const DB_NAME = "cpm_test_attempts";
-const DB_VERSION = 1;
-const STORE = "bundles";
 
 export interface AttemptBundle {
   attempt: TestAttempt;
@@ -10,22 +8,8 @@ export interface AttemptBundle {
   updatedAt: number;
 }
 
-function openDb(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
-    request.onerror = () => reject(request.error);
-    request.onsuccess = () => resolve(request.result);
-    request.onupgradeneeded = () => {
-      const db = request.result;
-      if (!db.objectStoreNames.contains(STORE)) {
-        db.createObjectStore(STORE, { keyPath: "attemptId" });
-      }
-    };
-  });
-}
-
 export async function saveAttemptBundle(bundle: AttemptBundle): Promise<void> {
-  const db = await openDb();
+  const db = await openAttemptDb();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE, "readwrite");
     tx.objectStore(STORE).put({
@@ -43,7 +27,7 @@ export async function saveAttemptBundle(bundle: AttemptBundle): Promise<void> {
 export async function loadAttemptBundle(
   attemptId: string,
 ): Promise<AttemptBundle | null> {
-  const db = await openDb();
+  const db = await openAttemptDb();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE, "readonly");
     const req = tx.objectStore(STORE).get(attemptId);
@@ -56,7 +40,7 @@ export async function loadAttemptBundle(
 }
 
 export async function deleteAttemptBundle(attemptId: string): Promise<void> {
-  const db = await openDb();
+  const db = await openAttemptDb();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE, "readwrite");
     tx.objectStore(STORE).delete(attemptId);

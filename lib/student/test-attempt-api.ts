@@ -146,6 +146,7 @@ export function getAttemptErrorMessage(code: string): string {
     test_version_mismatch: "Версия теста не совпадает. Локальные данные сохранены — обратитесь к администратору.",
     snapshot_hash_mismatch: "Локальный слепок повреждён. Данные не удалены — обратитесь к администратору.",
     corrupted_local_bundle: "Локальные данные попытки повреждены. Они не удалены и не будут смешаны с новой попыткой.",
+    indexeddb_upgrade_blocked: "Закройте другие вкладки CPM, обновите страницу и попробуйте снова.",
   };
 
   return messages[code] ?? code;
