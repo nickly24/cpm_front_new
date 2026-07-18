@@ -13,6 +13,11 @@
   color: var(--ds-report-section-test-fg) !important;
 }
 
+.sectionHeaderTestDirection {
+  background: var(--ds-report-section-summary-bg) !important;
+  color: var(--ds-report-section-summary-fg) !important;
+}
+
 .sectionHeaderSummary {
   background: var(--ds-report-section-summary-bg) !important;
   color: var(--ds-report-section-summary-fg) !important;
@@ -28,6 +33,12 @@
   width: 64px;
   min-width: 64px;
   max-width: 64px;
+}
+
+.colDirectionScore {
+  width: 88px;
+  min-width: 88px;
+  max-width: 88px;
 }
 
 .scoreCell {
@@ -56,6 +67,13 @@
   font-weight: 700;
   background: var(--ds-report-score-summary-bg);
   color: var(--ds-report-score-summary-fg);
+}
+
+.scoreCellDirection {
+  font-weight: 750;
+  background: var(--ds-report-score-summary-bg);
+  color: var(--ds-report-score-summary-fg);
+  box-shadow: inset 1px 0 0 var(--ds-border), inset -1px 0 0 var(--ds-border);
 }
 
 .scoreCellFinal {

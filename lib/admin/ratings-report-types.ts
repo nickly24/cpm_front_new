@@ -2,6 +2,7 @@ export type RatingsReportColumnKind =
   | "summary"
   | "homework"
   | "exam"
+  | "test_direction"
   | "test";
 
 export interface RatingsReportColumn {
@@ -9,6 +10,8 @@ export interface RatingsReportColumn {
   kind: RatingsReportColumnKind;
   label: string;
   subtitle?: string | null;
+  group_key?: string | null;
+  group_label?: string | null;
 }
 
 export interface RatingsReportStudent {

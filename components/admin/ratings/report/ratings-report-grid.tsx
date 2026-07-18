@@ -88,6 +88,7 @@ function HeaderSelect({
 function sectionClass(kind: RatingsReportColumn["kind"]): string {
   if (kind === "homework") return ratingReportStyles.sectionHeaderHomework;
   if (kind === "exam") return ratingReportStyles.sectionHeaderExam;
+  if (kind === "test_direction") return ratingReportStyles.sectionHeaderTestDirection;
   if (kind === "test") return ratingReportStyles.sectionHeaderTest;
   return ratingReportStyles.sectionHeaderSummary;
 }
@@ -100,6 +101,9 @@ function scoreCellClass(column: RatingsReportColumn, score: number): string {
   if (column.kind === "summary") {
     return `${base} ${ratingReportStyles.scoreCellSummary}`;
   }
+  if (column.kind === "test_direction") {
+    return `${base} ${ratingReportStyles.scoreCellDirection}`;
+  }
   if (score > 0) {
     return `${base} ${ratingReportStyles.scoreCellPositive}`;
   }
@@ -107,22 +111,30 @@ function scoreCellClass(column: RatingsReportColumn, score: number): string {
 }
 
 function groupColumns(columns: RatingsReportColumn[]) {
-  const groups: { kind: RatingsReportColumn["kind"]; label: string; items: RatingsReportColumn[] }[] = [];
+  const groups: {
+    key: string;
+    kind: RatingsReportColumn["kind"];
+    label: string;
+    items: RatingsReportColumn[];
+  }[] = [];
   for (const column of columns) {
     const last = groups[groups.length - 1];
-    if (last && last.kind === column.kind) {
+    const groupKey = column.group_key ?? column.kind;
+    if (last && last.key === groupKey) {
       last.items.push(column);
       continue;
     }
     const label =
-      column.kind === "summary"
+      column.group_label ?? (column.kind === "summary"
         ? "Сводка"
         : column.kind === "homework"
           ? "Домашние задания"
           : column.kind === "exam"
             ? "Экзамены"
-            : "Тесты";
-    groups.push({ kind: column.kind, label, items: [column] });
+            : column.kind === "test_direction"
+              ? "Среднее по направлениям"
+              : "Тесты по направлениям");
+    groups.push({ key: groupKey, kind: column.kind, label, items: [column] });
   }
   return groups;
 }
@@ -275,7 +287,7 @@ export function RatingsReportGrid({
             </th>
             {columnGroups.map((group) => (
               <th
-                key={group.kind}
+                key={group.key}
                 colSpan={group.items.length}
                 className={sectionClass(group.kind)}
               >
@@ -287,7 +299,7 @@ export function RatingsReportGrid({
             {columns.map((column) => (
               <th
                 key={column.key}
-                className={`${ratingReportStyles.colScore} ${sectionClass(column.kind)}`}
+                className={`${column.kind === "test_direction" ? ratingReportStyles.colDirectionScore : ratingReportStyles.colScore} ${sectionClass(column.kind)}`}
                 title={column.subtitle ? `${column.label} · ${column.subtitle}` : column.label}
               >
                 <div className={ratingReportStyles.columnHeaderStack}>
@@ -352,7 +364,7 @@ export function RatingsReportGrid({
                       return (
                         <td
                           key={column.key}
-                          className={ratingReportStyles.colScore}
+                          className={column.kind === "test_direction" ? ratingReportStyles.colDirectionScore : ratingReportStyles.colScore}
                           title={
                             cell?.status
                               ? `${formatScore(score)} · ${cell.status}`

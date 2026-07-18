@@ -15,7 +15,7 @@ export function SupervisorTestsSection() {
           onBack={onBack}
           title="Результаты тестов"
           fileNamePrefix="testy"
-          columnKinds={["test", "summary"]}
+          columnKinds={["test_direction", "test", "summary"]}
           summaryKeys={["sum_tests"]}
           periodSelection={period}
         />
