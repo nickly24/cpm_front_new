@@ -21,6 +21,19 @@ export interface StoredAttemptAnswer {
   selectedAnswer?: AnswerOptionId;
   selectedAnswers?: AnswerOptionId[];
   textAnswer?: string;
+  points?: number;
+  isCorrect?: boolean;
+}
+
+export interface PracticeFeedback {
+  questionId: number;
+  answer: StoredAttemptAnswer;
+  isCorrect: boolean;
+  points: number;
+  correct: {
+    correctOptionIds?: AnswerOptionId[];
+    correctAnswers?: string[];
+  };
 }
 
 export interface TestAttempt {
@@ -29,6 +42,7 @@ export interface TestAttempt {
   testId: string;
   status: string;
   isPractice?: boolean;
+  hasTimeLimit?: boolean;
   startedAt?: string;
   expiresAt?: string;
   remainingSeconds: number;
@@ -40,6 +54,7 @@ export interface TestAttempt {
   totalQuestions: number;
   schemaVersion?: number;
   testVersionId?: string;
+  practiceFeedback?: PracticeFeedback[];
   serverNowMoscow?: string;
   serverNowEpochMs?: number;
   startedAtMoscow?: string;

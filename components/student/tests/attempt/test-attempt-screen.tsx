@@ -54,8 +54,9 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { TouchEvent } from "react";
 import { OfficialTestAttemptScreen } from "./official-test-attempt-screen";
+import { PracticeAttemptScreen } from "./practice-attempt-screen";
 
-interface TestAttemptScreenProps {
+export interface TestAttemptScreenProps {
   testId: string;
   testTitle: string;
   timeLimitMinutes?: number | null;
@@ -99,10 +100,10 @@ export function TestAttemptScreen(props: TestAttemptScreenProps) {
   if (!props.isPractice) {
     return <OfficialTestAttemptScreen {...props} />;
   }
-  return <LegacyTestAttemptScreen {...props} />;
+  return <PracticeAttemptScreen {...props} />;
 }
 
-function LegacyTestAttemptScreen({
+export function LegacyTestAttemptScreen({
   testId,
   testTitle,
   resumeAttemptId,

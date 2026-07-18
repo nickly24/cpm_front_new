@@ -14,6 +14,7 @@ export function getReviewErrorMessage(code: string): string {
     session_not_found: "Сессия теста не найдена",
     test_not_found: "Тест не найден",
     forbidden: "Нет доступа к этому разбору",
+    results_hidden: "Результаты пока скрыты преподавателем",
   };
 
   return messages[code] ?? code;

@@ -237,7 +237,13 @@ export function TestDetailPanel({
 
           {test.isCompleted && !test.canViewResults ? (
             <p className={styles.mutedNote}>
-              Разбор доступен, но правильные ответы пока скрыты преподавателем
+              Результаты и тренировка станут доступны после публикации ответов преподавателем
+            </p>
+          ) : null}
+
+          {!test.isCompleted && test.status === "missed" && !test.canPractice ? (
+            <p className={styles.mutedNote}>
+              Тренировка станет доступна после публикации ответов преподавателем
             </p>
           ) : null}
         </div>
@@ -288,7 +294,7 @@ export function TestDetailPanel({
           </button>
         ) : null}
 
-        {!external && test.isCompleted && session?.id ? (
+        {!external && test.canViewResults && test.isCompleted && session?.id ? (
           <button
             type="button"
             className={`${styles.actionBtn} ${styles.actionBtnReview}`}

@@ -1,6 +1,7 @@
 import { ApiError, apiRequest } from "@/lib/api/client";
 import type {
   AttemptEnvelope,
+  PracticeFeedback,
   StoredAttemptAnswer,
   SubmitAttemptResponse,
   TestAttempt,
@@ -75,6 +76,28 @@ export async function saveTestAttemptAnswer(
   });
 }
 
+export interface PracticeAnswerResponse {
+  success: boolean;
+  feedback?: PracticeFeedback;
+  answeredCount?: number;
+  totalQuestions?: number;
+  idempotent?: boolean;
+  error?: string;
+}
+
+export async function checkPracticeAnswer(
+  attemptId: string,
+  answer: StoredAttemptAnswer,
+): Promise<PracticeAnswerResponse> {
+  return apiRequest<PracticeAnswerResponse>(
+    `/test-attempt/${attemptId}/practice-answer`,
+    {
+      method: "POST",
+      body: JSON.stringify(answer),
+    },
+  );
+}
+
 export interface BatchSyncResponse {
   success: boolean;
   attempt?: TestAttempt;
@@ -135,6 +158,14 @@ export function getAttemptErrorMessage(code: string): string {
     invalid_answer_type: "Неверный тип ответа",
     invalid_question_id: "Неверный вопрос",
     test_not_completed: "Сначала нужно официально сдать этот тест",
+    practice_not_published:
+      "Тренировка станет доступна после публикации ответов преподавателем",
+    practice_before_official_completion:
+      "Сначала завершите официальное прохождение или дождитесь окончания теста",
+    practice_attempt_required: "Эта операция доступна только в тренировке",
+    official_attempt_pending:
+      "Сначала отправьте или завершите сохранённую официальную попытку",
+    results_hidden: "Результаты пока скрыты преподавателем",
     answers_required: "Нет ответов для синхронизации",
     answers_batch_too_large: "Слишком много ответов в одном запросе",
     answers_not_synced:
