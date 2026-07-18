@@ -6,14 +6,15 @@ import {
   isHomeworkSubmitted,
 } from "@/lib/student/homework-api";
 import type { StudentHomeworkItem } from "@/lib/student/homework-types";
-import { CalendarDays, CheckCircle2 } from "lucide-react";
+import { CalendarDays, CheckCircle2, FileText } from "lucide-react";
 import styles from "./homework.module.css";
 
 interface HomeworkCardProps {
   item: StudentHomeworkItem;
+  onOpen?: () => void;
 }
 
-export function HomeworkCard({ item }: HomeworkCardProps) {
+export function HomeworkCard({ item, onOpen }: HomeworkCardProps) {
   const deadlineState = getHomeworkDeadlineState(item);
   const submitted = isHomeworkSubmitted(item);
   const score = formatHomeworkScore(item.result);
@@ -49,6 +50,9 @@ export function HomeworkCard({ item }: HomeworkCardProps) {
           <span className={styles.scoreValue}>{score}</span>
         </div>
       ) : null}
+      <button type="button" className={styles.workspaceButton} onClick={onOpen}>
+        <FileText size={17} /> Открыть работу
+      </button>
     </article>
   );
 }

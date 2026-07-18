@@ -25,6 +25,7 @@ import {
   type StudentHomeworkItem,
 } from "@/lib/student/homework-types";
 import { useEffect, useMemo, useState } from "react";
+import { HomeworkWorkspaceModal } from "@/components/homework/homework-workspace";
 
 export function StudentHomeworkSection() {
   const [items, setItems] = useState<StudentHomeworkItem[]>([]);
@@ -34,6 +35,7 @@ export function StudentHomeworkSection() {
   const [statusFilter, setStatusFilter] =
     useState<HomeworkStatusFilter>("all");
   const [currentPage, setCurrentPage] = useState(1);
+  const [openHomeworkId, setOpenHomeworkId] = useState<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -163,7 +165,7 @@ export function StudentHomeworkSection() {
       {pagination.items.length > 0 ? (
         <section className={styles.grid}>
           {pagination.items.map((item) => (
-            <HomeworkCard key={item.homework_id} item={item} />
+            <HomeworkCard key={item.homework_id} item={item} onOpen={() => setOpenHomeworkId(item.homework_id)} />
           ))}
         </section>
       ) : (
@@ -180,6 +182,7 @@ export function StudentHomeworkSection() {
         totalPages={pagination.totalPages}
         onPageChange={setCurrentPage}
       />
+      {openHomeworkId ? <HomeworkWorkspaceModal homeworkId={openHomeworkId} onClose={() => setOpenHomeworkId(null)} /> : null}
     </div>
   );
 }

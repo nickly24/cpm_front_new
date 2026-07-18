@@ -15,6 +15,7 @@ import {
   logoutRequest,
 } from "@/lib/auth/api";
 import type { User } from "@/lib/auth/types";
+import { clearScannerProjects } from "@/lib/homework-scanner/project-store";
 
 interface AuthContextValue {
   user: User | null;
@@ -61,6 +62,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(async () => {
     await logoutRequest();
+    await clearScannerProjects().catch(() => undefined);
+    try {
+      Object.keys(localStorage).filter((key) => key.startsWith("homework-chat-draft-")).forEach((key) => localStorage.removeItem(key));
+    } catch { /* storage unavailable */ }
     setUser(null);
   }, []);
 

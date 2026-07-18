@@ -24,6 +24,11 @@ import { StudentPerformanceSection } from "@/components/student/performance/stud
 import { StudentScheduleSection } from "@/components/student/schedule/student-schedule-section";
 import { StudentTestsSection } from "@/components/student/tests/student-tests-section";
 import { ProctorHomeworkSection } from "@/components/proctor/proctor-homework-section";
+import { ReviewQueueSection } from "@/components/homework/review-queue-section";
+import { HomeworkInboxSection } from "@/components/homework/homework-inbox-section";
+import { HomeworkMonitoringSection } from "@/components/admin/homework/homework-monitoring-section";
+import { HomeworkSettingsSection } from "@/components/admin/homework/homework-settings-section";
+import { HomeworkArchiveSection } from "@/components/admin/homework/homework-archive-section";
 import { ProctorStudentsSection } from "@/components/proctor/proctor-students-section";
 import { SupervisorDashboardSection } from "@/components/supervisor/supervisor-dashboard-section";
 import { SupervisorAttendanceSection } from "@/components/supervisor/reports/supervisor-attendance-section";
@@ -139,6 +144,11 @@ export function SectionContent({
   if (role === "admin" && section === "train") {
     return <AdminTrainingSection />;
   }
+  if (role === "admin" && section === "review-queue") return <ReviewQueueSection />;
+  if (role === "admin" && section === "messages") return <HomeworkInboxSection />;
+  if (role === "admin" && section === "monitoring") return <HomeworkMonitoringSection />;
+  if (role === "admin" && section === "settings") return <HomeworkSettingsSection />;
+  if (role === "admin" && section === "homework-archive") return <HomeworkArchiveSection />;
 
   if (role === "proctor" && section === "homework") {
     return <ProctorHomeworkSection />;
@@ -147,6 +157,8 @@ export function SectionContent({
   if (role === "proctor" && section === "students") {
     return <ProctorStudentsSection />;
   }
+  if (role === "proctor" && section === "review-queue") return <ReviewQueueSection />;
+  if (role === "proctor" && section === "messages") return <HomeworkInboxSection />;
 
   if (role === "supervisor" && section === "dashboard") {
     return <SupervisorDashboardSection />;

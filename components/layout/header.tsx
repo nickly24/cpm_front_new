@@ -7,6 +7,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import type { UserRole } from "@/lib/auth/types";
 import { LogOut, Menu } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { NotificationBell } from "@/components/layout/notification-bell";
 
 interface HeaderProps {
   role: UserRole;
@@ -36,6 +37,7 @@ export function Header({ role, onMenuOpen }: HeaderProps) {
       <SectionSearch role={role} />
 
       <div className="cabinet-header-actions">
+        <NotificationBell role={role} />
         <ThemeToggle />
         <Button variant="ghost" size="sm" onClick={() => void handleLogout()}>
           <LogOut size={16} />

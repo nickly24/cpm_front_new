@@ -5,6 +5,7 @@ export class ApiError extends Error {
   constructor(
     message: string,
     public status?: number,
+    public retryAfterSeconds?: number,
   ) {
     super(message);
     this.name = "ApiError";
@@ -79,7 +80,10 @@ export async function apiRequest<T>(
           ? (data as { error: string }).error
           : "Ошибка запроса";
 
-    throw new ApiError(message, response.status);
+    const retryAfterSeconds = typeof data === "object" && data !== null && "details" in data
+      ? Number((data as { details?: { retry_after_seconds?: number } }).details?.retry_after_seconds) || undefined
+      : undefined;
+    throw new ApiError(message, response.status, retryAfterSeconds);
   }
 
   return data;

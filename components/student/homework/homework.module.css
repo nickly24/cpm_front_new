@@ -5,6 +5,8 @@
   gap: 20px;
 }
 
+.workspaceButton{display:inline-flex;align-items:center;justify-content:center;gap:8px;width:100%;margin-top:16px;padding:11px 14px;border:1px solid var(--ds-accent);border-radius:10px;background:var(--ds-accent-soft);color:var(--ds-accent);font-weight:700;cursor:pointer}
+
 .header {
   display: flex;
   flex-wrap: wrap;

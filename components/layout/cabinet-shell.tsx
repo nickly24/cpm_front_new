@@ -11,6 +11,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import type { UserRole } from "@/lib/auth/types";
 import { type ReactNode, useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
+import { HomeworkUploadProvider } from "@/contexts/homework-upload-context";
+import { PwaBootstrap } from "@/components/layout/pwa-bootstrap";
 
 interface CabinetShellProps {
   role: UserRole;
@@ -31,7 +33,9 @@ export function CabinetShell({ role, children }: CabinetShellProps) {
   return (
     <RequireAuth role={role}>
       <CabinetChromeProvider>
-        <CabinetLayout role={role}>{children}</CabinetLayout>
+        <HomeworkUploadProvider>
+          <CabinetLayout role={role}>{children}</CabinetLayout>
+        </HomeworkUploadProvider>
       </CabinetChromeProvider>
     </RequireAuth>
   );
@@ -129,6 +133,7 @@ function CabinetLayout({
           <Header role={role} onMenuOpen={() => setMobileMenuOpen(true)} />
         ) : null}
         <main className="cabinet-content">{children}</main>
+        <PwaBootstrap />
       </div>
     </div>
   );

@@ -1,0 +1,19 @@
+export interface PagePoint { x:number; y:number }
+type OpenCv=typeof import("@techstark/opencv-js");
+let cvPromise:Promise<OpenCv>|null=null;
+function getCv(){if(cvPromise)return cvPromise;cvPromise=new Promise<OpenCv>((resolve,reject)=>{const ready=async()=>{const value=(window as typeof window&{cv?:OpenCv|Promise<OpenCv>}).cv;if(!value)return;const cv=await value;if(typeof cv.getBuildInformation==="function")resolve(cv);else cv.onRuntimeInitialized=()=>resolve(cv)};const existing=document.querySelector<HTMLScriptElement>('script[data-opencv]');if(existing){void ready();return}const script=document.createElement("script");script.src="https://docs.opencv.org/4.11.0/opencv.js";script.async=true;script.dataset.opencv="true";script.onload=()=>void ready();script.onerror=()=>reject(new Error("opencv_unavailable"));document.head.appendChild(script)});return cvPromise}
+const distance=(a:PagePoint,b:PagePoint)=>Math.hypot(a.x-b.x,a.y-b.y);
+function order(points:PagePoint[]){const bySum=[...points].sort((a,b)=>a.x+a.y-(b.x+b.y)),byDiff=[...points].sort((a,b)=>a.y-a.x-(b.y-b.x));return[bySum[0],byDiff[0],bySum[3],byDiff[3]] as [PagePoint,PagePoint,PagePoint,PagePoint]}
+
+export async function detectPageCorners(source:HTMLCanvasElement):Promise<PagePoint[]|null>{
+ const cv=await getCv();
+ const input=cv.imread(source),gray=new cv.Mat(),blurred=new cv.Mat(),edges=new cv.Mat(),contours=new cv.MatVector(),hierarchy=new cv.Mat();
+ try{cv.cvtColor(input,gray,cv.COLOR_RGBA2GRAY);cv.GaussianBlur(gray,blurred,new cv.Size(5,5),0);cv.Canny(blurred,edges,60,180);cv.findContours(edges,contours,hierarchy,cv.RETR_LIST,cv.CHAIN_APPROX_SIMPLE);let best:PagePoint[]|null=null,bestArea=source.width*source.height*.12;for(let index=0;index<contours.size();index++){const contour=contours.get(index),perimeter=cv.arcLength(contour,true),approx=new cv.Mat();cv.approxPolyDP(contour,approx,.02*perimeter,true);const area=Math.abs(cv.contourArea(approx));if(approx.rows===4&&area>bestArea){bestArea=area;best=[];for(let row=0;row<4;row++)best.push({x:approx.data32S[row*2],y:approx.data32S[row*2+1]})}contour.delete();approx.delete()}return best?order(best):null}finally{input.delete();gray.delete();blurred.delete();edges.delete();contours.delete();hierarchy.delete()}
+}
+
+export async function perspectiveCrop(source:HTMLCanvasElement,points:PagePoint[]):Promise<HTMLCanvasElement>{
+ const cv=await getCv();const[topLeft,topRight,bottomRight,bottomLeft]=order(points),width=Math.max(distance(topLeft,topRight),distance(bottomLeft,bottomRight)),height=Math.max(distance(topLeft,bottomLeft),distance(topRight,bottomRight)),input=cv.imread(source),from=cv.matFromArray(4,1,cv.CV_32FC2,[topLeft.x,topLeft.y,topRight.x,topRight.y,bottomRight.x,bottomRight.y,bottomLeft.x,bottomLeft.y]),to=cv.matFromArray(4,1,cv.CV_32FC2,[0,0,width,0,width,height,0,height]),matrix=cv.getPerspectiveTransform(from,to),output=new cv.Mat();
+ try{cv.warpPerspective(input,output,matrix,new cv.Size(Math.round(width),Math.round(height)),cv.INTER_LINEAR,cv.BORDER_REPLICATE,new cv.Scalar());const canvas=document.createElement("canvas");canvas.width=output.cols;canvas.height=output.rows;cv.imshow(canvas,output);return canvas}finally{input.delete();from.delete();to.delete();matrix.delete();output.delete()}
+}
+
+export async function autoCropCanvas(source:HTMLCanvasElement){const points=await detectPageCorners(source);return points?perspectiveCrop(source,points):source}
