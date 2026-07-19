@@ -113,7 +113,8 @@ export function formatHomeworkDate(value: string | null): string {
   return date.toLocaleDateString("ru-RU", {
     day: "numeric",
     month: "long",
-    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
   });
 }
 

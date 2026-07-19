@@ -16,6 +16,7 @@ import {
 } from "@/lib/auth/api";
 import type { User } from "@/lib/auth/types";
 import { clearScannerProjects } from "@/lib/homework-scanner/project-store";
+import { disconnectHomeworkRealtime } from "@/lib/homework-files/realtime";
 
 interface AuthContextValue {
   user: User | null;
@@ -61,6 +62,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const logout = useCallback(async () => {
+    disconnectHomeworkRealtime();
     await logoutRequest();
     await clearScannerProjects().catch(() => undefined);
     try {

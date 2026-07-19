@@ -11,6 +11,7 @@ import {
   ArrowDown,
   ArrowUp,
   Camera,
+  CheckCircle2,
   Crop as CropIcon,
   FilePlus2,
   Pencil,
@@ -23,6 +24,7 @@ import { ScannerPageEditor } from "./scanner-page-editor";
 import { LiveCameraScanner } from "./live-camera-scanner";
 import styles from "./scanner-modal.module.css";
 import { autoCropCanvas, perspectiveCrop } from "@/lib/homework-scanner/opencv-crop";
+import { Spinner } from "@/components/ui/spinner";
 
 async function normalize(file: File): Promise<Blob> {
   let source: Blob = file;
@@ -79,6 +81,8 @@ export function ScannerModal({ homeworkId, onClose }: { homeworkId: number; onCl
   const [liveCamera, setLiveCamera] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [building, setBuilding] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [processingAction, setProcessingAction] = useState<string | null>(null);
   const input = useRef<HTMLInputElement>(null);
   const replacementCamera = useRef<HTMLInputElement>(null);
   const { enqueue } = useHomeworkUploads();
@@ -99,8 +103,9 @@ export function ScannerModal({ homeworkId, onClose }: { homeworkId: number; onCl
 
   const add = async (files: FileList | null) => {
     if (!files) return;
+    setAdding(true);
     const next = [...pages];
-    for (const file of Array.from(files)) {
+    try { for (const file of Array.from(files)) {
       if (next.length >= 35) {
         setError("Максимум 35 страниц");
         break;
@@ -124,8 +129,9 @@ export function ScannerModal({ homeworkId, onClose }: { homeworkId: number; onCl
         break;
       }
     }
-    await persist(next);
-    setSelected(Math.max(0, next.length - 1));
+      await persist(next);
+      setSelected(Math.max(0, next.length - 1));
+    } finally { setAdding(false); }
   };
 
   const addCaptured = async (blob: Blob) => {
@@ -157,6 +163,7 @@ export function ScannerModal({ homeworkId, onClose }: { homeworkId: number; onCl
       setError("Укажите четыре числа от 0 до 40");
       return;
     }
+    setProcessingAction("crop");
     const bitmap = await createImageBitmap(current.image);
     const [left, top, right, bottom] = margins;
     const sourceX = Math.round((bitmap.width * left) / 100);
@@ -167,6 +174,7 @@ export function ScannerModal({ homeworkId, onClose }: { homeworkId: number; onCl
     canvas.getContext("2d")!.drawImage(bitmap, sourceX, sourceY, width, height, 0, 0, width, height); bitmap.close();
     const image = await new Promise<Blob>((resolve, reject) => canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error("crop_failed")), "image/jpeg", 0.9));
     update({ image });
+    setProcessingAction(null);
   };
 
   const correctCorners = async () => {
@@ -174,8 +182,10 @@ export function ScannerModal({ homeworkId, onClose }: { homeworkId: number; onCl
     const raw=window.prompt("Четыре угла в %: x,y; x,y; x,y; x,y", "0,0; 100,0; 100,100; 0,100");if(raw===null)return;
     const values=raw.split(";").map(pair=>pair.split(",").map(value=>Number(value.trim())));
     if(values.length!==4||values.some(pair=>pair.length!==2||pair.some(value=>!Number.isFinite(value)||value<0||value>100))){setError("Укажите четыре пары координат от 0 до 100");return}
-    const bitmap=await createImageBitmap(current.image),source=document.createElement("canvas");source.width=bitmap.width;source.height=bitmap.height;source.getContext("2d")!.drawImage(bitmap,0,0);bitmap.close();
-    const corrected=await perspectiveCrop(source,values.map(([x,y])=>({x:x*source.width/100,y:y*source.height/100}))),image=await new Promise<Blob>((resolve,reject)=>corrected.toBlob(blob=>blob?resolve(blob):reject(new Error("perspective_failed")),"image/jpeg",.9));update({image});
+    setProcessingAction("corners");
+    try { const bitmap=await createImageBitmap(current.image),source=document.createElement("canvas");source.width=bitmap.width;source.height=bitmap.height;source.getContext("2d")!.drawImage(bitmap,0,0);bitmap.close();
+      const corrected=await perspectiveCrop(source,values.map(([x,y])=>({x:x*source.width/100,y:y*source.height/100}))),image=await new Promise<Blob>((resolve,reject)=>corrected.toBlob(blob=>blob?resolve(blob):reject(new Error("perspective_failed")),"image/jpeg",.9));update({image});
+    } finally { setProcessingAction(null); }
   };
 
   const build = async () => {
@@ -219,14 +229,22 @@ export function ScannerModal({ homeworkId, onClose }: { homeworkId: number; onCl
     <div className={styles.backdrop}>
       <div className={styles.modal}>
         <header>
-          <div>
-            <h2>Сканер домашней работы</h2>
-            <p>{pages.length} из 35 страниц · проект сохраняется на устройстве</p>
+          <div className={styles.headerTitle}>
+            <h2>Сканер</h2>
+            <p><CheckCircle2 /> Проект сохранён локально на устройстве · {pages.length} из 35</p>
           </div>
-          <button onClick={onClose}><X /></button>
+          <div className={styles.headerActions}>
+            <input hidden multiple ref={input} type="file" accept="image/jpeg,image/png,image/heic,image/webp,.heic" onChange={(event) => void add(event.target.files)} />
+            <input hidden ref={replacementCamera} type="file" accept="image/*" capture="environment" onChange={(event) => { const file=event.target.files?.[0]; if(file) void normalize(file).then((image)=>update({image})); }} />
+            <button disabled={adding} onClick={() => setLiveCamera(true)}><Camera />Камера</button>
+            <button disabled={adding} onClick={() => input.current?.click()}>{adding ? <Spinner size="sm" /> : <FilePlus2 />}{adding ? "Добавляем…" : "Из галереи"}</button>
+            <button className={styles.primary} disabled={!pages.length || building || adding} onClick={() => void build()}>{building ? <><Spinner size="sm" />Собираем PDF…</> : <><FilePlus2 />Создать PDF</>}</button>
+            <button className={styles.close} onClick={onClose} aria-label="Закрыть"><X /></button>
+          </div>
         </header>
         <main>
-          <aside>
+          <aside className={styles.thumbnails}>
+            <h3>Страницы ({pages.length})</h3>
             {pages.map((page, index) => (
               <button key={page.id} data-active={index === selected} onClick={() => setSelected(index)}>
                 <BlobPreview blob={page.image} alt={`Страница ${index + 1}`} />
@@ -234,39 +252,33 @@ export function ScannerModal({ homeworkId, onClose }: { homeworkId: number; onCl
               </button>
             ))}
           </aside>
-          <section>
+          <section className={styles.previewSection}>
             {current ? (
-              <>
-                <BlobPreview className={styles.preview} blob={current.image} alt="Страница" />
-                <div className={styles.tools}>
-                  <button onClick={() => setEditing(true)}><Pencil />Редактор</button>
-                  <button onClick={() => void crop()}><CropIcon />Обрезать</button>
-                  <button onClick={() => void correctCorners()}>4 угла</button>
-                  <button onClick={() => { if (window.confirm("Пересъёмка удалит правки этой страницы. Продолжить?")) replacementCamera.current?.click(); }}><Camera />Переснять</button>
-                  <button onClick={() => update({ rotation: (current.rotation + 90) % 360 })}><RotateCw />Повернуть</button>
-                  <button onClick={() => move(-1)}><ArrowUp />Выше</button>
-                  <button onClick={() => move(1)}><ArrowDown />Ниже</button>
-                  <select value={current.mode} onChange={(event) => update({ mode: event.target.value as ScannerPage["mode"] })}>
-                    <option value="auto">Авто</option><option value="color">Цвет</option>
-                    <option value="gray">Серый</option><option value="bw">Ч/б</option>
-                  </select>
-                  <label>Яркость <input type="range" min={-40} max={40} value={current.brightness} onChange={(event) => update({ brightness: Number(event.target.value) })} /></label>
-                  <label>Контраст <input type="range" min={-40} max={60} value={current.contrast} onChange={(event) => update({ contrast: Number(event.target.value) })} /></label>
-                  <button onClick={() => { const next = pages.filter((_, index) => index !== selected); setSelected(Math.max(0, selected - 1)); void persist(next); }}><Trash2 />Удалить</button>
-                </div>
-              </>
+              <BlobPreview className={styles.preview} blob={current.image} alt="Страница" />
             ) : (
               <div className={styles.empty}><Camera size={54} /><h3>Сфотографируйте или добавьте листы</h3><p>JPEG, PNG, HEIC и WebP до 25 МБ.</p></div>
             )}
           </section>
+          {current ? <aside className={styles.toolPanel}>
+            <h3>Страница {selected + 1}</h3>
+            <div className={styles.tools}>
+              <button data-primary onClick={() => setEditing(true)}><Pencil />Редактор</button>
+              <button disabled={processingAction !== null} onClick={() => void crop()}>{processingAction === "crop" ? <Spinner size="sm" /> : <CropIcon />}Обрезать</button>
+              <button disabled={processingAction !== null} onClick={() => void correctCorners()}>{processingAction === "corners" ? <Spinner size="sm" /> : null}4 угла</button>
+              <button onClick={() => { if (window.confirm("Пересъёмка удалит правки этой страницы. Продолжить?")) replacementCamera.current?.click(); }}><Camera />Пересня́ть</button>
+              <button onClick={() => update({ rotation: (current.rotation + 90) % 360 })}><RotateCw />Повернуть</button>
+              <button disabled={selected === 0} onClick={() => move(-1)}><ArrowUp />Выше</button>
+              <button disabled={selected === pages.length - 1} onClick={() => move(1)}><ArrowDown />Ниже</button>
+              <button className={styles.delete} onClick={() => { const next = pages.filter((_, index) => index !== selected); setSelected(Math.max(0, selected - 1)); void persist(next); }}><Trash2 />Удалить</button>
+            </div>
+            <h4>Режим</h4>
+            <select value={current.mode} onChange={(event) => update({ mode: event.target.value as ScannerPage["mode"] })}>
+              <option value="auto">Авто</option><option value="color">Цвет</option><option value="gray">Серый</option><option value="bw">Ч/б</option>
+            </select>
+            <label>Яркость <input type="range" min={-40} max={40} value={current.brightness} onChange={(event) => update({ brightness: Number(event.target.value) })} /><span>{current.brightness}</span></label>
+            <label>Контраст <input type="range" min={-40} max={60} value={current.contrast} onChange={(event) => update({ contrast: Number(event.target.value) })} /><span>{current.contrast}</span></label>
+          </aside> : null}
         </main>
-        <footer>
-          <input hidden multiple ref={input} type="file" accept="image/jpeg,image/png,image/heic,image/webp,.heic" onChange={(event) => void add(event.target.files)} />
-          <input hidden ref={replacementCamera} type="file" accept="image/*" capture="environment" onChange={(event) => { const file=event.target.files?.[0]; if(file) void normalize(file).then((image)=>update({image})); }} />
-          <button onClick={() => setLiveCamera(true)}><Camera />Камера</button>
-          <button onClick={() => input.current?.click()}><FilePlus2 />Из галереи</button>
-          <button className={styles.primary} disabled={!pages.length || building} onClick={() => void build()}>{building ? "Собираем…" : "Создать PDF"}</button>
-        </footer>
         {error ? <div className={styles.error}>{error}</div> : null}
         {editing && current ? (
           <ScannerPageEditor

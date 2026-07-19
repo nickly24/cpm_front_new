@@ -3,6 +3,8 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { apiRequest } from "@/lib/api/client";
 import { useEffect, useState } from "react";
+import { useCallback } from "react";
+import { getHomeworkRealtimeSocket } from "@/lib/homework-files/realtime";
 import { HomeworkChat } from "./homework-chat";
 import styles from "./review-queue.module.css";
 
@@ -15,10 +17,20 @@ export function HomeworkInboxSection() {
   const [following, setFollowing] = useState(false);
   const [search, setSearch] = useState("");
 
+  const load=useCallback(()=>apiRequest<{ items: Thread[] }>(`/api/homework-chat/inbox?search=${encodeURIComponent(search)}`)
+    .then((data) => setItems(data.items)).catch(() => setItems([])),[search]);
+
   useEffect(() => {
-    void apiRequest<{ items: Thread[] }>(`/api/homework-chat/inbox?search=${encodeURIComponent(search)}`)
-      .then((data) => setItems(data.items)).catch(() => setItems([]));
-  }, [search]);
+    const timer=window.setTimeout(()=>void load(),250);
+    return()=>window.clearTimeout(timer);
+  }, [load]);
+
+  useEffect(()=>{
+    const socket=getHomeworkRealtimeSocket();let connectedOnce=Boolean(socket?.connected);
+    const changed=()=>void load();const connected=()=>{if(connectedOnce)changed();connectedOnce=true;};
+    socket?.on("notification.created",changed);socket?.on("connect",connected);if(socket&&!socket.connected)socket.connect();
+    return()=>{socket?.off("notification.created",changed);socket?.off("connect",connected);};
+  },[load]);
 
   const follow = async (enabled: boolean) => {
     if (!selected) return;

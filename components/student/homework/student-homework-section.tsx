@@ -2,12 +2,9 @@
 
 import { HomeworkCard } from "@/components/student/homework/homework-card";
 import { HomeworkPagination } from "@/components/student/homework/homework-pagination";
-import { SectionHeroBanner } from "@/components/student/section-hero-banner";
 import styles from "@/components/student/homework/homework.module.css";
 import { LoadingState } from "@/components/ui/loading-state";
-import { STUDENT_SECTION_BANNERS } from "@/lib/student/section-banners";
 import {
-  buildHomeworkSummary,
   fetchStudentHomework,
   filterHomeworkByStatus,
   paginateHomework,
@@ -24,6 +21,7 @@ import {
   type HomeworkTypeFilter,
   type StudentHomeworkItem,
 } from "@/lib/student/homework-types";
+import { Grid2X2, List, SlidersHorizontal } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { HomeworkWorkspaceModal } from "@/components/homework/homework-workspace";
 
@@ -36,6 +34,8 @@ export function StudentHomeworkSection() {
     useState<HomeworkStatusFilter>("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [openHomeworkId, setOpenHomeworkId] = useState<number | null>(null);
+  const [sort, setSort] = useState<"deadline-new" | "deadline-old" | "name">("deadline-new");
+  const [view, setView] = useState<"grid" | "list">("grid");
 
   useEffect(() => {
     let cancelled = false;
@@ -85,15 +85,24 @@ export function StudentHomeworkSection() {
   }, [typeFilter]);
 
   useEffect(() => {
-    setCurrentPage(1);
-  }, [typeFilter, statusFilter]);
+    const openFromUpload = (event: Event) => {
+      const homeworkId = (event as CustomEvent<{ homeworkId?: number }>).detail?.homeworkId;
+      if (homeworkId) setOpenHomeworkId(homeworkId);
+    };
+    window.addEventListener("homework-upload-open", openFromUpload);
+    return () => window.removeEventListener("homework-upload-open", openFromUpload);
+  }, []);
 
-  const filteredItems = useMemo(
-    () => filterHomeworkByStatus(items, statusFilter),
-    [items, statusFilter],
-  );
-
-  const summary = useMemo(() => buildHomeworkSummary(items), [items]);
+  const filteredItems = useMemo(() => {
+    const result = [...filterHomeworkByStatus(items, statusFilter)];
+    result.sort((left, right) => {
+      if (sort === "name") return left.homework_name.localeCompare(right.homework_name, "ru");
+      const leftDate = left.deadline ? new Date(left.deadline).getTime() : Number.MAX_SAFE_INTEGER;
+      const rightDate = right.deadline ? new Date(right.deadline).getTime() : Number.MAX_SAFE_INTEGER;
+      return sort === "deadline-new" ? leftDate - rightDate : rightDate - leftDate;
+    });
+    return result;
+  }, [items, sort, statusFilter]);
 
   const pagination = useMemo(
     () => paginateHomework(filteredItems, currentPage, HOMEWORK_PAGE_SIZE),
@@ -103,12 +112,7 @@ export function StudentHomeworkSection() {
   if (loading) {
     return (
       <div className={styles.page}>
-        <SectionHeroBanner
-          imageSrc={STUDENT_SECTION_BANNERS.homework}
-          eyebrow="Домашка"
-          title="Домашние задания"
-          subtitle="Все ваши задания с типом, дедлайном, статусом сдачи и баллом."
-        />
+        <div className={styles.pageHeading}><h1>Домашние задания</h1><p>Ваши задания и работы</p></div>
         <LoadingState label="Загрузка домашних заданий…" variant="block" />
       </div>
     );
@@ -116,27 +120,7 @@ export function StudentHomeworkSection() {
 
   return (
     <div className={styles.page}>
-      <SectionHeroBanner
-        imageSrc={STUDENT_SECTION_BANNERS.homework}
-        eyebrow="Домашка"
-        title="Домашние задания"
-        subtitle="Все ваши задания с типом, дедлайном, статусом сдачи и баллом."
-      />
-
-      <div className={styles.summaryGrid}>
-        <div className={`${styles.summaryStat} ${styles.summaryStatTotal}`}>
-          <span className={styles.summaryLabel}>Всего</span>
-          <span className={styles.summaryValue}>{summary.total}</span>
-        </div>
-        <div className={`${styles.summaryStat} ${styles.summaryStatDone}`}>
-          <span className={styles.summaryLabel}>Сдано</span>
-          <span className={styles.summaryValue}>{summary.submitted}</span>
-        </div>
-        <div className={`${styles.summaryStat} ${styles.summaryStatPending}`}>
-          <span className={styles.summaryLabel}>Не сдано</span>
-          <span className={styles.summaryValue}>{summary.pending}</span>
-        </div>
-      </div>
+      <div className={styles.pageHeading}><h1>Домашние задания</h1><p>Ваши задания и работы</p></div>
 
       {error ? <div className={styles.alert}>{error}</div> : null}
 
@@ -146,24 +130,34 @@ export function StudentHomeworkSection() {
             label="Статус"
             value={statusFilter}
             options={HOMEWORK_STATUS_FILTER_OPTIONS}
-            onChange={setStatusFilter}
+            onChange={(value) => { setStatusFilter(value); setCurrentPage(1); }}
           />
 
           <HomeworkFilterSelect
             label="Тип"
             value={typeFilter}
             options={HOMEWORK_TYPE_FILTER_OPTIONS}
-            onChange={setTypeFilter}
+            onChange={(value) => { setTypeFilter(value); setCurrentPage(1); }}
           />
         </div>
-
-        <p className={styles.resultMeta}>
-          Показано {pagination.items.length} из {pagination.totalItems}
-        </p>
+        <div className={styles.toolbarRight}>
+          <label className={styles.sortField}>Сортировка:
+            <select value={sort} onChange={(event) => setSort(event.target.value as typeof sort)}>
+              <option value="deadline-new">Срок сдачи: новые</option>
+              <option value="deadline-old">Срок сдачи: поздние</option>
+              <option value="name">По названию</option>
+            </select>
+          </label>
+          <div className={styles.viewSwitch} aria-label="Вид списка">
+            <button type="button" data-active={view === "grid"} onClick={() => setView("grid")} aria-label="Плитка"><Grid2X2 /></button>
+            <button type="button" data-active={view === "list"} onClick={() => setView("list")} aria-label="Список"><List /></button>
+          </div>
+          <button type="button" className={styles.mobileFilterIcon} aria-label="Фильтры"><SlidersHorizontal /></button>
+        </div>
       </section>
 
       {pagination.items.length > 0 ? (
-        <section className={styles.grid}>
+        <section className={styles.grid} data-view={view}>
           {pagination.items.map((item) => (
             <HomeworkCard key={item.homework_id} item={item} onOpen={() => setOpenHomeworkId(item.homework_id)} />
           ))}
@@ -182,6 +176,7 @@ export function StudentHomeworkSection() {
         totalPages={pagination.totalPages}
         onPageChange={setCurrentPage}
       />
+      <p className={styles.resultMeta}>Показано {pagination.items.length} из {pagination.totalItems}</p>
       {openHomeworkId ? <HomeworkWorkspaceModal homeworkId={openHomeworkId} onClose={() => setOpenHomeworkId(null)} /> : null}
     </div>
   );
