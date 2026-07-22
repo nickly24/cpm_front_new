@@ -25,9 +25,7 @@ import { StudentScheduleSection } from "@/components/student/schedule/student-sc
 import { StudentTestsSection } from "@/components/student/tests/student-tests-section";
 import { ProctorHomeworkSection } from "@/components/proctor/proctor-homework-section";
 import { ReviewQueueSection } from "@/components/homework/review-queue-section";
-import { HomeworkInboxSection } from "@/components/homework/homework-inbox-section";
 import { HomeworkMonitoringSection } from "@/components/admin/homework/homework-monitoring-section";
-import { HomeworkSettingsSection } from "@/components/admin/homework/homework-settings-section";
 import { HomeworkArchiveSection } from "@/components/admin/homework/homework-archive-section";
 import { ProctorStudentsSection } from "@/components/proctor/proctor-students-section";
 import { SupervisorDashboardSection } from "@/components/supervisor/supervisor-dashboard-section";
@@ -145,9 +143,7 @@ export function SectionContent({
     return <AdminTrainingSection />;
   }
   if (role === "admin" && section === "review-queue") return <ReviewQueueSection />;
-  if (role === "admin" && section === "messages") return <HomeworkInboxSection />;
   if (role === "admin" && section === "monitoring") return <HomeworkMonitoringSection />;
-  if (role === "admin" && section === "settings") return <HomeworkSettingsSection />;
   if (role === "admin" && section === "homework-archive") return <HomeworkArchiveSection />;
 
   if (role === "proctor" && section === "homework") {
@@ -158,7 +154,6 @@ export function SectionContent({
     return <ProctorStudentsSection />;
   }
   if (role === "proctor" && section === "review-queue") return <ReviewQueueSection />;
-  if (role === "proctor" && section === "messages") return <HomeworkInboxSection />;
 
   if (role === "supervisor" && section === "dashboard") {
     return <SupervisorDashboardSection />;

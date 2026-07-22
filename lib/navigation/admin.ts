@@ -13,9 +13,7 @@ import {
   Trophy,
   Upload,
   Users,
-  Inbox,
   Activity,
-  Settings,
 } from "lucide-react";
 import type { RoleNavigation } from "./types";
 
@@ -39,9 +37,7 @@ export const adminNavigation: RoleNavigation = {
         { id: "assignments", label: "Домашние задания", icon: NotebookPen },
         { id: "review-queue", label: "Очередь работ", icon: NotebookPen },
         { id: "homework-archive", label: "Архив работ", icon: NotebookPen },
-        { id: "messages", label: "Сообщения", icon: Inbox },
         { id: "monitoring", label: "Мониторинг", icon: Activity },
-        { id: "settings", label: "Настройки", icon: Settings },
         { id: "tests", label: "Тесты", icon: BarChart3 },
         { id: "test-results", label: "Результаты", icon: BarChart3 },
         { id: "exams", label: "Экзамены", icon: GraduationCap },

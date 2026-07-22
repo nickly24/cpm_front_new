@@ -12,7 +12,6 @@ import type { UserRole } from "@/lib/auth/types";
 import { type ReactNode, useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { HomeworkUploadProvider } from "@/contexts/homework-upload-context";
-import { PwaBootstrap } from "@/components/layout/pwa-bootstrap";
 
 interface CabinetShellProps {
   role: UserRole;
@@ -133,7 +132,6 @@ function CabinetLayout({
           <Header role={role} onMenuOpen={() => setMobileMenuOpen(true)} />
         ) : null}
         <main className="cabinet-content">{children}</main>
-        <PwaBootstrap />
       </div>
     </div>
   );

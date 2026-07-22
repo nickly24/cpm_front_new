@@ -2,7 +2,6 @@
 
 import { Spinner } from "@/components/ui/spinner";
 import { homeworkFilesApi, uploadHomeworkFile } from "@/lib/homework-files/api";
-import { getHomeworkRealtimeSocket } from "@/lib/homework-files/realtime";
 import type { UploadJob } from "@/lib/homework-files/types";
 import { useAuth } from "@/contexts/AuthContext";
 import { AlertTriangle, CheckCircle2, ChevronRight, CloudUpload, FileText, RotateCw, X } from "lucide-react";
@@ -16,6 +15,7 @@ const Context = createContext<UploadContextValue | null>(null);
 export function HomeworkUploadProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const [jobs, setJobs] = useState<QueuedUpload[]>([]);
+  const jobsRef = useRef<QueuedUpload[]>([]);
   const running = useRef(false);
   const uploadControllers = useRef(new Map<string, AbortController>());
   const upsertJob = useCallback((incoming: UploadJob) => setJobs((items) => {
@@ -23,6 +23,7 @@ export function HomeworkUploadProvider({ children }: { children: ReactNode }) {
     if(index<0)return[...items,incoming];
     return items.map((item)=>item.id===incoming.id?{...item,...incoming}:item);
   }),[]);
+  useEffect(() => { jobsRef.current = jobs; }, [jobs]);
   const pump = useCallback(async () => {
     if(user?.role!=="student")return;
     if (running.current) return;
@@ -30,7 +31,7 @@ export function HomeworkUploadProvider({ children }: { children: ReactNode }) {
     if (!next) return;
     running.current = true;
     try {
-      setJobs((items) => items.map((item) => item.id === next.id ? { ...item, status: "uploading", stage: "upload", progress: 1 } : item));
+      setJobs((items) => items.map((item) => item.id === next.id ? { ...item, status: "uploading", stage: "uploading", progress: 1 } : item));
       try {
         const controller = new AbortController();
         uploadControllers.current.set(next.id, controller);
@@ -50,16 +51,38 @@ export function HomeworkUploadProvider({ children }: { children: ReactNode }) {
     }
   }, [jobs,user?.role]);
   useEffect(() => { void pump(); }, [jobs, pump]);
+  const refreshJobs = useCallback(async () => {
+    const response = await homeworkFilesApi.jobs();
+    const activeIds = new Set(response.items.map((item) => item.id));
+    const tracked = jobsRef.current.filter((item) =>
+      !item.id.startsWith("local-") && ["uploading", "queued", "running", "retry"].includes(item.status),
+    );
+    const terminal = await Promise.all(
+      tracked.filter((item) => !activeIds.has(item.id)).map((item) => homeworkFilesApi.job(item.id).catch(() => item)),
+    );
+    setJobs((current) => {
+      const byId = new Map<string, QueuedUpload>();
+      current.forEach((item) => byId.set(item.id, item));
+      response.items.forEach((item) => byId.set(item.id, { ...byId.get(item.id), ...item }));
+      terminal.forEach((item) => byId.set(item.id, { ...byId.get(item.id), ...item }));
+      return [...byId.values()];
+    });
+  }, []);
   useEffect(() => {
-    if(user?.role!=="student")return;
-    let stopped=false;let connectedOnce=false;const socket=getHomeworkRealtimeSocket();
-    const load=()=>homeworkFilesApi.jobs().then(({items})=>{if(!stopped)setJobs(items)}).catch(()=>undefined);
-    const connected=()=>{if(connectedOnce)void load();connectedOnce=true;};
-    const progress=(payload:{job?:UploadJob})=>{if(payload.job)upsertJob(payload.job);};
-    void load();
-    if(socket){connectedOnce=socket.connected;socket.on("connect",connected);socket.on("job.progress",progress);if(!socket.connected)socket.connect();}
-    return()=>{stopped=true;socket?.off("connect",connected);socket?.off("job.progress",progress);};
-  },[upsertJob,user?.role]);
+    if (user?.role !== "student") return;
+    void refreshJobs().catch(() => undefined);
+  }, [refreshJobs, user?.role]);
+  const pollingRequired = jobs.some((item) =>
+    !item.id.startsWith("local-") && ["uploading", "queued", "running", "retry"].includes(item.status),
+  );
+  useEffect(() => {
+    if (user?.role !== "student" || !pollingRequired) return;
+    let stopped = false;
+    const timer = window.setTimeout(() => {
+      if (!stopped) void refreshJobs().catch(() => undefined);
+    }, 10_000);
+    return () => { stopped = true; window.clearTimeout(timer); };
+  }, [pollingRequired, refreshJobs, jobs, user?.role]);
   const enqueue = useCallback((homeworkId: number, file: File) => {
     const id = crypto.randomUUID();
     setJobs((items) => [...items, { id: `local-${id}`, clientId: id, homework_id: homeworkId, file, status: "local", stage: "queue", progress: 0 }]);
@@ -71,13 +94,12 @@ export function HomeworkUploadProvider({ children }: { children: ReactNode }) {
       setJobs((items) => items.filter((job) => job.id !== id));
       return;
     }
-    await homeworkFilesApi.cancel(id);
-    setJobs((items) => items.map((job) => job.id === id ? { ...job, status: "cancelled" } : job));
-  }, []);
+    const cancelled = await homeworkFilesApi.cancel(id);
+    upsertJob(cancelled);
+  }, [upsertJob]);
   const retry = useCallback(async (id: string) => {
-    await homeworkFilesApi.retry(id);
-    setJobs((items)=>items.map((job)=>job.id===id?{...job,status:"queued",stage:"checking",progress:5,error_code:null}:job));
-  }, []);
+    upsertJob(await homeworkFilesApi.retry(id));
+  }, [upsertJob]);
   return <Context.Provider value={{ jobs, enqueue, cancel, retry }}>{children}{user?.role==="student"?<UploadCenter jobs={jobs} cancel={cancel} retry={retry} />:null}</Context.Provider>;
 }
 
@@ -96,7 +118,7 @@ function UploadCenter({ jobs, cancel, retry }: { jobs: QueuedUpload[]; cancel: (
     hadJobs.current = Boolean(visible.length);
   }, [visible.length]);
   if (!visible.length) return null;
-  const labels: Record<string, string> = { queue: "В очереди", upload: "Загружается", checking: "Проверка", optimization: "Оптимизация", s3: "Сохранение", ready: "Готово", error: "Ошибка" };
+  const labels: Record<string, string> = { queue: "В очереди", uploading: "Загружается", queued: "В очереди", checking: "Проверка", optimizing: "Оптимизация", saving: "Сохранение", ready: "Готово", failed: "Ошибка" };
   const active = visible.filter((job) => !["ready", "failed"].includes(job.status));
   const complete = visible.filter((job) => job.status === "ready");
   const failed = visible.filter((job) => job.status === "failed");
