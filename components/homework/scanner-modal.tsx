@@ -24,7 +24,11 @@ import { ScannerAdjustEditor } from "./scanner-adjust-editor";
 import { ScannerPageEditor } from "./scanner-page-editor";
 import { LiveCameraScanner } from "./live-camera-scanner";
 import styles from "./scanner-modal.module.css";
-import { scannerCanvasFilter, scannerFilterLabels } from "@/lib/homework-scanner/image-filters";
+import {
+  applyScannerFilterToCanvas,
+  scannerCanvasFilter,
+  scannerFilterLabels,
+} from "@/lib/homework-scanner/image-filters";
 import { Spinner } from "@/components/ui/spinner";
 
 async function normalize(file: File): Promise<Blob> {
@@ -60,8 +64,8 @@ function filteredCanvas(page: ScannerPage, image: ImageBitmap) {
   const context = canvas.getContext("2d")!;
   context.translate(canvas.width / 2, canvas.height / 2);
   context.rotate((page.rotation * Math.PI) / 180);
-  context.filter = scannerCanvasFilter(page.mode, page.brightness, page.contrast);
   context.drawImage(image, -image.width / 2, -image.height / 2);
+  applyScannerFilterToCanvas(canvas,page.mode,page.brightness,page.contrast);
   return canvas;
 }
 

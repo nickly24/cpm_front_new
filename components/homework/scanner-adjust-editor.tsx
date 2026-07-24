@@ -2,7 +2,7 @@
 
 import { Spinner } from "@/components/ui/spinner";
 import {
-  scannerCanvasFilter,
+  applyScannerFilterToCanvas,
   scannerFilterLabels,
   type ScannerFilterMode,
 } from "@/lib/homework-scanner/image-filters";
@@ -60,6 +60,7 @@ export function ScannerAdjustEditor({
 }){
   const preview=useRef<HTMLCanvasElement>(null);
   const source=useRef<HTMLCanvasElement|null>(null);
+  const previewSource=useRef<HTMLCanvasElement|null>(null);
   const overlay=useRef<SVGSVGElement>(null);
   const [dimensions,setDimensions]=useState<Dimensions|null>(null);
   const [points,setPoints]=useState<PagePoint[]>([]);
@@ -75,14 +76,14 @@ export function ScannerAdjustEditor({
   const [error,setError]=useState<string|null>(null);
 
   const draw=useCallback(()=>{
-    if(!preview.current||!source.current)return;
-    const canvas=preview.current,raw=source.current;
+    if(!preview.current||!previewSource.current)return;
+    const canvas=preview.current,raw=previewSource.current;
     canvas.width=raw.width;
     canvas.height=raw.height;
     const context=canvas.getContext("2d")!;
     context.clearRect(0,0,canvas.width,canvas.height);
-    context.filter=compare?"none":scannerCanvasFilter(mode,brightness,contrast);
     context.drawImage(raw,0,0);
+    if(!compare)applyScannerFilterToCanvas(canvas,mode,brightness,contrast);
   },[brightness,compare,contrast,mode]);
 
   useEffect(()=>{
@@ -97,12 +98,18 @@ export function ScannerAdjustEditor({
       canvas.height=picture.naturalHeight;
       canvas.getContext("2d")!.drawImage(picture,0,0);
       source.current=canvas;
+      const previewScale=Math.min(1,1100/Math.max(canvas.width,canvas.height));
+      const display=document.createElement("canvas");
+      display.width=Math.max(1,Math.round(canvas.width*previewScale));
+      display.height=Math.max(1,Math.round(canvas.height*previewScale));
+      display.getContext("2d")!.drawImage(canvas,0,0,display.width,display.height);
+      previewSource.current=display;
       setDimensions({width:canvas.width,height:canvas.height});
       setPoints(insetPoints(canvas.width,canvas.height));
     };
     picture.onerror=()=>{URL.revokeObjectURL(url);setError("Не удалось открыть изображение")};
     picture.src=url;
-    return()=>{stopped=true;URL.revokeObjectURL(url);source.current=null};
+    return()=>{stopped=true;URL.revokeObjectURL(url);source.current=null;previewSource.current=null};
   },[page.image]);
 
   useEffect(()=>draw(),[draw,dimensions]);
@@ -206,14 +213,14 @@ export function ScannerAdjustEditor({
             <path className={styles.mask} d={mask} fillRule="evenodd"/>
             <polygon className={styles.polygon} points={polygon}/>
             {points.map((point,index)=><g key={index}>
-              <circle className={styles.handleHit} cx={point.x} cy={point.y} r={Math.max(32,dimensions.width*.025)} onPointerDown={event=>startDrag(event,index)}/>
-              <circle className={styles.handle} cx={point.x} cy={point.y} r={Math.max(12,dimensions.width*.009)}/>
+              <circle className={styles.handleHit} cx={point.x} cy={point.y} r={Math.max(48,Math.min(dimensions.width,dimensions.height)*.055)} onPointerDown={event=>startDrag(event,index)}/>
+              <circle className={styles.handle} cx={point.x} cy={point.y} r={Math.max(16,Math.min(dimensions.width,dimensions.height)*.018)}/>
             </g>)}
           </svg>:null}
         </div>:null}
       </section>
 
-      <aside className={styles.controls}>
+      <aside className={styles.controls} data-tab={tab}>
         {tab==="crop"?<>
           <div className={styles.controlIntro}>
             <WandSparkles/>
