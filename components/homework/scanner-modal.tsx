@@ -218,9 +218,9 @@ export function ScannerModal({ homeworkId, onClose }: { homeworkId: number; onCl
           <div className={styles.headerActions}>
             <input hidden multiple ref={input} type="file" accept="image/jpeg,image/png,image/heic,image/webp,.heic" onChange={(event) => void add(event.target.files)} />
             <input hidden ref={replacementCamera} type="file" accept="image/*" capture="environment" onChange={(event) => { const file=event.target.files?.[0]; if(file) void normalize(file).then((image)=>update({image})); }} />
-            <button disabled={adding} onClick={() => setLiveCamera(true)}><Camera />Камера</button>
-            <button disabled={adding} onClick={() => input.current?.click()}>{adding ? <Spinner size="sm" /> : <FilePlus2 />}{adding ? "Добавляем…" : "Из галереи"}</button>
-            <button className={styles.primary} disabled={!pages.length || building || adding} onClick={() => void build()}>{building ? <><Spinner size="sm" />Собираем PDF…</> : <><FilePlus2 />Создать PDF</>}</button>
+            <button disabled={adding} onClick={() => setLiveCamera(true)}><Camera /><span>Камера</span></button>
+            <button disabled={adding} onClick={() => input.current?.click()}>{adding ? <Spinner size="sm" /> : <FilePlus2 />}<span>{adding ? "Добавляем…" : "Галерея"}</span></button>
+            <button className={styles.primary} disabled={!pages.length || building || adding} onClick={() => void build()}>{building ? <Spinner size="sm" /> : <FilePlus2 />}<span>{building ? "Собираем…" : "PDF"}</span></button>
             <button className={styles.close} onClick={onClose} aria-label="Закрыть"><X /></button>
           </div>
         </header>

@@ -127,6 +127,7 @@ export function StudentHomeworkSection() {
       <section className={styles.toolbar}>
         <div className={styles.filters}>
           <HomeworkFilterSelect
+            className={styles.filterSelect}
             label="Статус"
             value={statusFilter}
             options={HOMEWORK_STATUS_FILTER_OPTIONS}
@@ -134,6 +135,7 @@ export function StudentHomeworkSection() {
           />
 
           <HomeworkFilterSelect
+            className={styles.filterSelect}
             label="Тип"
             value={typeFilter}
             options={HOMEWORK_TYPE_FILTER_OPTIONS}

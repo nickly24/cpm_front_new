@@ -5,7 +5,7 @@ import { deleteScannerProject } from "@/lib/homework-scanner/project-store";
 import { homeworkFilesApi } from "@/lib/homework-files/api";
 import type { HomeworkWorkspace, SubmissionState } from "@/lib/homework-files/types";
 import { Spinner } from "@/components/ui/spinner";
-import { AlertCircle, ArrowLeft, CheckCircle2, Eye, File, FilePenLine, FileUp, RotateCcw, ScanLine, Search, Send, Settings2, Star, Upload } from "lucide-react";
+import { AlertCircle, ArrowLeft, CheckCircle2, Eye, File, FilePenLine, FileUp, MessageCircle, RotateCcw, ScanLine, Search, Send, Settings2, Star, Upload, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ScannerModal } from "./scanner-modal";
 import styles from "./homework-workspace.module.css";
@@ -32,6 +32,7 @@ export function HomeworkWorkspaceModal({ homeworkId, onClose }: { homeworkId: nu
   const [error, setError] = useState<string | null>(null);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [scanner, setScanner] = useState(false);
+  const [pdfViewerOpen, setPdfViewerOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [choosing, setChoosing] = useState(false);
   const input = useRef<HTMLInputElement>(null);
@@ -109,6 +110,7 @@ export function HomeworkWorkspaceModal({ homeworkId, onClose }: { homeworkId: nu
 
         <nav className={styles.tabs}>
           <button data-active><FilePenLine />Работа</button>
+          <button disabled aria-label="Чат скоро будет доступен"><MessageCircle />Чат <small>скоро</small></button>
         </nav>
 
         {initialLoading ? <div className={styles.initialLoading}><Spinner /><span>Открываем домашнюю работу…</span></div> : (
@@ -136,7 +138,10 @@ export function HomeworkWorkspaceModal({ homeworkId, onClose }: { homeworkId: nu
 
               <div className={styles.fileWorkspace}>
                 <div className={styles.previewPane}>
-                  {pdfUrl ? <iframe src={pdfUrl} title="Домашняя работа" /> : <div className={styles.emptyPreview}><FileUp /><h3>Прикрепите готовую работу</h3><p>PDF до 10 МБ и 35 страниц</p></div>}
+                  {pdfUrl ? <>
+                    <iframe src={pdfUrl} title="Домашняя работа" />
+                    <button className={styles.mobilePdfButton} onClick={() => setPdfViewerOpen(true)}><Eye />Открыть PDF</button>
+                  </> : <div className={styles.emptyPreview}><FileUp /><h3>Прикрепите готовую работу</h3><p>PDF до 10 МБ и 35 страниц</p></div>}
                 </div>
                 <aside className={styles.detailsPane}>
                   {processing ? <div className={styles.processingCard}><Spinner size="sm" /><div><b>Обработка на сервере</b><span>{activeJob?.progress ?? 0}% · окно можно закрыть</span></div></div> : null}
@@ -149,6 +154,10 @@ export function HomeworkWorkspaceModal({ homeworkId, onClose }: { homeworkId: nu
             </section>
           </div>
         )}
+        {pdfViewerOpen && pdfUrl ? <div className={styles.pdfViewer} role="dialog" aria-modal="true" aria-label="Просмотр PDF">
+          <button className={styles.pdfViewerClose} onClick={() => setPdfViewerOpen(false)} aria-label="Закрыть PDF"><X /></button>
+          <iframe src={pdfUrl} title="Просмотр домашней работы" />
+        </div> : null}
         {scanner ? <ScannerModal homeworkId={homeworkId} onClose={() => setScanner(false)} /> : null}
       </div>
     </div>

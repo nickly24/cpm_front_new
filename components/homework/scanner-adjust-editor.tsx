@@ -14,8 +14,12 @@ import {
 import type { ScannerPage } from "@/lib/homework-scanner/project-store";
 import {
   Check,
+  ChevronDown,
+  ChevronUp,
   Crop,
   Eye,
+  Minus,
+  Plus,
   RotateCcw,
   SlidersHorizontal,
   Sparkles,
@@ -32,6 +36,7 @@ import {
 import styles from "./scanner-adjust-editor.module.css";
 
 interface Dimensions { width:number; height:number }
+type DragTarget={kind:"corner"|"edge";index:number};
 
 const insetPoints=(width:number,height:number):PagePoint[]=>{
   const x=width*.035,y=height*.035;
@@ -64,7 +69,9 @@ export function ScannerAdjustEditor({
   const overlay=useRef<SVGSVGElement>(null);
   const [dimensions,setDimensions]=useState<Dimensions|null>(null);
   const [points,setPoints]=useState<PagePoint[]>([]);
-  const [dragging,setDragging]=useState<number|null>(null);
+  const [dragging,setDragging]=useState<DragTarget|null>(null);
+  const [panelOpen,setPanelOpen]=useState(true);
+  const [zoom,setZoom]=useState(1);
   const [tab,setTab]=useState<"crop"|"filters">("crop");
   const [mode,setMode]=useState<ScannerFilterMode>(page.mode);
   const [brightness,setBrightness]=useState(page.brightness);
@@ -155,13 +162,23 @@ export function ScannerAdjustEditor({
     if(dragging===null)return;
     const position=pointerPosition(event);
     if(!position)return;
-    setPoints(current=>current.map((point,index)=>index===dragging?position:point));
+    if(dragging.kind==="corner"){
+      setPoints(current=>current.map((point,index)=>index===dragging.index?position:point));
+      return;
+    }
+    setPoints(current=>current.map((point,index)=>{
+      if(dragging.index===0&&(index===0||index===1))return{...point,y:position.y};
+      if(dragging.index===1&&(index===1||index===2))return{...point,x:position.x};
+      if(dragging.index===2&&(index===2||index===3))return{...point,y:position.y};
+      if(dragging.index===3&&(index===3||index===0))return{...point,x:position.x};
+      return point;
+    }));
   };
 
-  const startDrag=(event:ReactPointerEvent<SVGCircleElement>,index:number)=>{
+  const startDrag=(event:ReactPointerEvent<SVGElement>,target:DragTarget)=>{
     event.preventDefault();
     event.currentTarget.setPointerCapture(event.pointerId);
-    setDragging(index);
+    setDragging(target);
   };
 
   const save=async()=>{
@@ -200,7 +217,12 @@ export function ScannerAdjustEditor({
     <main>
       <section className={styles.stage}>
         {!dimensions?<div className={styles.loading}><Spinner/>Открываем фотографию…</div>:null}
-        {dimensions?<div className={styles.canvasFrame} style={{aspectRatio:`${dimensions.width}/${dimensions.height}`}}>
+        <div className={styles.zoomControls} aria-label="Масштаб">
+          <button onClick={()=>setZoom(value=>Math.max(.75,Number((value-.25).toFixed(2))))} aria-label="Уменьшить"><Minus/></button>
+          <span>{Math.round(zoom*100)}%</span>
+          <button onClick={()=>setZoom(value=>Math.min(2.5,Number((value+.25).toFixed(2))))} aria-label="Увеличить"><Plus/></button>
+        </div>
+        {dimensions?<div className={styles.canvasFrame} style={{aspectRatio:`${dimensions.width}/${dimensions.height}`,width:`${zoom*100}%`,maxWidth:`${1000*zoom}px`}}>
           <canvas ref={preview}/>
           {tab==="crop"?<svg
             ref={overlay}
@@ -212,19 +234,34 @@ export function ScannerAdjustEditor({
           >
             <path className={styles.mask} d={mask} fillRule="evenodd"/>
             <polygon className={styles.polygon} points={polygon}/>
+            {points.map((point,index)=>{
+              const next=points[(index+1)%points.length];
+              return <line
+                key={`edge-${index}`}
+                className={styles.edgeHit}
+                x1={point.x}
+                y1={point.y}
+                x2={next.x}
+                y2={next.y}
+                onPointerDown={event=>startDrag(event,{kind:"edge",index})}
+              />;
+            })}
             {points.map((point,index)=><g key={index}>
-              <circle className={styles.handleHit} cx={point.x} cy={point.y} r={Math.max(48,Math.min(dimensions.width,dimensions.height)*.055)} onPointerDown={event=>startDrag(event,index)}/>
+              <circle className={styles.handleHit} cx={point.x} cy={point.y} r={Math.max(48,Math.min(dimensions.width,dimensions.height)*.055)} onPointerDown={event=>startDrag(event,{kind:"corner",index})}/>
               <circle className={styles.handle} cx={point.x} cy={point.y} r={Math.max(16,Math.min(dimensions.width,dimensions.height)*.018)}/>
             </g>)}
           </svg>:null}
         </div>:null}
       </section>
 
-      <aside className={styles.controls} data-tab={tab}>
+      <button className={styles.panelToggle} onClick={()=>setPanelOpen(open=>!open)} aria-label={panelOpen?"Скрыть инструменты":"Показать инструменты"}>
+        {panelOpen?<ChevronDown/>:<ChevronUp/>}
+      </button>
+      <aside className={styles.controls} data-tab={tab} data-open={panelOpen}>
         {tab==="crop"?<>
           <div className={styles.controlIntro}>
             <WandSparkles/>
-            <div><strong>Четыре угла</strong><span>Тяните оранжевые точки пальцем или мышью</span></div>
+            <div><strong>Рамка листа</strong><span>Тяните углы или любую из четырёх граней</span></div>
           </div>
           <button className={styles.controlButton} disabled={detecting||!dimensions} onClick={()=>void detect()}>
             {detecting?<Spinner size="sm"/>:<Sparkles/>}{detecting?"Ищем лист…":"Найти границы"}

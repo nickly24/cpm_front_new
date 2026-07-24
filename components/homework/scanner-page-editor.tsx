@@ -2,9 +2,13 @@
 
 import { Spinner } from "@/components/ui/spinner";
 import {
+  ChevronDown,
+  ChevronUp,
   Eraser,
+  Minus,
   MousePointer2,
   PenLine,
+  Plus,
   Redo2,
   Type,
   Undo2,
@@ -30,11 +34,14 @@ export function ScannerPageEditor({
   const history=useRef<string[]>([]);
   const cursor=useRef(-1);
   const originalSize=useRef({width:1,height:1});
+  const baseSize=useRef({width:1,height:1});
   const [color,setColor]=useState("#ef4444");
   const [width,setWidth]=useState(4);
   const [tool,setTool]=useState<Tool>("select");
   const [ready,setReady]=useState(false);
   const [saving,setSaving]=useState(false);
+  const [panelOpen,setPanelOpen]=useState(true);
+  const [zoom,setZoom]=useState(1);
   const [historyState,setHistoryState]=useState({index:-1,length:0});
 
   useEffect(()=>{
@@ -47,6 +54,7 @@ export function ScannerPageEditor({
       const scale=Math.min(1,1000/dimensions.width,700/dimensions.height);
       const canvasWidth=Math.round(dimensions.width*scale);
       const canvasHeight=Math.round(dimensions.height*scale);
+      baseSize.current={width:canvasWidth,height:canvasHeight};
       dimensions.close();
       const canvas=new Canvas(element.current,{
         width:canvasWidth,
@@ -88,6 +96,19 @@ export function ScannerPageEditor({
       fabricCanvas.current=null;
     };
   },[image]);
+
+  const changeZoom=(next:number)=>{
+    const normalized=Math.max(.75,Math.min(2.5,Number(next.toFixed(2))));
+    const canvas=fabricCanvas.current;
+    setZoom(normalized);
+    if(!canvas)return;
+    canvas.setZoom(normalized);
+    canvas.setDimensions({
+      width:Math.round(baseSize.current.width*normalized),
+      height:Math.round(baseSize.current.height*normalized),
+    });
+    canvas.requestRenderAll();
+  };
 
   const select=()=>{
     const canvas=fabricCanvas.current;
@@ -131,8 +152,8 @@ export function ScannerPageEditor({
     select();
     const {IText}=await import("fabric");
     const object=new IText("Введите текст",{
-      left:Math.max(24,canvas.width/2-90),
-      top:Math.max(24,canvas.height/2-20),
+      left:Math.max(24,baseSize.current.width/2-90),
+      top:Math.max(24,baseSize.current.height/2-20),
       fill:color,
       fontSize:28,
       fontFamily:"Arial",
@@ -149,8 +170,8 @@ export function ScannerPageEditor({
     select();
     const {Rect}=await import("fabric");
     const region=new Rect({
-      left:Math.max(20,canvas.width/2-110),
-      top:Math.max(20,canvas.height/2-50),
+      left:Math.max(20,baseSize.current.width/2-110),
+      top:Math.max(20,baseSize.current.height/2-50),
       width:220,
       height:100,
       fill:"rgba(100,116,139,.65)",
@@ -177,14 +198,17 @@ export function ScannerPageEditor({
     setSaving(true);
     select();
     canvas.discardActiveObject();
+    const currentZoom=zoom;
+    canvas.setZoom(1);
+    canvas.setDimensions(baseSize.current);
     const regions=canvas.getObjects().filter(object=>
       object.type==="rect"&&object.fill==="rgba(100,116,139,.65)",
     );
     regions.forEach(object=>object.set({visible:false}));
     canvas.requestRenderAll();
     const multiplier=Math.max(
-      originalSize.current.width/canvas.getWidth(),
-      originalSize.current.height/canvas.getHeight(),
+      originalSize.current.width/baseSize.current.width,
+      originalSize.current.height/baseSize.current.height,
       1,
     );
     const rendered=canvas.toCanvasElement(multiplier);
@@ -204,6 +228,11 @@ export function ScannerPageEditor({
       context.restore();
     }
     regions.forEach(object=>object.set({visible:true}));
+    canvas.setZoom(currentZoom);
+    canvas.setDimensions({
+      width:Math.round(baseSize.current.width*currentZoom),
+      height:Math.round(baseSize.current.height*currentZoom),
+    });
     canvas.requestRenderAll();
     output.toBlob(blob=>{
       if(blob)onSave(blob);
@@ -220,24 +249,34 @@ export function ScannerPageEditor({
       <button className={styles.close} onClick={onClose} aria-label="Закрыть"><X/></button>
     </header>
     <div className={styles.editorToolbar}>
-      <div className={styles.toolGroup}>
-        <button data-active={tool==="select"} disabled={!ready} onClick={select}><MousePointer2/><span>Выбор</span></button>
-        <button data-active={tool==="pen"} disabled={!ready} onClick={()=>void drawing("pen")}><PenLine/><span>Перо</span></button>
-        <button data-active={tool==="eraser"} disabled={!ready} onClick={()=>void drawing("eraser")}><Eraser/><span>Ластик</span></button>
-        <button disabled={!ready} onClick={()=>void addText()}><Type/><span>Текст</span></button>
-        <button disabled={!ready} onClick={()=>void addBlur()}><Waves/><span>Размыть</span></button>
-      </div>
-      <div className={styles.options}>
-        <label className={styles.color}><span>Цвет</span><input type="color" value={color} onChange={event=>changeColor(event.target.value)}/></label>
-        <label className={styles.width}><span>Толщина</span><input aria-label="Толщина" type="range" min={1} max={20} value={width} onChange={event=>changeWidth(Number(event.target.value))}/><output>{width}</output></label>
-      </div>
-      <div className={styles.history}>
-        <button disabled={!ready||!canUndo} onClick={()=>void restore(cursor.current-1)} aria-label="Отменить"><Undo2/></button>
-        <button disabled={!ready||!canRedo} onClick={()=>void restore(cursor.current+1)} aria-label="Вернуть"><Redo2/></button>
+      <button className={styles.panelToggle} onClick={()=>setPanelOpen(open=>!open)} aria-label={panelOpen?"Скрыть инструменты":"Показать инструменты"}>
+        {panelOpen?<ChevronDown/>:<ChevronUp/>}
+      </button>
+      <div className={styles.toolbarContent} data-open={panelOpen}>
+        <div className={styles.toolGroup}>
+          <button data-active={tool==="select"} disabled={!ready} onClick={select}><MousePointer2/><span>Выбор</span></button>
+          <button data-active={tool==="pen"} disabled={!ready} onClick={()=>void drawing("pen")}><PenLine/><span>Перо</span></button>
+          <button data-active={tool==="eraser"} disabled={!ready} onClick={()=>void drawing("eraser")}><Eraser/><span>Ластик</span></button>
+          <button disabled={!ready} onClick={()=>void addText()}><Type/><span>Текст</span></button>
+          <button disabled={!ready} onClick={()=>void addBlur()}><Waves/><span>Размыть</span></button>
+        </div>
+        <div className={styles.options}>
+          <label className={styles.color}><span>Цвет</span><input type="color" value={color} onChange={event=>changeColor(event.target.value)}/></label>
+          <label className={styles.width}><span>Толщина</span><input aria-label="Толщина" type="range" min={1} max={20} value={width} onChange={event=>changeWidth(Number(event.target.value))}/><output>{width}</output></label>
+        </div>
+        <div className={styles.history}>
+          <button disabled={!ready||!canUndo} onClick={()=>void restore(cursor.current-1)} aria-label="Отменить"><Undo2/></button>
+          <button disabled={!ready||!canRedo} onClick={()=>void restore(cursor.current+1)} aria-label="Вернуть"><Redo2/></button>
+        </div>
       </div>
     </div>
     <div className={styles.editorCanvas}>
       {!ready?<div className={styles.loading}><Spinner/>Загружаем редактор…</div>:null}
+      <div className={styles.zoomControls}>
+        <button onClick={()=>changeZoom(zoom-.25)} aria-label="Уменьшить"><Minus/></button>
+        <span>{Math.round(zoom*100)}%</span>
+        <button onClick={()=>changeZoom(zoom+.25)} aria-label="Увеличить"><Plus/></button>
+      </div>
       <canvas ref={element}/>
     </div>
     <footer>

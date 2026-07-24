@@ -14,6 +14,7 @@ interface HomeworkFilterSelectProps<T extends string> {
   value: T;
   options: HomeworkFilterOption<T>[];
   onChange: (value: T) => void;
+  className?: string;
 }
 
 export function HomeworkFilterSelect<T extends string>(
