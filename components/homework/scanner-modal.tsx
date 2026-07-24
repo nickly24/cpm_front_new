@@ -12,18 +12,19 @@ import {
   ArrowUp,
   Camera,
   CheckCircle2,
-  Crop as CropIcon,
   FilePlus2,
   Pencil,
   RotateCw,
+  SlidersHorizontal,
   Trash2,
   X,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { ScannerAdjustEditor } from "./scanner-adjust-editor";
 import { ScannerPageEditor } from "./scanner-page-editor";
 import { LiveCameraScanner } from "./live-camera-scanner";
 import styles from "./scanner-modal.module.css";
-import { autoCropCanvas, perspectiveCrop } from "@/lib/homework-scanner/opencv-crop";
+import { scannerCanvasFilter, scannerFilterLabels } from "@/lib/homework-scanner/image-filters";
 import { Spinner } from "@/components/ui/spinner";
 
 async function normalize(file: File): Promise<Blob> {
@@ -40,10 +41,8 @@ async function normalize(file: File): Promise<Blob> {
   canvas.height = Math.round(bitmap.height * scale);
   canvas.getContext("2d")!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
   bitmap.close();
-  let normalized = canvas;
-  try { normalized = await autoCropCanvas(canvas); } catch { /* manual crop remains available */ }
   return new Promise((resolve, reject) =>
-    normalized.toBlob(
+    canvas.toBlob(
       (blob) => (blob ? resolve(blob) : reject(new Error("Не удалось обработать снимок"))),
       "image/jpeg",
       0.86,
@@ -61,28 +60,40 @@ function filteredCanvas(page: ScannerPage, image: ImageBitmap) {
   const context = canvas.getContext("2d")!;
   context.translate(canvas.width / 2, canvas.height / 2);
   context.rotate((page.rotation * Math.PI) / 180);
-  context.filter = `brightness(${100 + page.brightness}%) contrast(${100 + page.contrast}%) ${page.mode === "gray" ? "grayscale(1)" : ""} ${page.mode === "bw" ? "grayscale(1) contrast(180%)" : ""}`;
+  context.filter = scannerCanvasFilter(page.mode, page.brightness, page.contrast);
   context.drawImage(image, -image.width / 2, -image.height / 2);
   return canvas;
 }
 
-function BlobPreview({ blob, alt, className }: { blob: Blob; alt: string; className?: string }) {
+function BlobPreview({
+  blob,
+  alt,
+  className,
+  filter,
+  rotation = 0,
+}:{
+  blob:Blob;
+  alt:string;
+  className?:string;
+  filter?:string;
+  rotation?:number;
+}) {
   const url = useMemo(() => URL.createObjectURL(blob), [blob]);
   useEffect(() => () => URL.revokeObjectURL(url), [url]);
   // Scanner previews are local object URLs and cannot use the Next image optimizer.
   // eslint-disable-next-line @next/next/no-img-element
-  return <img className={className} src={url} alt={alt} />;
+  return <img className={className} src={url} alt={alt} style={{filter,transform:`rotate(${rotation}deg)`}} />;
 }
 
 export function ScannerModal({ homeworkId, onClose }: { homeworkId: number; onClose: () => void }) {
   const [pages, setPages] = useState<ScannerPage[]>([]);
   const [selected, setSelected] = useState(0);
   const [editing, setEditing] = useState(false);
+  const [adjusting, setAdjusting] = useState(false);
   const [liveCamera, setLiveCamera] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [building, setBuilding] = useState(false);
   const [adding, setAdding] = useState(false);
-  const [processingAction, setProcessingAction] = useState<string | null>(null);
   const input = useRef<HTMLInputElement>(null);
   const replacementCamera = useRef<HTMLInputElement>(null);
   const { enqueue } = useHomeworkUploads();
@@ -131,6 +142,7 @@ export function ScannerModal({ homeworkId, onClose }: { homeworkId: number; onCl
     }
       await persist(next);
       setSelected(Math.max(0, next.length - 1));
+      if (next.length > pages.length) setAdjusting(true);
     } finally { setAdding(false); }
   };
 
@@ -138,7 +150,7 @@ export function ScannerModal({ homeworkId, onClose }: { homeworkId: number; onCl
     if (pages.length >= 35) { setError("Максимум 35 страниц"); setLiveCamera(false); return; }
     const image=await normalize(new File([blob],"camera.jpg",{type:"image/jpeg"}));
     const next=[...pages,{id:crypto.randomUUID(),image,rotation:0,mode:await suggestedMode(image),brightness:0,contrast:0}];
-    await persist(next);setSelected(next.length-1);setLiveCamera(false);
+    await persist(next);setSelected(next.length-1);setLiveCamera(false);setAdjusting(true);
   };
 
   const update = (patch: Partial<ScannerPage>) => {
@@ -152,40 +164,6 @@ export function ScannerModal({ homeworkId, onClose }: { homeworkId: number; onCl
     [next[selected], next[target]] = [next[target], next[selected]];
     setSelected(target);
     void persist(next);
-  };
-
-  const crop = async () => {
-    if (!current) return;
-    const raw = window.prompt("Поля обрезки в процентах: слева, сверху, справа, снизу", "0,0,0,0");
-    if (raw === null) return;
-    const margins = raw.split(",").map((value) => Number(value.trim()));
-    if (margins.length !== 4 || margins.some((value) => !Number.isFinite(value) || value < 0 || value > 40)) {
-      setError("Укажите четыре числа от 0 до 40");
-      return;
-    }
-    setProcessingAction("crop");
-    const bitmap = await createImageBitmap(current.image);
-    const [left, top, right, bottom] = margins;
-    const sourceX = Math.round((bitmap.width * left) / 100);
-    const sourceY = Math.round((bitmap.height * top) / 100);
-    const width = Math.round((bitmap.width * (100 - left - right)) / 100);
-    const height = Math.round((bitmap.height * (100 - top - bottom)) / 100);
-    const canvas = document.createElement("canvas"); canvas.width = width; canvas.height = height;
-    canvas.getContext("2d")!.drawImage(bitmap, sourceX, sourceY, width, height, 0, 0, width, height); bitmap.close();
-    const image = await new Promise<Blob>((resolve, reject) => canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error("crop_failed")), "image/jpeg", 0.9));
-    update({ image });
-    setProcessingAction(null);
-  };
-
-  const correctCorners = async () => {
-    if (!current) return;
-    const raw=window.prompt("Четыре угла в %: x,y; x,y; x,y; x,y", "0,0; 100,0; 100,100; 0,100");if(raw===null)return;
-    const values=raw.split(";").map(pair=>pair.split(",").map(value=>Number(value.trim())));
-    if(values.length!==4||values.some(pair=>pair.length!==2||pair.some(value=>!Number.isFinite(value)||value<0||value>100))){setError("Укажите четыре пары координат от 0 до 100");return}
-    setProcessingAction("corners");
-    try { const bitmap=await createImageBitmap(current.image),source=document.createElement("canvas");source.width=bitmap.width;source.height=bitmap.height;source.getContext("2d")!.drawImage(bitmap,0,0);bitmap.close();
-      const corrected=await perspectiveCrop(source,values.map(([x,y])=>({x:x*source.width/100,y:y*source.height/100}))),image=await new Promise<Blob>((resolve,reject)=>corrected.toBlob(blob=>blob?resolve(blob):reject(new Error("perspective_failed")),"image/jpeg",.9));update({image});
-    } finally { setProcessingAction(null); }
   };
 
   const build = async () => {
@@ -254,29 +232,35 @@ export function ScannerModal({ homeworkId, onClose }: { homeworkId: number; onCl
           </aside>
           <section className={styles.previewSection}>
             {current ? (
-              <BlobPreview className={styles.preview} blob={current.image} alt="Страница" />
+              <BlobPreview
+                className={styles.preview}
+                blob={current.image}
+                alt="Страница"
+                filter={scannerCanvasFilter(current.mode,current.brightness,current.contrast)}
+                rotation={current.rotation}
+              />
             ) : (
               <div className={styles.empty}><Camera size={54} /><h3>Сфотографируйте или добавьте листы</h3><p>JPEG, PNG, HEIC и WebP до 25 МБ.</p></div>
             )}
           </section>
           {current ? <aside className={styles.toolPanel}>
             <h3>Страница {selected + 1}</h3>
+            <button className={styles.adjustHero} onClick={() => setAdjusting(true)}>
+              <SlidersHorizontal/>
+              <span>
+                <b>Границы и фильтры</b>
+                <small>{scannerFilterLabels[current.mode]} · яркость {current.brightness>0?"+":""}{current.brightness}</small>
+              </span>
+            </button>
             <div className={styles.tools}>
-              <button data-primary onClick={() => setEditing(true)}><Pencil />Редактор</button>
-              <button disabled={processingAction !== null} onClick={() => void crop()}>{processingAction === "crop" ? <Spinner size="sm" /> : <CropIcon />}Обрезать</button>
-              <button disabled={processingAction !== null} onClick={() => void correctCorners()}>{processingAction === "corners" ? <Spinner size="sm" /> : null}4 угла</button>
+              <button data-primary onClick={() => setAdjusting(true)}><SlidersHorizontal/>Обработать</button>
+              <button onClick={() => setEditing(true)}><Pencil />Разметка</button>
               <button onClick={() => { if (window.confirm("Пересъёмка удалит правки этой страницы. Продолжить?")) replacementCamera.current?.click(); }}><Camera />Пересня́ть</button>
               <button onClick={() => update({ rotation: (current.rotation + 90) % 360 })}><RotateCw />Повернуть</button>
               <button disabled={selected === 0} onClick={() => move(-1)}><ArrowUp />Выше</button>
               <button disabled={selected === pages.length - 1} onClick={() => move(1)}><ArrowDown />Ниже</button>
               <button className={styles.delete} onClick={() => { const next = pages.filter((_, index) => index !== selected); setSelected(Math.max(0, selected - 1)); void persist(next); }}><Trash2 />Удалить</button>
             </div>
-            <h4>Режим</h4>
-            <select value={current.mode} onChange={(event) => update({ mode: event.target.value as ScannerPage["mode"] })}>
-              <option value="auto">Авто</option><option value="color">Цвет</option><option value="gray">Серый</option><option value="bw">Ч/б</option>
-            </select>
-            <label>Яркость <input type="range" min={-40} max={40} value={current.brightness} onChange={(event) => update({ brightness: Number(event.target.value) })} /><span>{current.brightness}</span></label>
-            <label>Контраст <input type="range" min={-40} max={60} value={current.contrast} onChange={(event) => update({ contrast: Number(event.target.value) })} /><span>{current.contrast}</span></label>
           </aside> : null}
         </main>
         {error ? <div className={styles.error}>{error}</div> : null}
@@ -285,6 +269,13 @@ export function ScannerModal({ homeworkId, onClose }: { homeworkId: number; onCl
             image={current.image}
             onClose={() => setEditing(false)}
             onSave={(image) => { update({ image }); setEditing(false); }}
+          />
+        ) : null}
+        {adjusting && current ? (
+          <ScannerAdjustEditor
+            page={current}
+            onClose={() => setAdjusting(false)}
+            onSave={(patch) => { update(patch); setAdjusting(false); }}
           />
         ) : null}
         {liveCamera ? <LiveCameraScanner onCapture={(blob)=>void addCaptured(blob)} onClose={()=>setLiveCamera(false)} /> : null}

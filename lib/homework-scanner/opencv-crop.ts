@@ -1,14 +1,45 @@
 export interface PagePoint { x:number; y:number }
-type OpenCv=typeof import("@techstark/opencv-js");
+type OpenCv=typeof globalThis.cv;
 let cvPromise:Promise<OpenCv>|null=null;
-function getCv(){if(cvPromise)return cvPromise;cvPromise=new Promise<OpenCv>((resolve,reject)=>{const ready=async()=>{const value=(window as typeof window&{cv?:OpenCv|Promise<OpenCv>}).cv;if(!value)return;const cv=await value;if(typeof cv.getBuildInformation==="function")resolve(cv);else cv.onRuntimeInitialized=()=>resolve(cv)};const existing=document.querySelector<HTMLScriptElement>('script[data-opencv]');if(existing){void ready();return}const script=document.createElement("script");script.src="https://docs.opencv.org/4.11.0/opencv.js";script.async=true;script.dataset.opencv="true";script.onload=()=>void ready();script.onerror=()=>reject(new Error("opencv_unavailable"));document.head.appendChild(script)});return cvPromise}
+function getCv(){
+ if(cvPromise)return cvPromise;
+ cvPromise=import("@techstark/opencv-js").then(async module=>{
+  const ready=(module as unknown as {default:OpenCv|Promise<OpenCv>}).default;
+  const cv=await ready;
+  if(typeof cv.getBuildInformation!=="function")throw new Error("opencv_unavailable");
+  return cv;
+ });
+ return cvPromise;
+}
 const distance=(a:PagePoint,b:PagePoint)=>Math.hypot(a.x-b.x,a.y-b.y);
 function order(points:PagePoint[]){const bySum=[...points].sort((a,b)=>a.x+a.y-(b.x+b.y)),byDiff=[...points].sort((a,b)=>a.y-a.x-(b.y-b.x));return[bySum[0],byDiff[0],bySum[3],byDiff[3]] as [PagePoint,PagePoint,PagePoint,PagePoint]}
 
 export async function detectPageCorners(source:HTMLCanvasElement):Promise<PagePoint[]|null>{
  const cv=await getCv();
  const input=cv.imread(source),gray=new cv.Mat(),blurred=new cv.Mat(),edges=new cv.Mat(),contours=new cv.MatVector(),hierarchy=new cv.Mat();
- try{cv.cvtColor(input,gray,cv.COLOR_RGBA2GRAY);cv.GaussianBlur(gray,blurred,new cv.Size(5,5),0);cv.Canny(blurred,edges,60,180);cv.findContours(edges,contours,hierarchy,cv.RETR_LIST,cv.CHAIN_APPROX_SIMPLE);let best:PagePoint[]|null=null,bestArea=source.width*source.height*.12;for(let index=0;index<contours.size();index++){const contour=contours.get(index),perimeter=cv.arcLength(contour,true),approx=new cv.Mat();cv.approxPolyDP(contour,approx,.02*perimeter,true);const area=Math.abs(cv.contourArea(approx));if(approx.rows===4&&area>bestArea){bestArea=area;best=[];for(let row=0;row<4;row++)best.push({x:approx.data32S[row*2],y:approx.data32S[row*2+1]})}contour.delete();approx.delete()}return best?order(best):null}finally{input.delete();gray.delete();blurred.delete();edges.delete();contours.delete();hierarchy.delete()}
+ try{
+  cv.cvtColor(input,gray,cv.COLOR_RGBA2GRAY);
+  cv.GaussianBlur(gray,blurred,new cv.Size(7,7),0);
+  cv.Canny(blurred,edges,45,150);
+  cv.findContours(edges,contours,hierarchy,cv.RETR_LIST,cv.CHAIN_APPROX_SIMPLE);
+  let best:PagePoint[]|null=null,bestArea=source.width*source.height*.1;
+  for(let index=0;index<contours.size();index++){
+   const contour=contours.get(index),perimeter=cv.arcLength(contour,true);
+   for(const factor of [.015,.02,.025,.03,.04]){
+    const approx=new cv.Mat();
+    cv.approxPolyDP(contour,approx,factor*perimeter,true);
+    const area=Math.abs(cv.contourArea(approx));
+    if(approx.rows===4&&area>bestArea&&cv.isContourConvex(approx)){
+     bestArea=area;
+     best=[];
+     for(let row=0;row<4;row++)best.push({x:approx.data32S[row*2],y:approx.data32S[row*2+1]});
+    }
+    approx.delete();
+   }
+   contour.delete();
+  }
+  return best?order(best):null;
+ }finally{input.delete();gray.delete();blurred.delete();edges.delete();contours.delete();hierarchy.delete()}
 }
 
 export async function perspectiveCrop(source:HTMLCanvasElement,points:PagePoint[]):Promise<HTMLCanvasElement>{
