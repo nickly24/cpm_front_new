@@ -3,6 +3,7 @@
 import attendanceStyles from "@/components/admin/attendance/admin-attendance.module.css";
 import styles from "@/components/admin/tests/admin-tests.module.css";
 import { Button } from "@/components/ui/button";
+import { DismissibleOverlay } from "@/components/ui/dismissible-overlay";
 import { createClassDay, updateClassDay } from "@/lib/attendance/attendance-api";
 import type { ClassDay } from "@/lib/attendance/attendance-types";
 import { todayIsoDate } from "@/lib/attendance/attendance-utils";
@@ -68,7 +69,7 @@ export function ClassDayFormModal({
   };
 
   return (
-    <div className={attendanceStyles.modalOverlay} onClick={onClose}>
+    <DismissibleOverlay className={attendanceStyles.modalOverlay} onDismiss={onClose}>
       <form
         className={attendanceStyles.modal}
         onClick={(event) => event.stopPropagation()}
@@ -111,6 +112,6 @@ export function ClassDayFormModal({
           </Button>
         </div>
       </form>
-    </div>
+    </DismissibleOverlay>
   );
 }

@@ -4,6 +4,7 @@ import userStyles from "@/components/admin/users/admin-users.module.css";
 import ratingStyles from "@/components/admin/ratings/admin-ratings.module.css";
 import adminStyles from "@/components/admin/tests/admin-tests.module.css";
 import { Button } from "@/components/ui/button";
+import { DismissibleOverlay } from "@/components/ui/dismissible-overlay";
 import { useEffect, useState } from "react";
 
 interface AdminRatingRecalcPanelProps {
@@ -62,7 +63,7 @@ export function AdminRatingRecalcPanel({
   };
 
   return (
-    <div className={userStyles.overlay} onClick={onClose}>
+    <DismissibleOverlay className={userStyles.overlay} onDismiss={onClose}>
       <div
         className={userStyles.modal}
         onClick={(event) => event.stopPropagation()}
@@ -108,6 +109,6 @@ export function AdminRatingRecalcPanel({
           </div>
         </form>
       </div>
-    </div>
+    </DismissibleOverlay>
   );
 }

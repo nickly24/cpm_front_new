@@ -52,11 +52,116 @@ export async function createExternalAdminTest(
   );
 }
 
+export interface AdminTestUpdateRecalcDecision {
+  needsRecalc: boolean;
+  reasons: string[];
+  excludeQuestionIds?: Array<string | number>;
+}
+
+export interface AdminTestUpdateRecalc {
+  updated: number;
+  sessions: number;
+  skipped?: boolean;
+  error?: string;
+  decision?: AdminTestUpdateRecalcDecision;
+}
+
+export interface AdminTestUpdateResponse {
+  message: string;
+  testId: string;
+  recalc?: AdminTestUpdateRecalc;
+}
+
+const RECALC_REASON_LABELS: Record<string, string> = {
+  question_removed: "удалён вопрос",
+  question_type_changed: "изменён тип вопроса",
+  points_changed: "изменён вес вопроса",
+  correct_flag_changed: "изменён правильный ответ",
+  option_removed: "удалён вариант ответа",
+  text_correct_removed: "удалён эталон текстового ответа",
+};
+
+export type AdminTestRecalcOutcomeKind =
+  | "saved"
+  | "skipped"
+  | "recalculated"
+  | "error";
+
+export interface AdminTestRecalcOutcome {
+  kind: AdminTestRecalcOutcomeKind;
+  title: string;
+  summary: string;
+  reasons: string[];
+  updated: number;
+  sessions: number;
+}
+
+export function describeAdminTestRecalc(
+  recalc?: AdminTestUpdateRecalc | null,
+): AdminTestRecalcOutcome {
+  if (!recalc) {
+    return {
+      kind: "saved",
+      title: "Тест сохранён",
+      summary: "Изменения записаны.",
+      reasons: [],
+      updated: 0,
+      sessions: 0,
+    };
+  }
+  if (recalc.error) {
+    return {
+      kind: "error",
+      title: "Тест сохранён с ошибкой пересчёта",
+      summary: recalc.error,
+      reasons: [],
+      updated: Number(recalc.updated || 0),
+      sessions: Number(recalc.sessions || 0),
+    };
+  }
+  const decision = recalc.decision;
+  if (recalc.skipped || (decision && !decision.needsRecalc)) {
+    return {
+      kind: "skipped",
+      title: "Тест сохранён",
+      summary: "Пересчёт старых сдач не требуется.",
+      reasons: [],
+      updated: 0,
+      sessions: Number(recalc.sessions || 0),
+    };
+  }
+  const reasons =
+    decision?.reasons
+      ?.map((code) => RECALC_REASON_LABELS[code] || code)
+      .filter(Boolean) || [];
+  const updated = Number(recalc.updated || 0);
+  const sessions = Number(recalc.sessions || 0);
+  return {
+    kind: "recalculated",
+    title: "Тест сохранён",
+    summary: `Решение: пересчитать старые сдачи. Обновлено сессий: ${updated} из ${sessions}.`,
+    reasons:
+      reasons.length > 0 ? reasons : ["изменения, влияющие на баллы"],
+    updated,
+    sessions,
+  };
+}
+
+export function formatAdminTestRecalcMessage(
+  recalc?: AdminTestUpdateRecalc | null,
+): string {
+  const outcome = describeAdminTestRecalc(recalc);
+  if (outcome.kind === "recalculated" && outcome.reasons.length > 0) {
+    return `${outcome.title}. ${outcome.summary} Причины: ${outcome.reasons.join(", ")}.`;
+  }
+  return `${outcome.title}. ${outcome.summary}`;
+}
+
 export async function updateAdminTest(
   testId: string,
   payload: AdminTestFormData,
-): Promise<{ message: string; testId: string }> {
-  return apiRequest<{ message: string; testId: string }>(`/test/${testId}`, {
+): Promise<AdminTestUpdateResponse> {
+  return apiRequest<AdminTestUpdateResponse>(`/test/${testId}`, {
     method: "PUT",
     body: JSON.stringify(payload),
   });
@@ -76,8 +181,8 @@ export async function deleteAdminTest(testId: string): Promise<{
 export async function patchAdminTestFields(
   testId: string,
   fields: { published?: boolean; visible?: boolean },
-): Promise<{ message: string; testId: string }> {
-  return apiRequest<{ message: string; testId: string }>(`/test/${testId}`, {
+): Promise<AdminTestUpdateResponse> {
+  return apiRequest<AdminTestUpdateResponse>(`/test/${testId}`, {
     method: "PUT",
     body: JSON.stringify(fields),
   });

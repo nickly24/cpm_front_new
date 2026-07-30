@@ -1,6 +1,7 @@
 "use client";
 
 import styles from "@/components/admin/tests/admin-tests.module.css";
+import { DismissibleOverlay } from "@/components/ui/dismissible-overlay";
 import { LoadingState } from "@/components/ui/loading-state";
 import { fetchExamDeletePreview } from "@/lib/exams/exams-api";
 import type { Exam } from "@/lib/exams/exams-types";
@@ -96,10 +97,11 @@ export function AdminExamsBulkDeleteDialog({
   const busy = loadingPreview || deleting;
 
   return (
-    <div
+    <DismissibleOverlay
       className={styles.deleteDialogOverlay}
       role="presentation"
-      onClick={busy ? undefined : onCancel}
+      onDismiss={onCancel}
+      disabled={busy}
     >
       <div
         className={styles.deleteDialog}
@@ -183,6 +185,6 @@ export function AdminExamsBulkDeleteDialog({
           </button>
         </div>
       </div>
-    </div>
+    </DismissibleOverlay>
   );
 }

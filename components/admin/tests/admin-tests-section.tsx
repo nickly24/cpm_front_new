@@ -1,13 +1,21 @@
 "use client";
 
+import { AdminCreateTestMenu } from "@/components/admin/tests/admin-create-test-menu";
+import { AdminDirectionCombobox } from "@/components/admin/tests/admin-direction-combobox";
 import { AdminExternalTestDeleteDialog } from "@/components/admin/tests/admin-external-test-delete-dialog";
 import { AdminExternalTestForm } from "@/components/admin/tests/admin-external-test-form";
+import { AdminTestCardActions } from "@/components/admin/tests/admin-test-card-actions";
+import {
+  AdminTestCardSchedule,
+  AdminTestStatusBadge,
+} from "@/components/admin/tests/admin-test-card-meta";
 import { AdminTestDraftEditor } from "@/components/admin/tests/admin-test-draft-editor";
 import { AdminTestForm } from "@/components/admin/tests/admin-test-form";
 import { AdminTestWorkspace } from "@/components/admin/tests/admin-test-workspace";
 import styles from "@/components/admin/tests/admin-tests.module.css";
 import { useCabinetChrome } from "@/contexts/cabinet-chrome-context";
 import { Button } from "@/components/ui/button";
+import { DismissibleOverlay } from "@/components/ui/dismissible-overlay";
 import { LoadingState } from "@/components/ui/loading-state";
 import { Toggle } from "@/components/ui/toggle";
 import {
@@ -40,13 +48,11 @@ import {
   filterAdminTestsByDate,
   filterAdminTestsBySearch,
   filterAdminTestsByStatus,
-  formatAdminTestDate,
   getAdminTestStatus,
-  getAdminTestStatusLabel,
 } from "@/lib/admin/admin-tests-utils";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Trash2 } from "lucide-react";
+import { FileStack, Plus, Trash2, X } from "lucide-react";
 
 const IMMERSIVE_VIEWS: AdminTestsView[] = [
   "create",
@@ -58,13 +64,6 @@ const IMMERSIVE_VIEWS: AdminTestsView[] = [
 ];
 
 const PAGE_SIZE = 6;
-
-function statusBadgeClass(status: ReturnType<typeof getAdminTestStatus>) {
-  if (status === "upcoming") return styles.badgeUpcoming;
-  if (status === "ended") return styles.badgeEnded;
-  if (status === "external") return styles.badgeExternal;
-  return styles.badgeActive;
-}
 
 export function AdminTestsSection() {
   const searchParams = useSearchParams();
@@ -100,6 +99,7 @@ export function AdminTestsSection() {
   const [externalDeleteError, setExternalDeleteError] = useState<string | null>(
     null,
   );
+  const [draftsOpen, setDraftsOpen] = useState(false);
   const { setImmersive } = useCabinetChrome();
 
   const loadTests = useCallback(async (direction: string) => {
@@ -185,6 +185,21 @@ export function AdminTestsSection() {
   }, [view, setImmersive]);
 
   useEffect(() => {
+    if (!draftsOpen) return;
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setDraftsOpen(false);
+    };
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [draftsOpen]);
+
+  useEffect(() => {
     if (openedFromUrlRef.current || loadingDirections) return;
 
     const direction = searchParams.get("direction");
@@ -229,6 +244,7 @@ export function AdminTestsSection() {
       const draft = await createAdminTestDraft({
         direction: directionName,
       });
+      setDraftsOpen(false);
       setEditingDraft(draft);
       setDraftEditorMode("draft");
       setView("draftEditor");
@@ -504,131 +520,169 @@ export function AdminTestsSection() {
         />
       ) : null}
 
+      {draftsOpen ? (
+        <DismissibleOverlay
+          className={styles.draftsOverlay}
+          onDismiss={() => setDraftsOpen(false)}
+        >
+          <aside
+            className={styles.draftsDrawer}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="admin-drafts-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className={styles.draftsDrawerHead}>
+              <div>
+                <h2 id="admin-drafts-title">Драфты</h2>
+                <p>Черновики нового редактора с автосохранением</p>
+              </div>
+              <button
+                type="button"
+                className={styles.draftsDrawerClose}
+                aria-label="Закрыть"
+                onClick={() => setDraftsOpen(false)}
+              >
+                <X size={16} aria-hidden />
+              </button>
+            </div>
+            <div className={styles.draftsDrawerBody}>
+              <div className={styles.draftsDrawerActions}>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => {
+                    void openNewDraft();
+                  }}
+                >
+                  <Plus size={15} aria-hidden />
+                  Новый драфт
+                </Button>
+                <button
+                  type="button"
+                  className={styles.headerGhostBtn}
+                  onClick={() => {
+                    void loadDrafts();
+                  }}
+                >
+                  Обновить
+                </button>
+              </div>
+              {loadingDrafts ? (
+                <p className={styles.panelHint}>Загрузка драфтов…</p>
+              ) : drafts.length === 0 ? (
+                <p className={styles.panelHint}>Активных драфтов пока нет</p>
+              ) : (
+                <div className={styles.draftsList}>
+                  {drafts.map((draft) => (
+                    <article
+                      key={draft.id}
+                      className={styles.draftItemCard}
+                      onClick={() => {
+                        setEditingDraft(draft);
+                        setDraftEditorMode("draft");
+                        setDraftsOpen(false);
+                        setView("draftEditor");
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          setEditingDraft(draft);
+                          setDraftEditorMode("draft");
+                          setDraftsOpen(false);
+                          setView("draftEditor");
+                        }
+                      }}
+                      role="button"
+                      tabIndex={0}
+                    >
+                      <strong>{draft.title || "Без названия"}</strong>
+                      {draft.source?.kind === "manual_cards" ? (
+                        <span className={`${styles.badge} ${styles.badgeUpcoming}`}>
+                          Из карточек: {draft.source.themeName || "раздел"}
+                        </span>
+                      ) : null}
+                      <span>
+                        {draft.canvas?.questions?.length ?? 0} вопросов ·{" "}
+                        {draft.direction || "направление не выбрано"}
+                      </span>
+                      <button
+                        type="button"
+                        className={styles.draftDeleteButton}
+                        aria-label="Удалить драфт"
+                        disabled={deletingDraftId === draft.id}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          void handleDeleteDraft(draft);
+                        }}
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </div>
+          </aside>
+        </DismissibleOverlay>
+      ) : null}
+
       <header className={styles.pageHeader}>
         <h1 className={styles.pageTitle}>Управление тестами</h1>
         <div className={styles.headerActions}>
-          <Button
+          <button
             type="button"
+            className={styles.headerGhostBtn}
             onClick={() => {
+              setDraftsOpen(true);
+              void loadDrafts();
+            }}
+          >
+            <FileStack size={15} aria-hidden />
+            Драфты
+            {drafts.length > 0 ? (
+              <span className={styles.draftsTriggerBadge}>{drafts.length}</span>
+            ) : null}
+          </button>
+          <AdminCreateTestMenu
+            onCreateTest={() => {
               setEditingTest(null);
               setView("create");
             }}
-          >
-            + Создать тест
-          </Button>
-          <Button type="button" variant="secondary" onClick={openNewDraft}>
-            Попробовать новый интерфейс
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={() => {
+            onCreateExternal={() => {
               setEditingTest(null);
               setView("createExternal");
             }}
-          >
-            + Создать вне системы
-          </Button>
+          />
         </div>
       </header>
 
-      <section className={styles.draftsPanel}>
-        <div className={styles.draftsPanelHead}>
-          <div>
-            <h2>Драфты нового редактора</h2>
-            <p>Общие наброски тестов с автосохранением</p>
-          </div>
-          <Button type="button" variant="ghost" size="sm" onClick={loadDrafts}>
-            Обновить
-          </Button>
-        </div>
-        {loadingDrafts ? (
-          <p className={styles.panelHint}>Загрузка драфтов...</p>
-        ) : drafts.length === 0 ? (
-          <p className={styles.panelHint}>Активных драфтов пока нет</p>
-        ) : (
-          <div className={styles.draftsList}>
-            {drafts.map((draft) => (
-              <article
-                key={draft.id}
-                className={styles.draftItemCard}
-                onClick={() => {
-                  setEditingDraft(draft);
-                  setDraftEditorMode("draft");
-                  setView("draftEditor");
-                }}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" || event.key === " ") {
-                    event.preventDefault();
-                    setEditingDraft(draft);
-                    setDraftEditorMode("draft");
-                    setView("draftEditor");
-                  }
-                }}
-                role="button"
-                tabIndex={0}
-              >
-                <strong>{draft.title || "Без названия"}</strong>
-                {draft.source?.kind === "manual_cards" ? (
-                  <span className={`${styles.badge} ${styles.badgeUpcoming}`}>
-                    Из карточек: {draft.source.themeName || "раздел"}
-                  </span>
-                ) : null}
-                <span>
-                  {draft.canvas?.questions?.length ?? 0} вопросов ·{" "}
-                  {draft.direction || "направление не выбрано"}
-                </span>
-                <button
-                  type="button"
-                  className={styles.draftDeleteButton}
-                  aria-label="Удалить драфт"
-                  disabled={deletingDraftId === draft.id}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    void handleDeleteDraft(draft);
-                  }}
-                >
-                  <Trash2 size={14} />
-                </button>
-              </article>
-            ))}
-          </div>
-        )}
-      </section>
+      <div className={styles.toolbar}>
+        <div className={styles.toolbarRow}>
+          {loadingDirections ? (
+            <p className={styles.panelHint}>Загрузка направлений…</p>
+          ) : directions.length === 0 ? (
+            <p className={styles.panelHint}>Направления не найдены</p>
+          ) : (
+            <AdminDirectionCombobox
+              directions={directions}
+              value={directionName}
+              onChange={setDirectionName}
+              loading={loadingDirections}
+            />
+          )}
 
-      {loadingDirections ? (
-        <LoadingState
-          label="Загрузка направлений…"
-          variant="block"
-          className={styles.stateBox}
-        />
-      ) : directions.length === 0 ? (
-        <div className={styles.stateBox}>Направления не найдены</div>
-      ) : (
-        <div className={styles.directionTabs}>
-          {directions.map((d) => (
-            <button
-              key={d.id}
-              type="button"
-              className={`${styles.directionTab} ${directionName === d.name ? styles.directionTabActive : ""}`}
-              onClick={() => setDirectionName(d.name)}
-            >
-              {d.name}
-            </button>
-          ))}
-        </div>
-      )}
+          <label className={styles.searchField}>
+            <span className={styles.fieldLabel}>Поиск</span>
+            <input
+              type="search"
+              className={styles.searchInput}
+              placeholder="Название теста…"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </label>
 
-      <div className={styles.filters}>
-        <input
-          type="search"
-          className={styles.searchInput}
-          placeholder="Поиск тестов…"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
-
-        <div className={styles.dateRow}>
           <label className={styles.dateField}>
             <span className={styles.fieldLabel}>С даты</span>
             <input
@@ -651,19 +705,6 @@ export function AdminTestsSection() {
               }
             />
           </label>
-          <button
-            type="button"
-            className={styles.clearBtn}
-            disabled={
-              !searchTerm &&
-              !dateFilter.startDate &&
-              !dateFilter.endDate &&
-              statusFilter === "all"
-            }
-            onClick={clearFilters}
-          >
-            Очистить фильтры
-          </button>
         </div>
 
         <div className={styles.statusFilters}>
@@ -685,6 +726,19 @@ export function AdminTestsSection() {
               {label} ({countByStatus(key)})
             </button>
           ))}
+          <button
+            type="button"
+            className={styles.clearBtn}
+            disabled={
+              !searchTerm &&
+              !dateFilter.startDate &&
+              !dateFilter.endDate &&
+              statusFilter === "all"
+            }
+            onClick={clearFilters}
+          >
+            Очистить
+          </button>
         </div>
       </div>
 
@@ -706,16 +760,16 @@ export function AdminTestsSection() {
           <p>{tests.length === 0 ? "Тестов пока нет" : "По фильтрам ничего не найдено"}</p>
           {tests.length === 0 ? (
             <div className={styles.emptyActions}>
-              <Button type="button" onClick={() => setView("create")}>
+              <Button type="button" size="sm" onClick={() => setView("create")}>
                 Создать первый тест
               </Button>
-              <Button
+              <button
                 type="button"
-                variant="ghost"
+                className={styles.headerGhostBtn}
                 onClick={() => setView("createExternal")}
               >
-                Создать вне системы
-              </Button>
+                Вне системы
+              </button>
             </div>
           ) : (
             <button type="button" className={styles.clearBtn} onClick={clearFilters}>
@@ -739,43 +793,17 @@ export function AdminTestsSection() {
                   className={`${styles.card} ${external ? styles.cardExternal : ""}`}
                 >
                   <div className={styles.cardHead}>
+                    <AdminTestStatusBadge status={status} />
                     <h3 className={styles.cardTitle}>{getAdminTestTitle(test)}</h3>
-                    <span className={`${styles.badge} ${statusBadgeClass(status)}`}>
-                      {getAdminTestStatusLabel(status)}
-                    </span>
                   </div>
 
-                  <dl className={styles.infoList}>
-                    {external ? (
-                      <div className={styles.infoRow}>
-                        <dt>Дата</dt>
-                        <dd className={styles.infoValue}>
-                          {formatAdminTestDate(test.date)}
-                        </dd>
-                      </div>
-                    ) : (
-                      <>
-                        <div className={styles.infoRow}>
-                          <dt>Время</dt>
-                          <dd className={styles.infoValue}>
-                            {test.timeLimitMinutes ?? "—"} мин
-                          </dd>
-                        </div>
-                        <div className={styles.infoRow}>
-                          <dt>Начало</dt>
-                          <dd className={styles.infoValue}>
-                            {formatAdminTestDate(test.startDate)}
-                          </dd>
-                        </div>
-                        <div className={styles.infoRow}>
-                          <dt>Окончание</dt>
-                          <dd className={styles.infoValue}>
-                            {formatAdminTestDate(test.endDate)}
-                          </dd>
-                        </div>
-                      </>
-                    )}
-                  </dl>
+                  <AdminTestCardSchedule
+                    external={external}
+                    date={test.date}
+                    startDate={test.startDate}
+                    endDate={test.endDate}
+                    timeLimitMinutes={test.timeLimitMinutes}
+                  />
 
                   {!external ? (
                     <div className={styles.togglesRow}>
@@ -802,52 +830,27 @@ export function AdminTestsSection() {
                     </div>
                   ) : (
                     <p className={styles.externalNotice}>
-                      Внешний тест CPM-LMS — редактирование и переключатели недоступны.
+                      Внешний тест CPM-LMS — редактирование недоступно.
                     </p>
                   )}
 
-                  <div className={styles.cardActions}>
-                    {external ? (
-                      <button
-                        type="button"
-                        className={`${styles.actionBtn} ${styles.actionBtnDanger}`}
-                        onClick={() => openExternalDeleteDialog(test)}
-                      >
-                        Удалить
-                      </button>
-                    ) : (
-                      <>
-                        <button
-                          type="button"
-                          className={`${styles.actionBtn} ${styles.actionBtnPrimary}`}
-                          onClick={() => openWorkspace(testId)}
-                        >
-                          Открыть
-                        </button>
-                        <button
-                          type="button"
-                          className={styles.actionBtn}
-                          onClick={() => openTest(testId, "edit")}
-                        >
-                          Редактировать
-                        </button>
-                        <button
-                          type="button"
-                          className={styles.actionBtn}
-                          onClick={() => openDraftFromTest(testId)}
-                        >
-                          Редактировать в новом интерфейсе
-                        </button>
-                        <button
-                          type="button"
-                          className={`${styles.actionBtn} ${styles.actionBtnDanger}`}
-                          onClick={() => handleDelete(testId)}
-                        >
-                          Удалить
-                        </button>
-                      </>
-                    )}
-                  </div>
+                  <AdminTestCardActions
+                    external={external}
+                    onOpen={() => openWorkspace(testId)}
+                    onEditClassic={() => {
+                      void openTest(testId, "edit");
+                    }}
+                    onEditNew={() => {
+                      void openDraftFromTest(testId);
+                    }}
+                    onDelete={() => {
+                      if (external) {
+                        openExternalDeleteDialog(test);
+                      } else {
+                        void handleDelete(testId);
+                      }
+                    }}
+                  />
                 </article>
               );
             })}

@@ -85,6 +85,40 @@ export function parseQuestionIdFromCanvasId(
   return fallbackIndex + 1;
 }
 
+/**
+ * Сохраняет стабильные numeric ID из canvas id вида q_12.
+ * Новым узлам (uid вроде q_1738_xxx) выдаёт max(used)+1, без заполнения дырок:
+ * повторное использование удалённого ID могло бы склеить новый вопрос со старыми answers в sessions.
+ */
+export function allocateStableQuestionIds(
+  canvasIds: string[],
+): number[] {
+  const used = new Set<number>();
+  const assigned: Array<number | null> = canvasIds.map((canvasId) => {
+    const match = /^q_(\d+)$/.exec(canvasId);
+    if (!match) return null;
+    const id = Number.parseInt(match[1], 10);
+    if (!Number.isFinite(id) || id <= 0 || used.has(id)) return null;
+    used.add(id);
+    return id;
+  });
+
+  let next = 0;
+  for (const id of used) {
+    if (id > next) next = id;
+  }
+  next += 1;
+
+  return assigned.map((id) => {
+    if (id != null) return id;
+    while (used.has(next)) next += 1;
+    const allocated = next;
+    used.add(allocated);
+    next += 1;
+    return allocated;
+  });
+}
+
 export function parseAnswerIdFromCanvasId(
   canvasAnswerId: string,
   questionCanvasId: string,
@@ -97,10 +131,13 @@ export function parseAnswerIdFromCanvasId(
 }
 
 export function canvasStateToTestFormData(state: AdminTestDraft): AdminTestFormData {
-  const sorted = sortQuestions(state.canvas);
+  const sorted = sortQuestions(state.canvas).filter(
+    (question) => !question.markedForDeletion,
+  );
+  const questionIds = allocateStableQuestionIds(sorted.map((q) => q.id));
 
   const questions = sorted.map((question, index) => {
-    const questionId = parseQuestionIdFromCanvasId(question.id, index);
+    const questionId = questionIds[index];
 
     if (question.type === "text") {
       return {

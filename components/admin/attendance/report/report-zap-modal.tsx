@@ -5,6 +5,7 @@ import zapStyles from "@/components/admin/zaps/admin-zaps.module.css";
 import reportStyles from "@/components/admin/attendance/report/report.module.css";
 import styles from "@/components/admin/tests/admin-tests.module.css";
 import { Button } from "@/components/ui/button";
+import { DismissibleOverlay } from "@/components/ui/dismissible-overlay";
 import { LoadingState } from "@/components/ui/loading-state";
 import { unlinkZapDate } from "@/lib/attendance/attendance-report-api";
 import {
@@ -47,7 +48,7 @@ function ZapAttachmentViewer({
   if (!file?.img_base64) return null;
 
   return (
-    <div className={zapStyles.viewerOverlay} onClick={onClose}>
+    <DismissibleOverlay className={zapStyles.viewerOverlay} onDismiss={onClose}>
       <div
         className={`${zapStyles.viewerModal} ${isPdf ? zapStyles.viewerModalPdf : ""}`}
         onClick={(event) => event.stopPropagation()}
@@ -112,7 +113,7 @@ function ZapAttachmentViewer({
           </button>
         </div>
       </div>
-    </div>
+    </DismissibleOverlay>
   );
 }
 
@@ -182,7 +183,7 @@ export function ReportZapModal({
   const zap = detail?.zap;
 
   return (
-    <div className={attendanceStyles.modalOverlay} onClick={onClose}>
+    <DismissibleOverlay className={attendanceStyles.modalOverlay} onDismiss={onClose}>
       <div
         className={attendanceStyles.modal}
         style={{ maxWidth: 520 }}
@@ -282,6 +283,6 @@ export function ReportZapModal({
           }
         />
       ) : null}
-    </div>
+    </DismissibleOverlay>
   );
 }

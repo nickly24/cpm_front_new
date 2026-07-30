@@ -44,6 +44,68 @@ export function getAdminTestStatusLabel(status: AdminTestStatus): string {
   }
 }
 
+export type AdminTestDateParts = {
+  day: string;
+  month: string;
+  year: string;
+  time: string;
+};
+
+const MONTHS_GENITIVE = [
+  "января",
+  "февраля",
+  "марта",
+  "апреля",
+  "мая",
+  "июня",
+  "июля",
+  "августа",
+  "сентября",
+  "октября",
+  "ноября",
+  "декабря",
+] as const;
+
+export function parseAdminTestDateParts(
+  value?: string | null,
+): AdminTestDateParts | null {
+  if (!value) {
+    return null;
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  const parts = new Intl.DateTimeFormat("ru-RU", {
+    timeZone: "Europe/Moscow",
+    day: "numeric",
+    month: "numeric",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(date);
+
+  const map = Object.fromEntries(
+    parts.filter((p) => p.type !== "literal").map((p) => [p.type, p.value]),
+  );
+
+  const monthIndex = Number(map.month) - 1;
+  const month =
+    monthIndex >= 0 && monthIndex < 12
+      ? MONTHS_GENITIVE[monthIndex]
+      : map.month;
+
+  return {
+    day: map.day,
+    month,
+    year: map.year,
+    time: `${map.hour}:${map.minute}`,
+  };
+}
+
 export function formatAdminTestDate(value?: string | null): string {
   if (!value) {
     return "—";
@@ -199,3 +261,18 @@ export const emptyAdminTestForm = (): AdminTestFormData => ({
   visible: false,
   published: true,
 });
+
+/** Следующий свободный numeric questionId (max+1), без коллизий после удалений. */
+export function nextQuestionId(
+  questions: Array<{ questionId?: number | null }>,
+): number {
+  let maxId = 0;
+  for (const question of questions) {
+    const raw = question?.questionId;
+    const id = typeof raw === "number" ? raw : Number(raw);
+    if (Number.isFinite(id) && id > maxId) {
+      maxId = id;
+    }
+  }
+  return maxId + 1;
+}

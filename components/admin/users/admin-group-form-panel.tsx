@@ -3,6 +3,7 @@
 import styles from "@/components/admin/tests/admin-tests.module.css";
 import userStyles from "@/components/admin/users/admin-users.module.css";
 import { Button } from "@/components/ui/button";
+import { DismissibleOverlay } from "@/components/ui/dismissible-overlay";
 import { useEffect, useState } from "react";
 
 interface AdminGroupFormPanelProps {
@@ -48,7 +49,7 @@ export function AdminGroupFormPanel({
   };
 
   return (
-    <div className={userStyles.overlay} onClick={onClose}>
+    <DismissibleOverlay className={userStyles.overlay} onDismiss={onClose}>
       <div
         className={userStyles.modal}
         onClick={(event) => event.stopPropagation()}
@@ -83,6 +84,6 @@ export function AdminGroupFormPanel({
           </div>
         </form>
       </div>
-    </div>
+    </DismissibleOverlay>
   );
 }

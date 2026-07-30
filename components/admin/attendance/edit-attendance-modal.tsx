@@ -3,6 +3,7 @@
 import attendanceStyles from "@/components/admin/attendance/admin-attendance.module.css";
 import styles from "@/components/admin/tests/admin-tests.module.css";
 import { Button } from "@/components/ui/button";
+import { DismissibleOverlay } from "@/components/ui/dismissible-overlay";
 import { OptionSelect } from "@/components/ui/option-select";
 import { setClassDayAttendance } from "@/lib/attendance/attendance-api";
 import { buildAttendanceTypeOptions } from "@/lib/attendance/attendance-type-options";
@@ -59,7 +60,7 @@ export function EditAttendanceModal({
   };
 
   return (
-    <div className={attendanceStyles.modalOverlay} onClick={onClose}>
+    <DismissibleOverlay className={attendanceStyles.modalOverlay} onDismiss={onClose}>
       <form
         className={attendanceStyles.modal}
         onClick={(event) => event.stopPropagation()}
@@ -89,6 +90,6 @@ export function EditAttendanceModal({
           </Button>
         </div>
       </form>
-    </div>
+    </DismissibleOverlay>
   );
 }

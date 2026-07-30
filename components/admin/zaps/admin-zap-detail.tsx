@@ -4,6 +4,7 @@ import { AdminFullscreenBack } from "@/components/admin/admin-fullscreen-back";
 import zapStyles from "@/components/admin/zaps/admin-zaps.module.css";
 import styles from "@/components/admin/tests/admin-tests.module.css";
 import { Button } from "@/components/ui/button";
+import { DismissibleOverlay } from "@/components/ui/dismissible-overlay";
 import { LoadingState } from "@/components/ui/loading-state";
 import { fetchZapById, processZap, retryZapDate } from "@/lib/zaps/zaps-api";
 import {
@@ -51,7 +52,7 @@ function ZapAttachmentViewer({
   }
 
   return (
-    <div className={zapStyles.viewerOverlay} onClick={onClose}>
+    <DismissibleOverlay className={zapStyles.viewerOverlay} onDismiss={onClose}>
       <div
         className={`${zapStyles.viewerModal} ${isPdf ? zapStyles.viewerModalPdf : ""}`}
         onClick={(event) => event.stopPropagation()}
@@ -127,7 +128,7 @@ function ZapAttachmentViewer({
           </button>
         </div>
       </div>
-    </div>
+    </DismissibleOverlay>
   );
 }
 

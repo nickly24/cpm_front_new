@@ -1,12 +1,15 @@
 "use client";
 
 import { AdminFullscreenBack } from "@/components/admin/admin-fullscreen-back";
+import { AdminTestSaveRecalcDialog } from "@/components/admin/tests/admin-test-save-recalc-dialog";
 import styles from "@/components/admin/tests/admin-tests.module.css";
 import { Button } from "@/components/ui/button";
+import { DismissibleOverlay } from "@/components/ui/dismissible-overlay";
 import { Toggle } from "@/components/ui/toggle";
 import {
   createAdminTest,
   updateAdminTest,
+  type AdminTestUpdateRecalc,
 } from "@/lib/admin/admin-tests-api";
 import type {
   AdminTestAnswer,
@@ -18,11 +21,13 @@ import type {
 } from "@/lib/admin/admin-tests-types";
 import {
   emptyAdminTestForm,
+  nextQuestionId,
   testDetailToFormData,
 } from "@/lib/admin/admin-tests-utils";
 import { useEffect, useState } from "react";
 
 type FormMode = "create" | "edit" | "view";
+type QuestionEditorMode = "add" | "edit";
 
 interface AdminTestFormProps {
   mode: FormMode;
@@ -46,6 +51,24 @@ const defaultQuestion = (nextId: number): AdminTestQuestion => ({
   correctAnswers: [],
 });
 
+function buildNewQuestion(
+  type: AdminTestQuestionType,
+  questionId: number,
+): AdminTestQuestion {
+  return {
+    ...defaultQuestion(questionId),
+    type,
+    correctAnswers: type === "text" ? [""] : [],
+    answers:
+      type === "text"
+        ? []
+        : [
+            { id: "a", text: "", isCorrect: false },
+            { id: "b", text: "", isCorrect: false },
+          ],
+  };
+}
+
 export function AdminTestForm({
   mode,
   directions,
@@ -66,9 +89,18 @@ export function AdminTestForm({
   const [currentQuestion, setCurrentQuestion] = useState<AdminTestQuestion>(
     defaultQuestion(1),
   );
+  const [questionEditorMode, setQuestionEditorMode] =
+    useState<QuestionEditorMode>("add");
   const [showQuestionPopup, setShowQuestionPopup] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [saveDialog, setSaveDialog] = useState<"confirm" | "result" | null>(
+    null,
+  );
+  const [saveDialogError, setSaveDialogError] = useState<string | null>(null);
+  const [saveRecalc, setSaveRecalc] = useState<AdminTestUpdateRecalc | null>(
+    null,
+  );
 
   useEffect(() => {
     if (editingTest && (mode === "edit" || mode === "view")) {
@@ -100,22 +132,15 @@ export function AdminTestForm({
   };
 
   const openNewQuestion = (type: AdminTestQuestionType) => {
-    setCurrentQuestion({
-      ...defaultQuestion(testData.questions.length + 1),
-      type,
-      correctAnswers: type === "text" ? [""] : [],
-      answers:
-        type === "text"
-          ? []
-          : [
-              { id: "a", text: "", isCorrect: false },
-              { id: "b", text: "", isCorrect: false },
-            ],
-    });
+    setQuestionEditorMode("add");
+    setCurrentQuestion(
+      buildNewQuestion(type, nextQuestionId(testData.questions)),
+    );
     setShowQuestionPopup(true);
   };
 
   const editQuestion = (question: AdminTestQuestion, index: number) => {
+    setQuestionEditorMode("edit");
     setCurrentQuestion({
       ...question,
       questionId: question.questionId || index + 1,
@@ -126,28 +151,46 @@ export function AdminTestForm({
   };
 
   const saveQuestion = () => {
-    const questionToAdd: AdminTestQuestion = { ...currentQuestion };
-    if (questionToAdd.type === "text") {
-      questionToAdd.answers = [];
+    const draft: AdminTestQuestion = { ...currentQuestion };
+    if (draft.type === "text") {
+      draft.answers = [];
     } else {
-      questionToAdd.correctAnswers = [];
+      draft.correctAnswers = [];
     }
 
-    const existingIndex = testData.questions.findIndex(
-      (q) => q.questionId === questionToAdd.questionId,
+    setTestData((prev) => {
+      if (questionEditorMode === "edit") {
+        const existingIndex = prev.questions.findIndex(
+          (q) => q.questionId === draft.questionId,
+        );
+        if (existingIndex < 0) {
+          // Редактируемый ID пропал — не затираем чужой, добавляем как новый.
+          const questionId = nextQuestionId(prev.questions);
+          return {
+            ...prev,
+            questions: [...prev.questions, { ...draft, questionId }],
+          };
+        }
+        return {
+          ...prev,
+          questions: prev.questions.map((q, i) =>
+            i === existingIndex ? draft : q,
+          ),
+        };
+      }
+
+      // add: всегда append со свежим свободным ID (на случай устаревшего popup state)
+      const questionId = nextQuestionId(prev.questions);
+      return {
+        ...prev,
+        questions: [...prev.questions, { ...draft, questionId }],
+      };
+    });
+
+    setQuestionEditorMode("add");
+    setCurrentQuestion(
+      defaultQuestion(nextQuestionId(testData.questions) + 1),
     );
-
-    setTestData((prev) => ({
-      ...prev,
-      questions:
-        existingIndex >= 0
-          ? prev.questions.map((q, i) =>
-              i === existingIndex ? questionToAdd : q,
-            )
-          : [...prev.questions, questionToAdd],
-    }));
-
-    setCurrentQuestion(defaultQuestion(testData.questions.length + 2));
     setShowQuestionPopup(false);
   };
 
@@ -159,15 +202,18 @@ export function AdminTestForm({
       return;
     }
 
-    setSaving(true);
     setError(null);
 
+    if (mode === "edit" && editingTest) {
+      setSaveDialogError(null);
+      setSaveRecalc(null);
+      setSaveDialog("confirm");
+      return;
+    }
+
+    setSaving(true);
     try {
-      if (mode === "edit" && editingTest) {
-        await updateAdminTest(editingTest._id, testData);
-      } else {
-        await createAdminTest(testData);
-      }
+      await createAdminTest(testData);
       onSaved();
     } catch (err) {
       setError(
@@ -175,6 +221,33 @@ export function AdminTestForm({
       );
     } finally {
       setSaving(false);
+    }
+  };
+
+  const confirmEditSave = async () => {
+    if (!editingTest) return;
+    setSaving(true);
+    setSaveDialogError(null);
+    try {
+      const result = await updateAdminTest(editingTest._id, testData);
+      setSaveRecalc(result.recalc ?? null);
+      setSaveDialog("result");
+    } catch (err) {
+      setSaveDialogError(
+        err instanceof Error ? err.message : "Не удалось сохранить тест",
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const closeSaveDialog = () => {
+    if (saving) return;
+    const wasResult = saveDialog === "result";
+    setSaveDialog(null);
+    setSaveDialogError(null);
+    if (wasResult) {
+      onSaved();
     }
   };
 
@@ -394,6 +467,18 @@ export function AdminTestForm({
             onClose={() => setShowQuestionPopup(false)}
           />
         ) : null}
+
+        {saveDialog ? (
+          <AdminTestSaveRecalcDialog
+            mode={saveDialog}
+            saving={saving}
+            saveError={saveDialogError}
+            recalc={saveRecalc}
+            onCancel={closeSaveDialog}
+            onConfirm={() => void confirmEditSave()}
+            onCloseResult={closeSaveDialog}
+          />
+        ) : null}
       </div>
     </div>
   );
@@ -438,7 +523,7 @@ function QuestionPopup({
   };
 
   return (
-    <div className={styles.popupOverlay} onClick={onClose} role="presentation">
+    <DismissibleOverlay className={styles.popupOverlay} onDismiss={onClose} role="presentation">
       <div
         className={styles.popup}
         onClick={(e) => e.stopPropagation()}
@@ -553,6 +638,6 @@ function QuestionPopup({
           </Button>
         </div>
       </div>
-    </div>
+    </DismissibleOverlay>
   );
 }

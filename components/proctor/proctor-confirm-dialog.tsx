@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { DismissibleOverlay } from "@/components/ui/dismissible-overlay";
 import { AlertTriangle, Users } from "lucide-react";
 import styles from "./proctor.module.css";
 
@@ -34,10 +35,11 @@ export function ProctorConfirmDialog({
   const Icon = state.kind === "bulk" ? Users : AlertTriangle;
 
   return (
-    <div
+    <DismissibleOverlay
       className={styles.confirmOverlay}
       role="presentation"
-      onClick={loading ? undefined : onCancel}
+      onDismiss={onCancel}
+      disabled={loading}
     >
       <div
         className={styles.confirmDialog}
@@ -89,6 +91,6 @@ export function ProctorConfirmDialog({
           </Button>
         </div>
       </div>
-    </div>
+    </DismissibleOverlay>
   );
 }

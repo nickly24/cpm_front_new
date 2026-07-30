@@ -19,6 +19,8 @@ export interface DraftQuestionNode {
   text: string;
   points: number;
   answers: DraftAnswerNode[];
+  /** Локальная пометка до «Сохранить изменения» (test-edit). На сервер не уходит. */
+  markedForDeletion?: boolean;
 }
 
 export interface DraftCanvasModel {

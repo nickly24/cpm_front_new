@@ -5,6 +5,7 @@ import styles from "@/components/admin/training/admin-training.module.css";
 import { SectionHeroBanner } from "@/components/student/section-hero-banner";
 import heroStyles from "@/components/student/section-hero-banner.module.css";
 import { Button } from "@/components/ui/button";
+import { DismissibleOverlay } from "@/components/ui/dismissible-overlay";
 import { LoadingState } from "@/components/ui/loading-state";
 import { cn } from "@/lib/cn";
 import { STUDENT_SECTION_BANNERS } from "@/lib/student/section-banners";
@@ -255,7 +256,7 @@ function FormModal({
   };
 
   return (
-    <div className={styles.overlay} onClick={onClose}>
+    <DismissibleOverlay className={styles.overlay} onDismiss={onClose}>
       <div
         className={styles.modal}
         onClick={(event) => event.stopPropagation()}
@@ -333,7 +334,7 @@ function FormModal({
           </div>
         </form>
       </div>
-    </div>
+    </DismissibleOverlay>
   );
 }
 

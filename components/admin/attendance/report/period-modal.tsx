@@ -4,6 +4,7 @@ import attendanceStyles from "@/components/admin/attendance/admin-attendance.mod
 import reportStyles from "@/components/admin/attendance/report/report.module.css";
 import styles from "@/components/admin/tests/admin-tests.module.css";
 import { Button } from "@/components/ui/button";
+import { DismissibleOverlay } from "@/components/ui/dismissible-overlay";
 import { OptionSelect } from "@/components/ui/option-select";
 import {
   getMonthRange,
@@ -94,7 +95,7 @@ export function PeriodModal({ onClose, onCreate }: PeriodModalProps) {
   };
 
   return (
-    <div className={attendanceStyles.modalOverlay} onClick={onClose}>
+    <DismissibleOverlay className={attendanceStyles.modalOverlay} onDismiss={onClose}>
       <form
         className={attendanceStyles.modal}
         style={{ maxWidth: 480 }}
@@ -184,6 +185,6 @@ export function PeriodModal({ onClose, onCreate }: PeriodModalProps) {
           <Button type="submit">Создать</Button>
         </div>
       </form>
-    </div>
+    </DismissibleOverlay>
   );
 }

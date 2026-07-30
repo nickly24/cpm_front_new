@@ -29,12 +29,15 @@ import {
 import {
   ArrowLeft,
   Check,
+  ChevronDown,
   ChevronRight,
   FileQuestion,
+  Plus,
   Redo2,
   Save,
   Settings,
   Scissors,
+  RotateCcw,
   Trash2,
   Undo2,
   CircleDot,
@@ -68,7 +71,8 @@ import {
   unlockAdminTestDraft,
   updateAdminTestDraft,
 } from "@/lib/admin/admin-test-drafts-api";
-import { updateAdminTest } from "@/lib/admin/admin-tests-api";
+import { AdminTestSaveRecalcDialog } from "@/components/admin/tests/admin-test-save-recalc-dialog";
+import { updateAdminTest, type AdminTestUpdateRecalc } from "@/lib/admin/admin-tests-api";
 import type {
   AdminTestDraft,
   DraftAnswerNode,
@@ -182,6 +186,7 @@ function questionSnapshot(question: DraftQuestionNode) {
     type: question.type,
     text: question.text,
     points: question.points,
+    markedForDeletion: Boolean(question.markedForDeletion),
     answers: question.answers.map((answer) => ({
       id: answer.id,
       kind: answer.kind,
@@ -467,7 +472,7 @@ function defaultQuestion(type: AdminTestQuestionType, position: { x: number; y: 
 
 function validateDraft(draft: AdminTestDraft): DraftValidationError[] {
   const errors: DraftValidationError[] = [];
-  const questions = draft.canvas.questions;
+  const questions = draft.canvas.questions.filter((question) => !question.markedForDeletion);
   if (!draft.title.trim()) errors.push({ targetId: "metadata", message: "Укажите название теста" });
   if (!draft.direction.trim()) errors.push({ targetId: "metadata", message: "Выберите направление" });
   if (!draft.startDate || !draft.endDate) {
@@ -504,7 +509,9 @@ function validateDraft(draft: AdminTestDraft): DraftValidationError[] {
 
 function validateDraftWarnings(draft: AdminTestDraft): DraftValidationError[] {
   const warnings: DraftValidationError[] = [];
-  draft.canvas.questions.forEach((question, index) => {
+  draft.canvas.questions
+    .filter((question) => !question.markedForDeletion)
+    .forEach((question, index) => {
     const num = index + 1;
     const trimmedQuestion = question.text.trim();
     if (trimmedQuestion && trimmedQuestion.length < 5) {
@@ -842,6 +849,8 @@ function QuestionNode(props: NodeProps) {
     onChangeQuestionType: (questionId: string, type: AdminTestQuestionType) => void;
     onUpdateQuestionPoints: (questionId: string, points: number) => void;
     onToggleAnswerCorrect: (questionId: string, answerId: string) => void;
+    onRestoreQuestion: (questionId: string) => void;
+    softDeleteEnabled: boolean;
     isQuestionDirty: boolean;
     disableQuestionReorder: boolean;
     areaSelectionPreview: {
@@ -857,6 +866,7 @@ function QuestionNode(props: NodeProps) {
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
   const copied = data.copiedIds.includes(data.question.id);
+  const markedDeleted = Boolean(data.question.markedForDeletion);
   const hasDropError = Boolean(data.dropErrorMessage);
   const previewQuestionSelected =
     data.areaSelectionPreview?.mode === "questions" &&
@@ -980,8 +990,8 @@ function QuestionNode(props: NodeProps) {
   return (
     <div
       data-question-id={data.question.id}
-      className={`nopan ${styles.questionNode} ${questionSelected ? styles.questionNodeSelected : ""} ${copied ? styles.questionNodeCopied : ""} ${hasDropError ? styles.questionNodeDropError : ""} ${previewQuestionSelected ? styles.questionNodePreviewSelected : ""} ${data.isQuestionDirty ? styles.questionNodeDirty : ""}`}
-      onPointerDown={onPointerDown}
+      className={`nopan ${styles.questionNode} ${questionSelected ? styles.questionNodeSelected : ""} ${copied ? styles.questionNodeCopied : ""} ${hasDropError ? styles.questionNodeDropError : ""} ${previewQuestionSelected ? styles.questionNodePreviewSelected : ""} ${data.isQuestionDirty ? styles.questionNodeDirty : ""} ${markedDeleted ? styles.questionNodeMarkedDeleted : ""}`}
+      onPointerDown={markedDeleted ? undefined : onPointerDown}
       onClick={(event) => {
         event.stopPropagation();
         if ((event.target as HTMLElement).closest("[data-inline-editable='true']")) return;
@@ -989,8 +999,12 @@ function QuestionNode(props: NodeProps) {
         data.onCommitInlineEdit();
         data.onSelectQuestion(data.question.id);
       }}
-      onDragOver={(event) => event.preventDefault()}
+      onDragOver={(event) => {
+        if (markedDeleted) return;
+        event.preventDefault();
+      }}
       onDrop={(event) => {
+        if (markedDeleted) return;
         const answerId = event.dataTransfer.getData("application/x-cpm-answer-id");
         const rawAnswerIds = event.dataTransfer.getData("application/x-cpm-answer-ids");
         let answerIds = answerId ? [answerId] : [];
@@ -1005,6 +1019,32 @@ function QuestionNode(props: NodeProps) {
         if (answerIds.length > 0) data.onDropAnswer(data.question.id, answerIds);
       }}
     >
+      {markedDeleted ? (
+        <div className={styles.questionDeletedChip} data-question-meta="true">
+          <span className={styles.questionDeletedChipIcon} aria-hidden="true">
+            <Trash2 size={14} strokeWidth={2.4} />
+          </span>
+          <span className={styles.questionDeletedChipPanel}>
+            <span className={styles.questionDeletedChipText}>
+              Удалится при сохранении
+            </span>
+            <button
+              type="button"
+              className={styles.questionRestoreButton}
+              title="Вернуть вопрос"
+              aria-label="Вернуть вопрос"
+              onPointerDown={(event) => event.stopPropagation()}
+              onClick={(event) => {
+                event.stopPropagation();
+                data.onRestoreQuestion(data.question.id);
+              }}
+            >
+              <RotateCcw size={13} strokeWidth={2.4} aria-hidden="true" />
+              Вернуть
+            </button>
+          </span>
+        </div>
+      ) : null}
       {data.dropErrorMessage ? (
         <div className={styles.dropErrorBubble}>{data.dropErrorMessage}</div>
       ) : null}
@@ -1210,6 +1250,10 @@ function AdminTestDraftEditorInner({
   const [questionGrabActive, setQuestionGrabActive] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [committing, setCommitting] = useState(false);
+  const [saveDialog, setSaveDialog] = useState<"confirm" | "result" | null>(null);
+  const [saveDialogError, setSaveDialogError] = useState<string | null>(null);
+  const [saveRecalc, setSaveRecalc] = useState<AdminTestUpdateRecalc | null>(null);
+  const [addQuestionMenuOpen, setAddQuestionMenuOpen] = useState(false);
   const [savedDraft, setSavedDraft] = useState<AdminTestDraft>({
     ...normalizedInitialDraft,
   });
@@ -1595,6 +1639,15 @@ function AdminTestDraftEditorInner({
     selectQuestionOnly(created.question.id);
   }, [draft.canvas.questions, mutateCanvas, selectQuestionOnly]);
 
+  const addQuestionFromMenu = useCallback(
+    (type: AdminTestQuestionType) => {
+      if (!canEdit) return;
+      setAddQuestionMenuOpen(false);
+      addQuestion(type);
+    },
+    [addQuestion, canEdit],
+  );
+
   const insertQuestionAt = useCallback((insertIndex: number, type: AdminTestQuestionType) => {
     const created = defaultQuestion(type, { x: 0, y: GRID_START_Y });
     mutateCanvas((canvas) => {
@@ -1720,11 +1773,8 @@ function AdminTestDraftEditorInner({
   }, [appendAnswerToQuestion, selectedQuestion]);
 
   const deleteSelection = useCallback(() => {
-    if (requireExplicitSave) {
-      window.alert("Удаление в этом режиме отключено.");
-      return;
-    }
     if (selectedAnswerIds.length > 0 && selectedQuestion) {
+      if (selectedQuestion.markedForDeletion) return;
       const selectedAnswerSet = new Set(selectedAnswerIds);
       updateQuestion(selectedQuestion.id, {
         answers: selectedQuestion.answers.filter((answer) => !selectedAnswerSet.has(answer.id)),
@@ -1732,19 +1782,89 @@ function AdminTestDraftEditorInner({
       selectQuestionOnly(selectedQuestion.id);
       return;
     }
-    if (selectedQuestionId) {
-      mutateCanvas((canvas) => {
-        const nextQuestions = canvas.questions.filter(
-          (question) => question.id !== selectedQuestionId,
-        );
-        return {
-          questions: nextQuestions,
-          layout: linearizeLayout(nextQuestions),
-        };
-      });
-      clearSelection();
+
+    const ids =
+      selectedQuestionIds.length > 0
+        ? selectedQuestionIds
+        : selectedQuestionId
+          ? [selectedQuestionId]
+          : [];
+    if (ids.length === 0) return;
+
+    if (requireExplicitSave) {
+      const idSet = new Set(ids);
+      mutateCanvas((canvas) => ({
+        ...canvas,
+        questions: canvas.questions.map((question) =>
+          idSet.has(question.id) ? { ...question, markedForDeletion: true } : question,
+        ),
+      }));
+      return;
     }
-  }, [clearSelection, mutateCanvas, requireExplicitSave, selectQuestionOnly, selectedAnswerIds, selectedQuestion, selectedQuestionId, updateQuestion]);
+
+    mutateCanvas((canvas) => {
+      const nextQuestions = canvas.questions.filter((question) => !ids.includes(question.id));
+      return {
+        questions: nextQuestions,
+        layout: linearizeLayout(nextQuestions),
+      };
+    });
+    clearSelection();
+  }, [
+    clearSelection,
+    mutateCanvas,
+    requireExplicitSave,
+    selectQuestionOnly,
+    selectedAnswerIds,
+    selectedQuestion,
+    selectedQuestionId,
+    selectedQuestionIds,
+    updateQuestion,
+  ]);
+
+  const restoreQuestion = useCallback(
+    (questionId: string) => {
+      mutateCanvas((canvas) => ({
+        ...canvas,
+        questions: canvas.questions.map((question) =>
+          question.id === questionId
+            ? { ...question, markedForDeletion: false }
+            : question,
+        ),
+      }));
+    },
+    [mutateCanvas],
+  );
+
+  const restoreSelectedQuestions = useCallback(() => {
+    const ids =
+      selectedQuestionIds.length > 0
+        ? selectedQuestionIds
+        : selectedQuestionId
+          ? [selectedQuestionId]
+          : [];
+    if (ids.length === 0) return;
+    const idSet = new Set(ids);
+    mutateCanvas((canvas) => ({
+      ...canvas,
+      questions: canvas.questions.map((question) =>
+        idSet.has(question.id) ? { ...question, markedForDeletion: false } : question,
+      ),
+    }));
+  }, [mutateCanvas, selectedQuestionId, selectedQuestionIds]);
+
+  const purgeMarkedQuestions = useCallback((source: AdminTestDraft): AdminTestDraft => {
+    const nextQuestions = source.canvas.questions.filter(
+      (question) => !question.markedForDeletion,
+    );
+    return {
+      ...source,
+      canvas: {
+        questions: nextQuestions,
+        layout: linearizeLayout(nextQuestions),
+      },
+    };
+  }, []);
 
   const copySelection = useCallback(async () => {
     if (selectedAnswers.length > 0) {
@@ -2514,37 +2634,54 @@ function AdminTestDraftEditorInner({
     return () => window.cancelAnimationFrame(frame);
   }, [getViewport, renderHorizontalScrollThumb, sortedQuestions.length, syncHorizontalScrollFromViewport]);
 
-  const saveWithConfirm = useCallback(
-    async () => {
-      if (!canEdit || !isTestPersistence || !sourceTestId) return;
-      if (!hasUnsavedChanges) return;
+  const saveWithConfirm = useCallback(() => {
+    if (!canEdit || !isTestPersistence || !sourceTestId) return;
+    if (!hasUnsavedChanges) return;
 
-      const errors = validateDraft(draft);
-      setValidationErrors(errors);
-      if (errors.length > 0) return;
+    const errors = validateDraft(draft);
+    setValidationErrors(errors);
+    if (errors.length > 0) return;
 
-      const confirmed = window.confirm(
-        "Вы точно уверены? Данные запишутся в историю, а также обнулят все выученные карточки по изменённым вопросам.",
+    setSaveDialogError(null);
+    setSaveRecalc(null);
+    setSaveDialog("confirm");
+  }, [canEdit, draft, hasUnsavedChanges, isTestPersistence, sourceTestId]);
+
+  const confirmSaveToTest = useCallback(async () => {
+    if (!sourceTestId) return;
+
+    setCommitting(true);
+    setAutosaveState("saving");
+    setSaveDialogError(null);
+    try {
+      const result = await updateAdminTest(
+        sourceTestId,
+        canvasStateToTestFormData(draft),
       );
-      if (!confirmed) return;
+      const purged = purgeMarkedQuestions(draft);
+      setDraft(purged);
+      setSavedDraft({ ...purged });
+      lastSavedSnapshotRef.current = autosaveSnapshot(purged);
+      setAutosaveState("saved");
+      setHistoryRefreshKey((prev) => prev + 1);
+      onTestSaved?.(sourceTestId);
+      setSaveRecalc(result.recalc ?? null);
+      setSaveDialog("result");
+    } catch (err) {
+      setAutosaveState("error");
+      setSaveDialogError(
+        err instanceof Error ? err.message : "Не удалось сохранить тест",
+      );
+    } finally {
+      setCommitting(false);
+    }
+  }, [draft, onTestSaved, purgeMarkedQuestions, sourceTestId]);
 
-      setCommitting(true);
-      setAutosaveState("saving");
-      try {
-        await updateAdminTest(sourceTestId, canvasStateToTestFormData(draft));
-        setSavedDraft({ ...draft });
-        lastSavedSnapshotRef.current = autosaveSnapshot(draft);
-        setAutosaveState("saved");
-        setHistoryRefreshKey((prev) => prev + 1);
-        onTestSaved?.(sourceTestId);
-      } catch {
-        setAutosaveState("error");
-      } finally {
-        setCommitting(false);
-      }
-    },
-    [canEdit, draft, hasUnsavedChanges, isTestPersistence, onTestSaved, sourceTestId],
-  );
+  const closeSaveDialog = useCallback(() => {
+    if (committing) return;
+    setSaveDialog(null);
+    setSaveDialogError(null);
+  }, [committing]);
 
   const nodes: Node[] = useMemo(() => {
     const stableOrdered = sortQuestions(draft.canvas);
@@ -2598,6 +2735,8 @@ function AdminTestDraftEditorInner({
         onChangeQuestionType: changeQuestionType,
         onUpdateQuestionPoints: updateQuestionPoints,
         onToggleAnswerCorrect: toggleAnswerCorrect,
+        onRestoreQuestion: restoreQuestion,
+        softDeleteEnabled: requireExplicitSave,
         isQuestionDirty: changedQuestionIds.has(question.id),
         disableQuestionReorder,
         areaSelectionPreview,
@@ -2625,17 +2764,19 @@ function AdminTestDraftEditorInner({
     moveAnswerToQuestion,
     openAnswerSplit,
     reorderAnswers,
+    requireExplicitSave,
+    restoreQuestion,
     selectAnswerOnly,
     selectQuestionFromClick,
     selectedAnswerIds,
     selectedQuestionIds,
-    changedQuestionIds,
     shiftKeyHeld,
     toggleAnswerCorrect,
     updateInlineEditDraft,
     updateQuestionPoints,
     validationErrors,
     visibleIssues,
+    changedQuestionIds,
   ]);
 
   const handleNodesChange = useCallback(() => {
@@ -2810,6 +2951,7 @@ function AdminTestDraftEditorInner({
       className={styles.editor}
       onClick={() => {
         setContextMenu(null);
+        setAddQuestionMenuOpen(false);
       }}
     >
       <div className={styles.mobileBlock}>
@@ -2828,12 +2970,62 @@ function AdminTestDraftEditorInner({
             <h1>{draft.title || "Без названия"}</h1>
             <p>
               {isTestPersistence ? "Редактирование теста · " : ""}
-              {sortedQuestions.length} вопросов ·{" "}
-              {draft.direction || "направление не выбрано"}
+              {sortedQuestions.filter((question) => !question.markedForDeletion).length} вопросов
+              {isTestPersistence &&
+              sortedQuestions.some((question) => question.markedForDeletion)
+                ? ` · к удалению: ${sortedQuestions.filter((question) => question.markedForDeletion).length}`
+                : ""}{" "}
+              · {draft.direction || "направление не выбрано"}
             </p>
           </div>
           <div className={styles.topbarActions}>
             <span className={styles.saveState}>{autosaveLabel}</span>
+            <div
+              className={styles.addQuestionWrap}
+              onClick={(event) => event.stopPropagation()}
+            >
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                disabled={!canEdit}
+                aria-expanded={addQuestionMenuOpen}
+                aria-haspopup="menu"
+                onClick={() => setAddQuestionMenuOpen((open) => !open)}
+              >
+                <Plus size={16} aria-hidden />
+                Вопрос
+                <ChevronDown size={14} aria-hidden />
+              </Button>
+              {addQuestionMenuOpen ? (
+                <div className={styles.addQuestionMenu} role="menu">
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => addQuestionFromMenu("single")}
+                  >
+                    <CircleDot size={14} aria-hidden />
+                    Одиночный выбор
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => addQuestionFromMenu("multiple")}
+                  >
+                    <ListChecks size={14} aria-hidden />
+                    Множественный выбор
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => addQuestionFromMenu("text")}
+                  >
+                    <Type size={14} aria-hidden />
+                    Текстовый ответ
+                  </button>
+                </div>
+              ) : null}
+            </div>
             <Button type="button" variant="ghost" size="sm" onClick={() => void copySelection()}>
               Копировать
             </Button>
@@ -2865,7 +3057,7 @@ function AdminTestDraftEditorInner({
               <Button
                 type="button"
                 disabled={!canEdit || !hasUnsavedChanges || committing}
-                onClick={() => void saveWithConfirm()}
+                onClick={() => saveWithConfirm()}
               >
                 <Save size={16} /> {committing ? "Сохраняем..." : "Сохранить изменения"}
               </Button>
@@ -3097,14 +3289,28 @@ function AdminTestDraftEditorInner({
                   type="button"
                   variant="secondary"
                   onClick={() => openAnswerSplit(selectedQuestion.id, selectedAnswer.id)}
+                  disabled={Boolean(selectedQuestion.markedForDeletion)}
                 >
                   <Scissors size={16} aria-hidden />
                   Разобрать ответ
                 </Button>
               ) : null}
-              <Button type="button" variant="ghost" onClick={deleteSelection} disabled={requireExplicitSave}>
-                Удалить выбранное
-              </Button>
+              {requireExplicitSave &&
+              (selectedQuestion?.markedForDeletion ||
+                selectedQuestions.some((question) => question.markedForDeletion)) ? (
+                <Button type="button" variant="secondary" onClick={restoreSelectedQuestions}>
+                  Вернуть вопрос
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={deleteSelection}
+                  disabled={Boolean(selectedQuestion?.markedForDeletion)}
+                >
+                  {requireExplicitSave ? "Удалить (при сохранении)" : "Удалить выбранное"}
+                </Button>
+              )}
             </>
           ) : (
             <>
@@ -3170,7 +3376,9 @@ function AdminTestDraftEditorInner({
         <div className={styles.contextMenu} style={{ left: contextMenu.x, top: contextMenu.y }}>
           <button type="button" onClick={() => void copySelection()}>Копировать</button>
           <button type="button" onClick={() => void pasteSelection()}>Вставить</button>
-          {!requireExplicitSave ? <button type="button" onClick={deleteSelection}>Удалить</button> : null}
+          <button type="button" onClick={deleteSelection}>
+            {requireExplicitSave ? "Удалить (при сохранении)" : "Удалить"}
+          </button>
         </div>
       ) : null}
 
@@ -3188,6 +3396,18 @@ function AdminTestDraftEditorInner({
           }
           onClose={() => setAnswerSplitTarget(null)}
           onApply={applyAnswerSplit}
+        />
+      ) : null}
+
+      {saveDialog ? (
+        <AdminTestSaveRecalcDialog
+          mode={saveDialog}
+          saving={committing}
+          saveError={saveDialogError}
+          recalc={saveRecalc}
+          onCancel={closeSaveDialog}
+          onConfirm={() => void confirmSaveToTest()}
+          onCloseResult={closeSaveDialog}
         />
       ) : null}
 

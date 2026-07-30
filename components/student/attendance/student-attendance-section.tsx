@@ -4,6 +4,7 @@ import styles from "@/components/student/attendance/student-attendance.module.cs
 import { AttendanceQrCard } from "@/components/student/performance/attendance-qr-card";
 import { SectionHeroBanner } from "@/components/student/section-hero-banner";
 import { Button } from "@/components/ui/button";
+import { DismissibleOverlay } from "@/components/ui/dismissible-overlay";
 import { LoadingState } from "@/components/ui/loading-state";
 import { useAuth } from "@/contexts/AuthContext";
 import { STUDENT_SECTION_BANNERS } from "@/lib/student/section-banners";
@@ -60,7 +61,7 @@ function ZapDetailModal({
   }, [zapId]);
 
   return (
-    <div className={styles.modalOverlay} onClick={onClose}>
+    <DismissibleOverlay className={styles.modalOverlay} onDismiss={onClose}>
       <div className={styles.modal} onClick={(event) => event.stopPropagation()}>
         <h3 className={styles.modalTitle}>Запрос на отгул #{zapId}</h3>
         {loading ? <LoadingState label="Загрузка…" variant="compact" /> : null}
@@ -105,7 +106,7 @@ function ZapDetailModal({
           </Button>
         </div>
       </div>
-    </div>
+    </DismissibleOverlay>
   );
 }
 

@@ -4,6 +4,7 @@ import trainingStyles from "@/components/admin/training/admin-training.module.cs
 import testStyles from "@/components/admin/tests/admin-tests.module.css";
 import uploadStyles from "@/components/admin/upload/admin-upload.module.css";
 import { Button } from "@/components/ui/button";
+import { DismissibleOverlay } from "@/components/ui/dismissible-overlay";
 import {
   ANSWER_SPLIT_DELIMITER_OPTIONS,
   detectDelimiter,
@@ -89,7 +90,7 @@ export function AdminAnswerSplitModal({
   const canApply = parts.some((part) => part.trim().length > 0);
 
   return (
-    <div className={trainingStyles.overlay} onClick={onClose}>
+    <DismissibleOverlay className={trainingStyles.overlay} onDismiss={onClose}>
       <div
         className={trainingStyles.modal}
         role="dialog"
@@ -232,6 +233,6 @@ export function AdminAnswerSplitModal({
           </Button>
         </div>
       </div>
-    </div>
+    </DismissibleOverlay>
   );
 }

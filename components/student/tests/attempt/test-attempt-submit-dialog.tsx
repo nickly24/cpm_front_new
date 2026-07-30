@@ -1,6 +1,7 @@
 "use client";
 
 import styles from "@/components/student/tests/attempt/test-attempt.module.css";
+import { DismissibleOverlay } from "@/components/ui/dismissible-overlay";
 import { AlertCircle, Send } from "lucide-react";
 
 export type SubmitDialogMode = "confirm" | "error";
@@ -48,10 +49,11 @@ export function TestAttemptSubmitDialog({
       "Все ответы и итоговый результат сохранены на этом устройстве. Отвечать заново не нужно." );
 
   return (
-    <div
+    <DismissibleOverlay
       className={styles.submitDialogOverlay}
       role="presentation"
-      onClick={loading ? undefined : onCancel}
+      onDismiss={onCancel}
+      disabled={loading}
     >
       <div
         className={styles.submitDialog}
@@ -104,6 +106,6 @@ export function TestAttemptSubmitDialog({
           )}
         </div>
       </div>
-    </div>
+    </DismissibleOverlay>
   );
 }

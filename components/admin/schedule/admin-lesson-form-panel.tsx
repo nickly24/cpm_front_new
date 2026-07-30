@@ -4,6 +4,7 @@ import adminStyles from "@/components/admin/tests/admin-tests.module.css";
 import userStyles from "@/components/admin/users/admin-users.module.css";
 import scheduleStyles from "@/components/schedule/schedule.module.css";
 import { Button } from "@/components/ui/button";
+import { DismissibleOverlay } from "@/components/ui/dismissible-overlay";
 import {
   SCHEDULE_DAYS,
   type ScheduleDay,
@@ -89,7 +90,7 @@ export function AdminLessonFormPanel({
   };
 
   return (
-    <div className={userStyles.overlay} onClick={onClose}>
+    <DismissibleOverlay className={userStyles.overlay} onDismiss={onClose}>
       <div
         className={userStyles.modal}
         onClick={(event) => event.stopPropagation()}
@@ -188,6 +189,6 @@ export function AdminLessonFormPanel({
           </div>
         </form>
       </div>
-    </div>
+    </DismissibleOverlay>
   );
 }

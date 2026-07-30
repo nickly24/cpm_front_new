@@ -265,6 +265,44 @@
   margin-left: auto;
 }
 
+.addQuestionWrap {
+  position: relative;
+}
+
+.addQuestionMenu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  min-width: 220px;
+  padding: 6px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.16);
+}
+
+.addQuestionMenu button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #0f172a;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.addQuestionMenu button:hover {
+  background: #f1f5f9;
+}
+
 .saveState {
   min-width: 96px;
   font-size: 12px;
@@ -708,6 +746,103 @@
   border-color: #ef4444;
   box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.16), 0 18px 46px rgba(15, 23, 42, 0.14);
   animation: errorFrameFade 4s ease forwards;
+}
+
+.questionNodeMarkedDeleted {
+  border-color: #ef4444;
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2), 0 18px 42px rgba(15, 23, 42, 0.1);
+  background: #fff8f8;
+}
+
+.questionNodeMarkedDeleted .questionHead,
+.questionNodeMarkedDeleted .questionBody {
+  pointer-events: none;
+  opacity: 0.55;
+  filter: grayscale(0.15);
+}
+
+.questionDeletedChip {
+  position: absolute;
+  top: -10px;
+  left: -10px;
+  z-index: 8;
+  display: inline-flex;
+  align-items: center;
+  max-width: 34px;
+  height: 34px;
+  overflow: hidden;
+  border: 2px solid #fff;
+  border-radius: 999px;
+  background: #ef4444;
+  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.18);
+  color: #fff;
+  transition:
+    max-width 180ms ease,
+    background 160ms ease,
+    border-radius 160ms ease;
+}
+
+.questionDeletedChip:hover,
+.questionDeletedChip:focus-within {
+  max-width: 260px;
+  border-radius: 999px;
+  background: #dc2626;
+}
+
+.questionDeletedChipIcon {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+}
+
+.questionDeletedChipPanel {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 0 10px 0 0;
+  opacity: 0;
+  transform: translateX(-6px);
+  white-space: nowrap;
+  pointer-events: none;
+  transition:
+    opacity 140ms ease,
+    transform 160ms ease;
+}
+
+.questionDeletedChip:hover .questionDeletedChipPanel,
+.questionDeletedChip:focus-within .questionDeletedChipPanel {
+  opacity: 1;
+  transform: translateX(0);
+  pointer-events: auto;
+}
+
+.questionDeletedChipText {
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.questionRestoreButton {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.questionRestoreButton:hover {
+  background: rgba(255, 255, 255, 0.32);
 }
 
 .dropErrorBubble {
