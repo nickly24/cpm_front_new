@@ -627,7 +627,7 @@ export function AdminTestsSection() {
         </DismissibleOverlay>
       ) : null}
 
-      <header className={styles.pageHeader}>
+      <header className={styles.listPageHeader}>
         <h1 className={styles.pageTitle}>Управление тестами</h1>
         <div className={styles.headerActions}>
           <button
@@ -673,32 +673,32 @@ export function AdminTestsSection() {
           )}
 
           <label className={styles.searchField}>
-            <span className={styles.fieldLabel}>Поиск</span>
+            <span className={styles.listFieldLabel}>Поиск</span>
             <input
               type="search"
-              className={styles.searchInput}
+              className={styles.listSearchInput}
               placeholder="Название теста…"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </label>
 
-          <label className={styles.dateField}>
-            <span className={styles.fieldLabel}>С даты</span>
+          <label className={styles.listDateField}>
+            <span className={styles.listFieldLabel}>С даты</span>
             <input
               type="date"
-              className={styles.dateInput}
+              className={styles.listDateInput}
               value={dateFilter.startDate}
               onChange={(e) =>
                 setDateFilter((f) => ({ ...f, startDate: e.target.value }))
               }
             />
           </label>
-          <label className={styles.dateField}>
-            <span className={styles.fieldLabel}>По дату</span>
+          <label className={styles.listDateField}>
+            <span className={styles.listFieldLabel}>По дату</span>
             <input
               type="date"
-              className={styles.dateInput}
+              className={styles.listDateInput}
               value={dateFilter.endDate}
               onChange={(e) =>
                 setDateFilter((f) => ({ ...f, endDate: e.target.value }))
@@ -707,7 +707,7 @@ export function AdminTestsSection() {
           </label>
         </div>
 
-        <div className={styles.statusFilters}>
+        <div className={styles.listStatusFilters}>
           {(
             [
               ["all", "Все"],
@@ -720,7 +720,7 @@ export function AdminTestsSection() {
             <button
               key={key}
               type="button"
-              className={`${styles.filterChip} ${statusFilter === key ? styles.filterChipActive : ""}`}
+              className={`${styles.listFilterChip} ${statusFilter === key ? styles.listFilterChipActive : ""}`}
               onClick={() => setStatusFilter(key)}
             >
               {label} ({countByStatus(key)})
@@ -728,7 +728,7 @@ export function AdminTestsSection() {
           ))}
           <button
             type="button"
-            className={styles.clearBtn}
+            className={styles.listClearBtn}
             disabled={
               !searchTerm &&
               !dateFilter.startDate &&
@@ -772,14 +772,14 @@ export function AdminTestsSection() {
               </button>
             </div>
           ) : (
-            <button type="button" className={styles.clearBtn} onClick={clearFilters}>
+            <button type="button" className={styles.listClearBtn} onClick={clearFilters}>
               Сбросить фильтры
             </button>
           )}
         </div>
       ) : (
         <>
-          <div className={styles.cardsGrid}>
+          <div className={styles.listCardsGrid}>
             {paginatedTests.map((test) => {
               const testId = getAdminTestId(test);
               const external = isAdminExternalTest(test);
@@ -790,11 +790,11 @@ export function AdminTestsSection() {
               return (
                 <article
                   key={testId}
-                  className={`${styles.card} ${external ? styles.cardExternal : ""}`}
+                  className={`${styles.listCard} ${external ? styles.listCardExternal : ""}`}
                 >
-                  <div className={styles.cardHead}>
+                  <div className={styles.listCardHead}>
                     <AdminTestStatusBadge status={status} />
-                    <h3 className={styles.cardTitle}>{getAdminTestTitle(test)}</h3>
+                    <h3 className={styles.listCardTitle}>{getAdminTestTitle(test)}</h3>
                   </div>
 
                   <AdminTestCardSchedule

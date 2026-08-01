@@ -1,24 +1,32 @@
-import type { ScheduleDay } from "./constants";
-
 export interface ScheduleLesson {
   _id: string;
-  day_of_week: ScheduleDay | string;
+  date: string;
   start_time: string;
   end_time: string;
   lesson_name: string;
   teacher_name: string;
   location: string;
+  classroom: string;
+  color: string;
+  is_changed: boolean;
+  is_public: boolean;
+  school_id: number | null;
   created_at?: string;
   updated_at?: string;
 }
 
 export interface ScheduleLessonFormData {
-  day_of_week: ScheduleDay;
+  date: string;
   start_time: string;
   end_time: string;
   lesson_name: string;
   teacher_name: string;
   location: string;
+  classroom: string;
+  color: string;
+  is_changed: boolean;
+  is_public: boolean;
+  school_id: number | null;
 }
 
 export interface ScheduleListResponse {
@@ -34,3 +42,5 @@ export interface ScheduleMutationResponse {
   error?: string;
   lesson_id?: string;
 }
+
+export type CalendarViewMode = "day" | "week" | "month";

@@ -82,7 +82,7 @@ export function AdminTestCardActions({
 
   if (external) {
     return (
-      <div className={styles.cardActions}>
+      <div className={styles.listCardActions}>
         <button
           type="button"
           className={cn(styles.iconAction, styles.iconActionDanger)}
@@ -97,7 +97,7 @@ export function AdminTestCardActions({
   }
 
   return (
-    <div className={styles.cardActions}>
+    <div className={styles.listCardActions}>
       <button
         type="button"
         className={styles.openBtn}

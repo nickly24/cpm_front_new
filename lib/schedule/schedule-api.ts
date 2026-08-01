@@ -5,8 +5,15 @@ import type {
   ScheduleMutationResponse,
 } from "./types";
 
-export async function fetchSchedule(): Promise<ScheduleListResponse> {
-  return apiRequest<ScheduleListResponse>("/api/schedule");
+export async function fetchSchedule(params: {
+  dateFrom: string;
+  dateTo: string;
+}): Promise<ScheduleListResponse> {
+  const qs = new URLSearchParams({
+    date_from: params.dateFrom,
+    date_to: params.dateTo,
+  });
+  return apiRequest<ScheduleListResponse>(`/api/schedule?${qs.toString()}`);
 }
 
 export async function createScheduleLesson(
