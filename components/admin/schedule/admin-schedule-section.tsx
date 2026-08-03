@@ -1,9 +1,11 @@
 "use client";
 
+import { AdminCreateScheduleMenu } from "@/components/admin/schedule/admin-create-schedule-menu";
 import {
   AdminInspectorIdle,
   AdminLessonForm,
 } from "@/components/admin/schedule/admin-lesson-form";
+import { ScheduleTableWorkspace } from "@/components/admin/schedule/table/schedule-table-workspace";
 import { CalendarShell } from "@/components/schedule/calendar-shell";
 import {
   calendarLabel,
@@ -34,7 +36,7 @@ import {
   shiftSelectedDate,
   todayISO,
 } from "@/lib/schedule/utils";
-import { ChevronDown, Plus, RefreshCw } from "lucide-react";
+import { ChevronDown, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 type RightPanel =
@@ -70,6 +72,7 @@ export function AdminScheduleSection() {
   const [panel, setPanel] = useState<RightPanel>(null);
   const [activeCalendar, setActiveCalendar] =
     useState<ActiveCalendarKey>(PUBLIC_CALENDAR_KEY);
+  const [showTableEditor, setShowTableEditor] = useState(false);
   const isMobile = useIsMobileSheet();
 
   const range = useMemo(
@@ -105,7 +108,7 @@ export function AdminScheduleSection() {
   }, [loadSchedule]);
 
   useEffect(() => {
-    void fetchAdminSchools(true)
+    void fetchAdminSchools(false)
       .then(setSchools)
       .catch(() => setSchools([]));
   }, []);
@@ -233,6 +236,23 @@ export function AdminScheduleSection() {
     ? styles.sheetPanel
     : `${styles.sideDrawer} ${styles.sideDrawerRight}`;
 
+  if (showTableEditor) {
+    return (
+      <ScheduleTableWorkspace
+        schools={schools}
+        initialDate={selectedDate}
+        initialCalendar={activeCalendar}
+        onClose={(nextCalendar) => {
+          if (nextCalendar) setActiveCalendar(nextCalendar);
+          setShowTableEditor(false);
+        }}
+        onSaved={() => {
+          void loadSchedule();
+        }}
+      />
+    );
+  }
+
   return (
     <div className={styles.adminLayout}>
       <div className={styles.adminLayoutMain}>
@@ -271,16 +291,14 @@ export function AdminScheduleSection() {
               >
                 <RefreshCw size={17} strokeWidth={2.25} />
               </button>
-              <button
-                type="button"
-                className={styles.createPlusBtn}
-                aria-label="Добавить занятие"
-                title="Добавить"
-                onClick={() => setPanel({ type: "create" })}
+              <AdminCreateScheduleMenu
                 disabled={actionBusy}
-              >
-                <Plus size={20} strokeWidth={2.4} aria-hidden />
-              </button>
+                onCreateLesson={() => setPanel({ type: "create" })}
+                onOpenTableEditor={() => {
+                  setPanel(null);
+                  setShowTableEditor(true);
+                }}
+              />
             </>
           }
         />

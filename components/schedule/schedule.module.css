@@ -72,6 +72,89 @@
   cursor: not-allowed;
 }
 
+.createPlusBtnOpen {
+  transform: rotate(45deg);
+  background: var(--ds-accent-hover, color-mix(in srgb, var(--ds-accent) 88%, #000));
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--ds-accent) 35%, transparent);
+}
+
+.createMenuWrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.createMicroMenu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 40;
+  display: flex;
+  min-width: 210px;
+  flex-direction: column;
+  gap: 2px;
+  padding: 5px;
+  border: 1px solid var(--ds-border);
+  border-radius: 14px;
+  background: var(--ds-surface);
+  box-shadow: var(--ds-shadow-md, 0 8px 24px rgba(0, 0, 0, 0.12));
+  animation: scheduleCreateMicroIn 0.15s ease;
+}
+
+@keyframes scheduleCreateMicroIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.createMicroItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 8px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ds-text);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.createMicroItem:hover {
+  background: var(--ds-surface-muted);
+}
+
+.createMicroIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  background: var(--ds-surface-muted);
+  color: var(--ds-text-secondary);
+}
+
+.createMicroIconAccent {
+  background: var(--ds-accent-soft);
+  color: var(--ds-accent);
+}
+
+.createMicroIconExcel {
+  background: color-mix(in srgb, #21a366 18%, #fff);
+  color: #217346;
+}
+
 .refreshIconBtn {
   display: inline-flex;
   align-items: center;
@@ -511,6 +594,28 @@
 
 .lessonCard:hover {
   filter: brightness(0.98);
+}
+
+:global(html.dark) .lessonCard {
+  background: var(--ds-surface-muted);
+  border: 1px solid color-mix(in srgb, var(--ds-border) 80%, transparent);
+  border-left: 3px solid var(--lesson-border, var(--ds-accent));
+  box-shadow: none;
+  color: var(--ds-text);
+}
+
+:global(html.dark) .lessonCard:hover {
+  filter: none;
+  background: color-mix(in srgb, var(--lesson-color, var(--ds-accent)) 10%, var(--ds-surface-muted));
+}
+
+:global(html.dark) .lessonMetaRow {
+  color: var(--ds-text-secondary);
+}
+
+:global(html.dark) .changedBadge {
+  background: color-mix(in srgb, #ff9f0a 28%, var(--ds-surface));
+  color: #ffb340;
 }
 
 .lessonCardCompact {

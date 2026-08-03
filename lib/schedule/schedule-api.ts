@@ -1,5 +1,7 @@
 import { apiRequest } from "@/lib/api/client";
 import type {
+  ScheduleBulkRequest,
+  ScheduleBulkResponse,
   ScheduleLessonFormData,
   ScheduleListResponse,
   ScheduleMutationResponse,
@@ -40,5 +42,14 @@ export async function deleteScheduleLesson(
 ): Promise<ScheduleMutationResponse> {
   return apiRequest<ScheduleMutationResponse>(`/api/schedule/${lessonId}`, {
     method: "DELETE",
+  });
+}
+
+export async function bulkSaveSchedule(
+  payload: ScheduleBulkRequest,
+): Promise<ScheduleBulkResponse> {
+  return apiRequest<ScheduleBulkResponse>("/api/schedule/bulk", {
+    method: "POST",
+    body: JSON.stringify(payload),
   });
 }

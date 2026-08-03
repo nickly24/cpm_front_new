@@ -43,4 +43,23 @@ export interface ScheduleMutationResponse {
   lesson_id?: string;
 }
 
+export interface ScheduleBulkUpdateItem extends ScheduleLessonFormData {
+  _id: string;
+}
+
+export interface ScheduleBulkRequest {
+  creates: ScheduleLessonFormData[];
+  updates: ScheduleBulkUpdateItem[];
+  deletes: string[];
+}
+
+export interface ScheduleBulkResponse {
+  status: boolean;
+  message?: string;
+  error?: string;
+  created_ids?: string[];
+  updated_count?: number;
+  deleted_count?: number;
+}
+
 export type CalendarViewMode = "day" | "week" | "month";

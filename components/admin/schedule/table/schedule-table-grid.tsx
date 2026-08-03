@@ -1,0 +1,246 @@
+"use client";
+
+import styles from "@/components/admin/schedule/table/schedule-table.module.css";
+import { SCHEDULE_PRESET_COLORS } from "@/lib/schedule/constants";
+import {
+  emptyTableRow,
+  formatDayBandLabel,
+  isRowBlank,
+  isRowFilledEnough,
+  type ScheduleTableRow,
+} from "@/lib/schedule/schedule-table-utils";
+import { Plus, Trash2 } from "lucide-react";
+
+interface ScheduleTableGridProps {
+  weekDates: string[];
+  rows: ScheduleTableRow[];
+  onChange: (rows: ScheduleTableRow[]) => void;
+}
+
+type RowField = keyof Pick<
+  ScheduleTableRow,
+  | "start_time"
+  | "end_time"
+  | "lesson_name"
+  | "teacher_name"
+  | "location"
+  | "classroom"
+  | "color"
+  | "is_changed"
+>;
+
+export function ScheduleTableGrid({
+  weekDates,
+  rows,
+  onChange,
+}: ScheduleTableGridProps) {
+  const updateRow = (key: string, patch: Partial<ScheduleTableRow>) => {
+    onChange(rows.map((row) => (row.key === key ? { ...row, ...patch } : row)));
+  };
+
+  const removeRow = (key: string) => {
+    onChange(rows.filter((row) => row.key !== key));
+  };
+
+  const addRow = (date: string) => {
+    onChange([...rows, emptyTableRow(date)]);
+  };
+
+  const setField = (key: string, field: RowField, value: string | boolean) => {
+    updateRow(key, { [field]: value } as Partial<ScheduleTableRow>);
+  };
+
+  return (
+    <div className={styles.gridWrap}>
+      {weekDates.map((date) => {
+        const dayRows = rows.filter((row) => row.date === date);
+        return (
+          <div key={date}>
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th className={styles.dayBand} colSpan={9}>
+                    {formatDayBandLabel(date)}
+                  </th>
+                </tr>
+                <tr>
+                  <th className={`${styles.colHead} ${styles.colHeadNarrow}`}>
+                    Начало
+                  </th>
+                  <th className={`${styles.colHead} ${styles.colHeadNarrow}`}>
+                    Конец
+                  </th>
+                  <th className={styles.colHead}>Предмет</th>
+                  <th className={styles.colHead}>Преподаватель</th>
+                  <th className={styles.colHead}>Локация</th>
+                  <th className={styles.colHead}>Аудитория</th>
+                  <th className={`${styles.colHead} ${styles.colHeadNarrow}`}>
+                    Цвет
+                  </th>
+                  <th className={`${styles.colHead} ${styles.colHeadNarrow}`}>
+                    Изм.
+                  </th>
+                  <th
+                    className={`${styles.colHead} ${styles.colHeadAction}`}
+                    aria-label="Удалить"
+                  />
+                </tr>
+              </thead>
+              <tbody>
+                {dayRows.map((row) => {
+                  const incomplete =
+                    !isRowBlank(row) && !isRowFilledEnough(row);
+                  return (
+                    <tr
+                      key={row.key}
+                      className={`${styles.row} ${incomplete ? styles.rowIncomplete : ""}`}
+                    >
+                      <td>
+                        <input
+                          type="time"
+                          className={`${styles.cellInput} ${styles.cellTime}`}
+                          value={row.start_time}
+                          onChange={(e) =>
+                            setField(row.key, "start_time", e.target.value)
+                          }
+                        />
+                      </td>
+                      <td>
+                        <input
+                          type="time"
+                          className={`${styles.cellInput} ${styles.cellTime}`}
+                          value={row.end_time}
+                          onChange={(e) =>
+                            setField(row.key, "end_time", e.target.value)
+                          }
+                        />
+                      </td>
+                      <td>
+                        <input
+                          className={styles.cellInput}
+                          value={row.lesson_name}
+                          onChange={(e) =>
+                            setField(row.key, "lesson_name", e.target.value)
+                          }
+                          placeholder="Предмет"
+                        />
+                      </td>
+                      <td>
+                        <input
+                          className={styles.cellInput}
+                          value={row.teacher_name}
+                          onChange={(e) =>
+                            setField(row.key, "teacher_name", e.target.value)
+                          }
+                          placeholder="ФИО"
+                        />
+                      </td>
+                      <td>
+                        <input
+                          className={styles.cellInput}
+                          value={row.location}
+                          onChange={(e) =>
+                            setField(row.key, "location", e.target.value)
+                          }
+                          placeholder="Вуз"
+                        />
+                      </td>
+                      <td>
+                        <input
+                          className={styles.cellInput}
+                          value={row.classroom}
+                          onChange={(e) =>
+                            setField(row.key, "classroom", e.target.value)
+                          }
+                          placeholder="301А"
+                        />
+                      </td>
+                      <td>
+                        <div className={styles.colorCell}>
+                          <select
+                            className={styles.cellSelect}
+                            value={
+                              (SCHEDULE_PRESET_COLORS as readonly string[]).includes(
+                                row.color.toUpperCase(),
+                              )
+                                ? row.color.toUpperCase()
+                                : "__custom__"
+                            }
+                            onChange={(e) => {
+                              if (e.target.value === "__custom__") return;
+                              setField(row.key, "color", e.target.value);
+                            }}
+                            aria-label="Цвет"
+                          >
+                            {SCHEDULE_PRESET_COLORS.map((color) => (
+                              <option key={color} value={color}>
+                                {color}
+                              </option>
+                            ))}
+                            <option value="__custom__">Свой…</option>
+                          </select>
+                          <input
+                            type="color"
+                            className={styles.colorNative}
+                            value={
+                              /^#[0-9A-Fa-f]{6}$/.test(row.color)
+                                ? row.color
+                                : "#5B8DEF"
+                            }
+                            onChange={(e) =>
+                              setField(
+                                row.key,
+                                "color",
+                                e.target.value.toUpperCase(),
+                              )
+                            }
+                            aria-label="Свой цвет"
+                          />
+                        </div>
+                      </td>
+                      <td>
+                        <div className={styles.cellCheck}>
+                          <input
+                            type="checkbox"
+                            checked={row.is_changed}
+                            onChange={(e) =>
+                              setField(row.key, "is_changed", e.target.checked)
+                            }
+                            aria-label="Расписание изменено"
+                          />
+                        </div>
+                      </td>
+                      <td>
+                        <div className={styles.rowAction}>
+                          <button
+                            type="button"
+                            className={styles.deleteBtn}
+                            aria-label="Удалить строку"
+                            title="Удалить"
+                            onClick={() => removeRow(row.key)}
+                          >
+                            <Trash2 size={14} strokeWidth={2.25} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            <div className={styles.addRowWrap}>
+              <button
+                type="button"
+                className={styles.addRowBtn}
+                onClick={() => addRow(date)}
+              >
+                <Plus size={14} strokeWidth={2.4} />
+                Строка
+              </button>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
