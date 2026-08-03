@@ -5,9 +5,11 @@ import { DismissibleOverlay } from "@/components/ui/dismissible-overlay";
 import type { ScheduleLesson } from "@/lib/schedule/types";
 import { formatDayHeading } from "@/lib/schedule/utils";
 import {
+  Building2,
   Clock3,
   DoorOpen,
   MapPin,
+  Monitor,
   School,
   UserRound,
   Users,
@@ -121,6 +123,38 @@ export function LessonDetailsSheet({ lesson, onClose }: LessonDetailsSheetProps)
               </span>
             </li>
           ) : null}
+
+          <li className={styles.lessonDetailsRow}>
+            <span className={styles.lessonDetailsIcon}>
+              {lesson.is_in_person !== false ? (
+                <Building2 size={16} strokeWidth={2.25} />
+              ) : (
+                <Monitor size={16} strokeWidth={2.25} />
+              )}
+            </span>
+            <span className={styles.lessonDetailsRowText}>
+              <span className={styles.lessonDetailsRowLabel}>Формат</span>
+              <span className={styles.lessonDetailsRowValue}>
+                {lesson.is_in_person !== false ? "Очно" : "Дистанционно"}
+              </span>
+            </span>
+          </li>
+
+          <li className={styles.lessonDetailsRow}>
+            <span className={styles.lessonDetailsIcon}>
+              {lesson.is_for_all !== false ? (
+                <Users size={16} strokeWidth={2.25} />
+              ) : (
+                <UserRound size={16} strokeWidth={2.25} />
+              )}
+            </span>
+            <span className={styles.lessonDetailsRowText}>
+              <span className={styles.lessonDetailsRowLabel}>Состав</span>
+              <span className={styles.lessonDetailsRowValue}>
+                {lesson.is_for_all !== false ? "Все" : "Частично"}
+              </span>
+            </span>
+          </li>
         </ul>
       </div>
     </DismissibleOverlay>

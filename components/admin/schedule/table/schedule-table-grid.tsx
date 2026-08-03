@@ -27,6 +27,8 @@ type RowField = keyof Pick<
   | "classroom"
   | "color"
   | "is_changed"
+  | "is_in_person"
+  | "is_for_all"
 >;
 
 export function ScheduleTableGrid({
@@ -59,7 +61,7 @@ export function ScheduleTableGrid({
             <table className={styles.table}>
               <thead>
                 <tr>
-                  <th className={styles.dayBand} colSpan={9}>
+                  <th className={styles.dayBand} colSpan={11}>
                     {formatDayBandLabel(date)}
                   </th>
                 </tr>
@@ -76,6 +78,12 @@ export function ScheduleTableGrid({
                   <th className={styles.colHead}>Аудитория</th>
                   <th className={`${styles.colHead} ${styles.colHeadNarrow}`}>
                     Цвет
+                  </th>
+                  <th className={`${styles.colHead} ${styles.colHeadNarrow}`}>
+                    Очно
+                  </th>
+                  <th className={`${styles.colHead} ${styles.colHeadNarrow}`}>
+                    Все
                   </th>
                   <th className={`${styles.colHead} ${styles.colHeadNarrow}`}>
                     Изм.
@@ -195,6 +203,32 @@ export function ScheduleTableGrid({
                               )
                             }
                             aria-label="Свой цвет"
+                          />
+                        </div>
+                      </td>
+                      <td>
+                        <div className={styles.cellCheck}>
+                          <input
+                            type="checkbox"
+                            checked={row.is_in_person !== false}
+                            onChange={(e) =>
+                              setField(row.key, "is_in_person", e.target.checked)
+                            }
+                            aria-label="Очно"
+                            title="Очно (выкл. = дистанционно)"
+                          />
+                        </div>
+                      </td>
+                      <td>
+                        <div className={styles.cellCheck}>
+                          <input
+                            type="checkbox"
+                            checked={row.is_for_all !== false}
+                            onChange={(e) =>
+                              setField(row.key, "is_for_all", e.target.checked)
+                            }
+                            aria-label="Для всех"
+                            title="Все (выкл. = частично)"
                           />
                         </div>
                       </td>

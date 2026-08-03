@@ -3,7 +3,15 @@
 import styles from "@/components/schedule/schedule.module.css";
 import type { ScheduleLesson } from "@/lib/schedule/types";
 import { hexTintOpaque } from "@/lib/schedule/utils";
-import { Clock3, MapPin, School, UserRound } from "lucide-react";
+import {
+  Building2,
+  Clock3,
+  MapPin,
+  Monitor,
+  School,
+  UserRound,
+  Users,
+} from "lucide-react";
 import type { CSSProperties } from "react";
 
 interface LessonCardProps {
@@ -31,6 +39,8 @@ export function LessonCard({
 
   const place = [lesson.location, lesson.classroom].filter(Boolean).join(" · ");
   const iconSize = compact ? 9 : 10;
+  const inPerson = lesson.is_in_person !== false;
+  const forAll = lesson.is_for_all !== false;
 
   return (
     <button
@@ -66,6 +76,24 @@ export function LessonCard({
           <span className={styles.lessonMetaTruncate}>{place}</span>
         </div>
       ) : null}
+
+      <div className={styles.lessonMetaRow}>
+        {inPerson ? (
+          <Building2 size={iconSize} strokeWidth={2} className={styles.lessonMetaIcon} />
+        ) : (
+          <Monitor size={iconSize} strokeWidth={2} className={styles.lessonMetaIcon} />
+        )}
+        <span>{inPerson ? "Очно" : "Дистанционно"}</span>
+      </div>
+
+      <div className={styles.lessonMetaRow}>
+        {forAll ? (
+          <Users size={iconSize} strokeWidth={2} className={styles.lessonMetaIcon} />
+        ) : (
+          <UserRound size={iconSize} strokeWidth={2} className={styles.lessonMetaIcon} />
+        )}
+        <span>{forAll ? "Все" : "Частично"}</span>
+      </div>
 
       {!compact && lesson.teacher_name ? (
         <div className={styles.lessonMetaRow}>

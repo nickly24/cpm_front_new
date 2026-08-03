@@ -20,6 +20,8 @@ export interface ScheduleTableRow {
   classroom: string;
   color: string;
   is_changed: boolean;
+  is_in_person: boolean;
+  is_for_all: boolean;
 }
 
 function newClientKey(): string {
@@ -39,6 +41,8 @@ export function emptyTableRow(date: string): ScheduleTableRow {
     classroom: "",
     color: SCHEDULE_DEFAULT_COLOR,
     is_changed: false,
+    is_in_person: true,
+    is_for_all: true,
   };
 }
 
@@ -55,6 +59,8 @@ export function lessonToTableRow(lesson: ScheduleLesson): ScheduleTableRow {
     classroom: lesson.classroom,
     color: lesson.color || SCHEDULE_DEFAULT_COLOR,
     is_changed: Boolean(lesson.is_changed),
+    is_in_person: lesson.is_in_person !== false,
+    is_for_all: lesson.is_for_all !== false,
   };
 }
 
@@ -135,6 +141,8 @@ function rowPayload(
     classroom: row.classroom.trim(),
     color: (row.color || SCHEDULE_DEFAULT_COLOR).toUpperCase(),
     is_changed: Boolean(row.is_changed),
+    is_in_person: row.is_in_person !== false,
+    is_for_all: row.is_for_all !== false,
     is_public: isPublic,
     school_id: isPublic ? null : schoolId,
   };
@@ -160,7 +168,9 @@ function rowsEqual(a: ScheduleTableRow, b: ScheduleTableRow): boolean {
     a.location === b.location &&
     a.classroom === b.classroom &&
     a.color.toUpperCase() === b.color.toUpperCase() &&
-    Boolean(a.is_changed) === Boolean(b.is_changed)
+    Boolean(a.is_changed) === Boolean(b.is_changed) &&
+    Boolean(a.is_in_person !== false) === Boolean(b.is_in_person !== false) &&
+    Boolean(a.is_for_all !== false) === Boolean(b.is_for_all !== false)
   );
 }
 

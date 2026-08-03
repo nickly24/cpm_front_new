@@ -175,6 +175,34 @@ function LessonFormFields({
       <div className={styles.toggleStack}>
         <div className={styles.toggleCard}>
           <div className={styles.toggleCardText}>
+            <span className={styles.toggleCardTitle}>Очное занятие</span>
+            <span className={styles.toggleCardHint}>
+              Выкл. — дистанционно (онлайн)
+            </span>
+          </div>
+          <Toggle
+            checked={form.is_in_person}
+            onChange={(checked) => update("is_in_person", checked)}
+            variant="accent"
+          />
+        </div>
+
+        <div className={styles.toggleCard}>
+          <div className={styles.toggleCardText}>
+            <span className={styles.toggleCardTitle}>Для всех</span>
+            <span className={styles.toggleCardHint}>
+              Выкл. — частично (кто именно — вне сервиса)
+            </span>
+          </div>
+          <Toggle
+            checked={form.is_for_all}
+            onChange={(checked) => update("is_for_all", checked)}
+            variant="accent"
+          />
+        </div>
+
+        <div className={styles.toggleCard}>
+          <div className={styles.toggleCardText}>
             <span className={styles.toggleCardTitle}>Расписание изменено</span>
             <span className={styles.toggleCardHint}>
               Пометит карточку бейджем «Изменено»

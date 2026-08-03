@@ -373,6 +373,8 @@ export function createEmptyLessonForm(
     classroom: "",
     color: SCHEDULE_DEFAULT_COLOR,
     is_changed: false,
+    is_in_person: true,
+    is_for_all: true,
     is_public: true,
     school_id: null,
   };
@@ -389,6 +391,8 @@ export function lessonToFormData(lesson: ScheduleLesson): ScheduleLessonFormData
     classroom: lesson.classroom,
     color: lesson.color || SCHEDULE_DEFAULT_COLOR,
     is_changed: Boolean(lesson.is_changed),
+    is_in_person: lesson.is_in_person !== false,
+    is_for_all: lesson.is_for_all !== false,
     is_public: lesson.is_public !== false,
     school_id: lesson.school_id ?? null,
   };

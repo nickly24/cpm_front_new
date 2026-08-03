@@ -9,6 +9,10 @@ export interface ScheduleLesson {
   classroom: string;
   color: string;
   is_changed: boolean;
+  /** true = очно, false = дистанционно */
+  is_in_person: boolean;
+  /** true = все студенты, false = частично */
+  is_for_all: boolean;
   is_public: boolean;
   school_id: number | null;
   created_at?: string;
@@ -25,6 +29,8 @@ export interface ScheduleLessonFormData {
   classroom: string;
   color: string;
   is_changed: boolean;
+  is_in_person: boolean;
+  is_for_all: boolean;
   is_public: boolean;
   school_id: number | null;
 }
