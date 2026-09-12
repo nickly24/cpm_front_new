@@ -10,7 +10,7 @@ import { AdminZapsSection } from "@/components/admin/zaps/admin-zaps-section";
 import { AdminTrainingSection } from "@/components/admin/training/admin-training-section";
 import { AdminDashboardSection } from "@/components/admin/dashboard/admin-dashboard-section";
 import { AdminHomeworkSection } from "@/components/admin/homework/admin-homework-section";
-import { AdminExamsSection } from "@/components/admin/exams/admin-exams-section";
+import { ExamSection } from "@/components/exams-v2/section";
 import { AdminRatingsSection } from "@/components/admin/ratings/admin-ratings-section";
 import { AdminTestResultsSection } from "@/components/admin/test-results/admin-test-results-section";
 import { AdminScheduleSection } from "@/components/admin/schedule/admin-schedule-section";
@@ -22,7 +22,6 @@ import { AdminUsersSection } from "@/components/admin/users/admin-users-section"
 import { StudentAttendanceSection } from "@/components/student/attendance/student-attendance-section";
 import { StudentZapsSection } from "@/components/student/zaps/student-zaps-section";
 import { StudentTrainingSection } from "@/components/student/training/student-training-section";
-import { StudentExamsSection } from "@/components/student/exams/student-exams-section";
 import { StudentHomeworkSection } from "@/components/student/homework/student-homework-section";
 import { StudentPerformanceSection } from "@/components/student/performance/student-performance-section";
 import { StudentScheduleSection } from "@/components/student/schedule/student-schedule-section";
@@ -77,8 +76,10 @@ function SectionBody({
   }
 
   if (role === "student" && section === "exams") {
-    return <StudentExamsSection />;
+    return <ExamSection />;
   }
+
+  if (role === "examinator" && section === "exams") return <ExamSection />;
 
   if (role === "student" && section === "attendance") {
     return <StudentAttendanceSection />;
@@ -137,7 +138,7 @@ function SectionBody({
   }
 
   if (role === "admin" && section === "exams") {
-    return <AdminExamsSection />;
+    return <ExamSection />;
   }
 
   if (role === "admin" && section === "attendance") {

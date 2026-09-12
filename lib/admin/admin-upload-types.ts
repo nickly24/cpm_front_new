@@ -11,6 +11,14 @@ export interface AdminUploadType {
 
 export const ADMIN_UPLOAD_TYPES: AdminUploadType[] = [
   {
+    id: "examResults",
+    label: "Результаты экзаменов",
+    description: "Результаты экзамена вне LMS: студент, баллы, оценка 0–5 и имя экзаменатора.",
+    acceptedLabel: ".xlsx",
+    status: "ready",
+    instructions: ["Выберите экзамен вне LMS.", "Подготовьте student_id или student_login, points, grade, examinator.", "Исправьте ошибки в предпросмотре; импорт не заменяет существующие результаты."],
+  },
+  {
     id: "users",
     label: "Пользовательские данные",
     description:
@@ -280,7 +288,7 @@ export interface UserImportReport {
 
 export type AdminUploadTab = "upload" | "jobs";
 
-export type AdminUploadTypeId = "users" | "tests" | "externalResults" | "cards";
+export type AdminUploadTypeId = "users" | "tests" | "externalResults" | "cards" | "examResults";
 
 export type CardImportCardAction = "create" | "warning" | "skip" | "error";
 

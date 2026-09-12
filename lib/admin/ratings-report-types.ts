@@ -1,3 +1,5 @@
+import type { RatingFreshness } from "@/lib/ratings/freshness";
+
 export type RatingsReportColumnKind =
   | "summary"
   | "homework"
@@ -44,6 +46,7 @@ export interface RatingsReportPeriod {
 }
 
 export interface RatingsReportData {
+  ratingFreshness?: RatingFreshness;
   period: RatingsReportPeriod | null;
   students: RatingsReportStudent[];
   columns: RatingsReportColumn[];
@@ -52,6 +55,7 @@ export interface RatingsReportData {
 }
 
 export interface RatingsReportResponse {
+  ratingFreshness?: RatingFreshness;
   status: boolean;
   error?: string;
   message?: string;

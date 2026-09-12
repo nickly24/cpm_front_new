@@ -1,6 +1,7 @@
 "use client";
 
 import reportStyles from "@/components/admin/attendance/report/report.module.css";
+import { RatingFreshnessNotice } from "@/components/exams-v2/rating-freshness";
 import ratingReportStyles from "@/components/admin/ratings/report/ratings-report.module.css";
 import { RatingsReportGrid } from "@/components/admin/ratings/report/ratings-report-grid";
 import { RatingsReportToolbar } from "@/components/admin/ratings/report/ratings-report-toolbar";
@@ -95,6 +96,7 @@ export function RatingsReportWorkspace({
         throw new Error(response.error ?? "Не удалось загрузить отчёт");
       }
       applyResponse({
+        ratingFreshness: response.ratingFreshness,
         period: response.period ?? null,
         students: response.students ?? [],
         columns: response.columns ?? [],
@@ -186,6 +188,7 @@ export function RatingsReportWorkspace({
         refreshing={refreshing}
       />
 
+      <RatingFreshnessNotice value={report?.ratingFreshness} />
       {error ? <p className={styles.errorText}>{error}</p> : null}
 
       {!error && report && report.students.length === 0 ? (

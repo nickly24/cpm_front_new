@@ -8,6 +8,7 @@ import { AdminUploadReportWorkspace } from "@/components/admin/upload/admin-uplo
 import { AdminCardsUploadPanel } from "@/components/admin/upload/admin-cards-upload-panel";
 import { AdminExternalResultsUploadPanel } from "@/components/admin/upload/admin-external-results-upload-panel";
 import { AdminTestUploadPanel } from "@/components/admin/upload/admin-test-upload-panel";
+import { ExamResultsUpload } from "@/components/exams-v2/upload";
 import styles from "@/components/admin/upload/admin-upload.module.css";
 import testStyles from "@/components/admin/tests/admin-tests.module.css";
 import { Button } from "@/components/ui/button";
@@ -260,7 +261,9 @@ export function AdminUploadSection() {
 
       {error ? <div className={testStyles.stateBox}>{error}</div> : null}
 
-      {uploadTypeId === "tests" ? (
+      {uploadTypeId === "examResults" ? (
+        <ExamResultsUpload />
+      ) : uploadTypeId === "tests" ? (
         <AdminTestUploadPanel />
       ) : uploadTypeId === "cards" ? (
         tab === "jobs" ? (

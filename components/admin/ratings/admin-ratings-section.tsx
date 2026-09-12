@@ -3,6 +3,8 @@
 import { EditOnly } from "@/components/admin/admin-section-access";
 
 import { AdminRatingDetailsView } from "@/components/admin/ratings/admin-rating-details-view";
+import { RatingFreshnessNotice } from "@/components/exams-v2/rating-freshness";
+import type { RatingFreshness } from "@/lib/ratings/freshness";
 import { AdminRatingJobsTab } from "@/components/admin/ratings/admin-rating-jobs-tab";
 import { AdminRatingRecalcPanel } from "@/components/admin/ratings/admin-rating-recalc-panel";
 import { RatingsReportWorkspace } from "@/components/admin/ratings/report/ratings-report-workspace";
@@ -40,6 +42,7 @@ export function AdminRatingsSection() {
 
   const [tab, setTab] = useState<AdminRatingsTab>("ratings");
   const [ratings, setRatings] = useState<AdminRatingRow[]>([]);
+  const [freshness, setFreshness] = useState<RatingFreshness | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -65,6 +68,7 @@ export function AdminRatingsSection() {
     setError(null);
     try {
       const response = await fetchAdminRatings();
+      setFreshness(response.ratingFreshness ?? null);
       if (response.status) {
         setRatings(response.ratings ?? []);
       } else {
@@ -168,6 +172,8 @@ export function AdminRatingsSection() {
           ) : null}
         </div>
       </header>
+
+      <RatingFreshnessNotice value={freshness} />
 
       <div className={ratingStyles.sectionTabs}>
         {TABS.map((item) => (

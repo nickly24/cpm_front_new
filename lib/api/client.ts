@@ -6,10 +6,27 @@ export class ApiError extends Error {
     message: string,
     public status?: number,
     public retryAfterSeconds?: number,
+    public code?: string,
+    public details?: Record<string, unknown>,
+    public correlationId?: string,
   ) {
     super(message);
     this.name = "ApiError";
   }
+}
+
+/** Both JSON and multipart requests expose the same stable error contract. */
+export function responseError(data: unknown, status: number): ApiError {
+  const body = typeof data === "object" && data !== null
+    ? data as Record<string, unknown> : {};
+  const details = typeof body.details === "object" && body.details !== null
+    ? body.details as Record<string, unknown> : undefined;
+  const message = typeof body.message === "string" ? body.message
+    : typeof body.error === "string" ? body.error : "Ошибка запроса";
+  const retry = Number(details?.retry_after_seconds);
+  return new ApiError(message, status, Number.isFinite(retry) && retry > 0 ? retry : undefined,
+    typeof body.error === "string" ? body.error : typeof body.code === "string" ? body.code : undefined,
+    details, typeof body.correlationId === "string" ? body.correlationId : undefined);
 }
 
 function requestTimeoutMs(path: string): number {
@@ -20,13 +37,14 @@ function requestTimeoutMs(path: string): number {
 
 async function fetchWithTimeout(url: string, path: string, options: RequestInit) {
   const controller = new AbortController();
-  const timer = window.setTimeout(() => controller.abort(), requestTimeoutMs(path));
+  const timer = globalThis.setTimeout(() => controller.abort(), requestTimeoutMs(path));
   const abort = () => controller.abort();
   options.signal?.addEventListener("abort", abort, { once: true });
+  if (options.signal?.aborted) controller.abort();
   try {
     return await fetch(url, { ...options, signal: controller.signal });
   } finally {
-    window.clearTimeout(timer);
+    globalThis.clearTimeout(timer);
     options.signal?.removeEventListener("abort", abort);
   }
 }
@@ -38,7 +56,7 @@ export async function apiRequest<T>(
   const token = getToken();
   const headers = new Headers(options.headers);
 
-  if (!headers.has("Content-Type") && options.body) {
+  if (!headers.has("Content-Type") && options.body && !(options.body instanceof FormData)) {
     headers.set("Content-Type", "application/json");
   }
 
@@ -67,23 +85,7 @@ export async function apiRequest<T>(
   }
 
   if (!response.ok) {
-    const message =
-      typeof data === "object" &&
-      data !== null &&
-      "message" in data &&
-      typeof (data as { message?: string }).message === "string"
-        ? (data as { message: string }).message
-        : typeof data === "object" &&
-            data !== null &&
-            "error" in data &&
-            typeof (data as { error?: string }).error === "string"
-          ? (data as { error: string }).error
-          : "Ошибка запроса";
-
-    const retryAfterSeconds = typeof data === "object" && data !== null && "details" in data
-      ? Number((data as { details?: { retry_after_seconds?: number } }).details?.retry_after_seconds) || undefined
-      : undefined;
-    throw new ApiError(message, response.status, retryAfterSeconds);
+    throw responseError(data, response.status);
   }
 
   return data;
@@ -96,6 +98,8 @@ export async function apiFormRequest<T>(
 ): Promise<T> {
   const token = getToken();
   const headers = new Headers(options.headers);
+  // The browser must attach the multipart boundary itself.
+  headers.delete("Content-Type");
 
   if (token) {
     headers.set("Authorization", `Bearer ${token}`);
@@ -124,15 +128,7 @@ export async function apiFormRequest<T>(
   }
 
   if (!response.ok) {
-    const message =
-      typeof data === "object" &&
-      data !== null &&
-      "error" in data &&
-      typeof (data as { error?: string }).error === "string"
-        ? (data as { error: string }).error
-        : "Ошибка запроса";
-
-    throw new ApiError(message, response.status);
+    throw responseError(data, response.status);
   }
 
   return data;

@@ -1,6 +1,8 @@
 "use client";
 
 import ratingStyles from "@/components/admin/ratings/admin-ratings.module.css";
+import { RatingFreshnessNotice } from "@/components/exams-v2/rating-freshness";
+import type { RatingFreshness } from "@/lib/ratings/freshness";
 import styles from "@/components/admin/tests/admin-tests.module.css";
 import { AdminFullscreenBack } from "@/components/admin/admin-fullscreen-back";
 import { LoadingState } from "@/components/ui/loading-state";
@@ -20,6 +22,7 @@ export function AdminRatingDetailsView({
   onBack,
 }: AdminRatingDetailsViewProps) {
   const [details, setDetails] = useState<RatingDetails | null>(null);
+  const [freshness, setFreshness] = useState<RatingFreshness | null>(null);
   const [tab, setTab] = useState<"homework" | "exams" | "tests">("homework");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -34,6 +37,7 @@ export function AdminRatingDetailsView({
         const response = await fetchRatingDetails(ratingId);
         if (cancelled) return;
         if (response.status && response.details) {
+          setFreshness(response.ratingFreshness ?? null);
           setDetails(response.details);
         } else {
           setError("Детализация не найдена");
@@ -95,6 +99,8 @@ export function AdminRatingDetailsView({
           </div>
         </div>
       </header>
+
+      <RatingFreshnessNotice value={freshness} />
 
       <div className={ratingStyles.sectionTabs}>
         {(
@@ -164,6 +170,8 @@ export function AdminRatingDetailsView({
                     <span className={ratingStyles.detailScore}>{item.score.toFixed(2)}</span>
                   </div>
                   <p className={ratingStyles.detailInfo}>Дата: {item.exam_date ?? "—"}</p>
+                  {item.exam_type && <p className={ratingStyles.detailInfo}>{item.exam_type === "classic" ? "Классический экзамен" : "Экзамен вне LMS"}{item.attempt_no === 2 ? " · Пересдача" : ""}{item.has_appeal ? " · После апелляции" : ""}</p>}
+                  {item.missing_result && <p className={ratingStyles.detailInfo}>Результата нет — учтено 0 баллов</p>}
                   <p className={ratingStyles.detailInfo}>{item.status}</p>
                 </article>
               ))

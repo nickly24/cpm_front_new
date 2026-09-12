@@ -1,4 +1,5 @@
 import { apiRequest } from "@/lib/api/client";
+import type { RatingFreshness } from "@/lib/ratings/freshness";
 import type {
   AdminRatingRow,
   RatingDetails,
@@ -9,13 +10,14 @@ export async function fetchAdminRatings(): Promise<{
   status: boolean;
   ratings: AdminRatingRow[];
   total: number;
+  ratingFreshness?: RatingFreshness;
 }> {
   return apiRequest("/get-all-ratings");
 }
 
 export async function fetchRatingDetails(
   ratingId: number,
-): Promise<{ status: boolean; details: RatingDetails }> {
+): Promise<{ status: boolean; details: RatingDetails; ratingFreshness?: RatingFreshness }> {
   return apiRequest("/get-rating-details", {
     method: "POST",
     body: JSON.stringify({ rating_id: ratingId }),

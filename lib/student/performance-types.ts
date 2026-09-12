@@ -1,3 +1,5 @@
+import type { RatingFreshness } from "@/lib/ratings/freshness";
+
 export interface StudentRatingCategory {
   rating: number;
 }
@@ -14,6 +16,7 @@ export interface StudentRatingData {
 }
 
 export interface MyRatingResponse {
+  ratingFreshness?: RatingFreshness;
   status: boolean;
   data: StudentRatingData | null;
   message?: string;

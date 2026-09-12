@@ -53,7 +53,7 @@ export type ExamSessionSortField = "student_name" | "grade" | "points";
 
 export type StudentExamSortField = "exam_date" | "grade" | "points";
 
-export type ExamGradeFilter = "all" | "5" | "4" | "3" | "2";
+export type ExamGradeFilter = "all" | "5" | "4" | "3" | "2" | "1" | "0";
 
 export interface FetchExamsParams {
   page: number;

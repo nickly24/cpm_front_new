@@ -47,6 +47,11 @@ export interface RatingExamDetail {
   exam_date: string | null;
   score: number;
   status: string;
+  exam_type?: "outside_lms" | "classic";
+  direction_id?: number;
+  attempt_no?: 1 | 2 | null;
+  has_appeal?: boolean;
+  missing_result?: boolean;
 }
 
 export interface RatingTestDetail {

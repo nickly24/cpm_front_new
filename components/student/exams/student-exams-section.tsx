@@ -90,7 +90,7 @@ function ExamDetailView({
           <div className={styles.statCard}>
             <span className={styles.statLabel}>Баллы</span>
             <span className={styles.statValue}>{session.points}</span>
-            <span className={styles.statHint}>из 6 максимальных</span>
+            <span className={styles.statHint}>Баллы за экзамен</span>
           </div>
           {session.examinator ? (
             <div className={styles.statCard}>
@@ -247,6 +247,8 @@ export function StudentExamsSection() {
               <option value="4">4 — хорошо</option>
               <option value="3">3 — удовлетворительно</option>
               <option value="2">2 — неудовлетворительно</option>
+              <option value="1">1</option>
+              <option value="0">0</option>
             </select>
           </div>
 
@@ -310,7 +312,7 @@ export function StudentExamsSection() {
                   {formatExamDate(session.exam_date)}
                 </p>
                 <div className={styles.cardFooter}>
-                  <span>Баллы: {session.points} / 6</span>
+                  <span>Баллы: {session.points}</span>
                   {session.examinator ? (
                     <span>Экзаменатор: {session.examinator}</span>
                   ) : null}
