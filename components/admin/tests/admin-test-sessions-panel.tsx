@@ -1,5 +1,7 @@
 "use client";
 
+import { EditOnly } from "@/components/admin/admin-section-access";
+
 import {
   AdminAnswerItemsList,
   reviewItemsToRows,
@@ -176,13 +178,13 @@ export function AdminTestSessionsPanel({ testId }: AdminTestSessionsPanelProps) 
                     >
                       Детали
                     </button>
-                    <button
+                    <EditOnly><button
                       type="button"
                       className={styles.linkBtnDanger}
                       onClick={() => handleDelete(row.sessionId)}
                     >
                       Удалить
-                    </button>
+                    </button></EditOnly>
                   </td>
                 </tr>
               ))}
@@ -259,14 +261,14 @@ export function AdminTestSessionsPanel({ testId }: AdminTestSessionsPanelProps) 
           <AdminAnswerItemsList items={reviewRows} />
 
           <div className={styles.detailCardActions}>
-            <Button
+            <EditOnly><Button
               type="button"
               variant="ghost"
               size="sm"
               onClick={() => activeSessionId && handleDelete(activeSessionId)}
             >
               Удалить сдачу
-            </Button>
+            </Button></EditOnly>
           </div>
         </div>
       ) : null}

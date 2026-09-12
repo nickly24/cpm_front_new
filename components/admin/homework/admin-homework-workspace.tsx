@@ -1,5 +1,7 @@
 "use client";
 
+import { EditOnly } from "@/components/admin/admin-section-access";
+
 import { AdminFullscreenBack } from "@/components/admin/admin-fullscreen-back";
 import { AdminHomeworkOverviewTab } from "@/components/admin/homework/admin-homework-overview-tab";
 import { AdminHomeworkStudentsPanel } from "@/components/admin/homework/admin-homework-students-panel";
@@ -70,7 +72,7 @@ export function AdminHomeworkWorkspace({
           <div className={styles.fullscreenHeaderMain}>
             <h1 className={styles.fullscreenTitle}>{title}</h1>
             <div className={styles.fullscreenHeaderActions}>
-            <Button
+            <EditOnly><Button
               type="button"
               variant="ghost"
               size="sm"
@@ -78,7 +80,7 @@ export function AdminHomeworkWorkspace({
               disabled={!homework}
             >
               Редактировать
-            </Button>
+            </Button></EditOnly>
             <Button type="button" variant="ghost" size="sm" onClick={loadMeta}>
               Обновить
             </Button>

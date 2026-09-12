@@ -1,5 +1,7 @@
 "use client";
 
+import { EditOnly, ReadOnlyControl, useAdminSectionAccess } from "@/components/admin/admin-section-access";
+
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { LoadingState } from "@/components/ui/loading-state";
@@ -65,6 +67,7 @@ function statusLabel(status: TelegramBotStatus | null): string {
 }
 
 export function AdminTelegramBotSection() {
+  const { canEdit } = useAdminSectionAccess("telegram-bot");
   const [settings, setSettings] = useState<TelegramBotSettings>(DEFAULT_SETTINGS);
   const [status, setStatus] = useState<TelegramBotStatus | null>(null);
   const [loading, setLoading] = useState(true);
@@ -193,15 +196,15 @@ export function AdminTelegramBotSection() {
             <RefreshCw className={styles.buttonIcon} size={16} />
             {action === "refresh" ? "Обновляем…" : "Обновить"}
           </Button>
-          <Button
+          <EditOnly><Button
             type="button"
             onClick={() => void runAction("start")}
             disabled={running || action !== null || saving}
           >
             <Play className={styles.buttonIcon} size={16} />
             {action === "start" ? "Запускаем…" : "Start"}
-          </Button>
-          <Button
+          </Button></EditOnly>
+          <EditOnly><Button
             type="button"
             variant="ghost"
             onClick={() => void runAction("stop")}
@@ -209,8 +212,8 @@ export function AdminTelegramBotSection() {
           >
             <Square className={styles.buttonIcon} size={16} />
             {action === "stop" ? "Останавливаем…" : "Stop"}
-          </Button>
-          <Button
+          </Button></EditOnly>
+          <EditOnly><Button
             type="button"
             variant="secondary"
             onClick={() => void runAction("restart")}
@@ -218,7 +221,7 @@ export function AdminTelegramBotSection() {
           >
             <RotateCcw className={styles.buttonIcon} size={16} />
             {action === "restart" ? "Перезапуск…" : "Restart"}
-          </Button>
+          </Button></EditOnly>
         </div>
       </header>
 
@@ -283,12 +286,12 @@ export function AdminTelegramBotSection() {
           <form className={styles.form} onSubmit={(event) => void handleSave(event)}>
             <label className={styles.field}>
               <span className={styles.fieldLabel}>Telegram bot token</span>
-              <input
+              <ReadOnlyControl><input
                 className={styles.input}
                 value={settings.bot_token}
                 onChange={(event) => updateField("bot_token", event.target.value)}
-                placeholder="123456:ABC..."
-              />
+                placeholder={canEdit ? "123456:ABC..." : settings.token_configured ? "Токен настроен; скрыт в режиме просмотра" : "Токен не настроен"}
+              /></ReadOnlyControl>
             </label>
 
             <label className={styles.toggleRow}>
@@ -296,48 +299,48 @@ export function AdminTelegramBotSection() {
                 <span className={styles.toggleTitle}>Autostart</span>
                 <span className={styles.toggleHint}>Запускать бота при старте Flask-приложения</span>
               </span>
-              <input
+              <ReadOnlyControl><input
                 className={styles.checkbox}
                 type="checkbox"
                 checked={settings.autostart}
                 onChange={(event) => updateField("autostart", event.target.checked)}
-              />
+              /></ReadOnlyControl>
             </label>
 
             <label className={styles.field}>
               <span className={styles.fieldLabel}>Приветствие</span>
-              <textarea
+              <ReadOnlyControl><textarea
                 className={styles.textarea}
                 value={settings.welcome_text}
                 onChange={(event) => updateField("welcome_text", event.target.value)}
-              />
+              /></ReadOnlyControl>
             </label>
 
             <label className={styles.field}>
               <span className={styles.fieldLabel}>Если ученик не найден</span>
-              <textarea
+              <ReadOnlyControl><textarea
                 className={styles.textarea}
                 value={settings.not_found_text}
                 onChange={(event) => updateField("not_found_text", event.target.value)}
-              />
+              /></ReadOnlyControl>
             </label>
 
             <label className={styles.field}>
               <span className={styles.fieldLabel}>Текст с логином и паролем</span>
-              <textarea
+              <ReadOnlyControl><textarea
                 className={styles.textarea}
                 value={settings.credentials_text}
                 onChange={(event) => updateField("credentials_text", event.target.value)}
-              />
+              /></ReadOnlyControl>
             </label>
 
             <label className={styles.field}>
               <span className={styles.fieldLabel}>Кнопка</span>
-              <input
+              <ReadOnlyControl><input
                 className={styles.input}
                 value={settings.button_label}
                 onChange={(event) => updateField("button_label", event.target.value)}
-              />
+              /></ReadOnlyControl>
             </label>
 
             <div className={styles.preview}>
@@ -345,10 +348,10 @@ export function AdminTelegramBotSection() {
             </div>
 
             <div className={styles.actions}>
-              <Button type="submit" disabled={saving || action !== null}>
+              <EditOnly><Button type="submit" disabled={saving || action !== null}>
                 <Save className={styles.buttonIcon} size={16} />
                 {saving ? "Сохраняем…" : "Сохранить настройки"}
-              </Button>
+              </Button></EditOnly>
             </div>
           </form>
         </Card>

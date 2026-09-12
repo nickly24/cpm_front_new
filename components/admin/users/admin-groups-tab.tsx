@@ -1,5 +1,7 @@
 "use client";
 
+import { EditOnly, ReadOnlyControl } from "@/components/admin/admin-section-access";
+
 import { AdminGroupFormPanel } from "@/components/admin/users/admin-group-form-panel";
 import { AdminListPaginationBar } from "@/components/admin/tests/admin-list-pagination";
 import styles from "@/components/admin/tests/admin-tests.module.css";
@@ -238,9 +240,9 @@ export function AdminGroupsTab() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
-        <Button type="button" onClick={() => setGroupForm({ mode: "create" })}>
+        <EditOnly><Button type="button" onClick={() => setGroupForm({ mode: "create" })}>
           + Создать группу
-        </Button>
+        </Button></EditOnly>
       </div>
 
       {error ? <div className={styles.stateBox}>{error}</div> : null}
@@ -250,9 +252,9 @@ export function AdminGroupsTab() {
       ) : rows.length === 0 ? (
         <div className={styles.stateBox}>
           <p>Группы не найдены</p>
-          <Button type="button" onClick={() => setGroupForm({ mode: "create" })}>
+          <EditOnly><Button type="button" onClick={() => setGroupForm({ mode: "create" })}>
             + Создать группу
-          </Button>
+          </Button></EditOnly>
         </div>
       ) : (
         <>
@@ -288,7 +290,7 @@ export function AdminGroupsTab() {
                     >
                       {expanded ? "Свернуть" : "Состав"}
                     </button>
-                    <button
+                    <EditOnly><button
                       type="button"
                       className={styles.actionBtn}
                       onClick={() =>
@@ -300,14 +302,14 @@ export function AdminGroupsTab() {
                       }
                     >
                       Переименовать
-                    </button>
-                    <button
+                    </button></EditOnly>
+                    <EditOnly><button
                       type="button"
                       className={`${styles.actionBtn} ${styles.actionBtnDanger}`}
                       onClick={() => handleDeleteGroup(row)}
                     >
                       Удалить
-                    </button>
+                    </button></EditOnly>
                   </div>
 
                   {expanded ? (
@@ -327,7 +329,7 @@ export function AdminGroupsTab() {
                                     {members.proctor.res.full_name}
                                   </div>
                                 </div>
-                                <button
+                                <EditOnly><button
                                   type="button"
                                   className={`${styles.actionBtn} ${styles.actionBtnDanger}`}
                                   onClick={() =>
@@ -341,7 +343,7 @@ export function AdminGroupsTab() {
                                   }
                                 >
                                   Снять
-                                </button>
+                                </button></EditOnly>
                               </div>
                             ) : (
                               <p className={userStyles.hint}>Проктор не назначен</p>
@@ -365,7 +367,7 @@ export function AdminGroupsTab() {
                                         : "Школа не указана"}
                                     </div>
                                   </div>
-                                  <button
+                                  <EditOnly><button
                                     type="button"
                                     className={`${styles.actionBtn} ${styles.actionBtnDanger}`}
                                     onClick={() =>
@@ -373,7 +375,7 @@ export function AdminGroupsTab() {
                                     }
                                   >
                                     Убрать
-                                  </button>
+                                  </button></EditOnly>
                                 </div>
                               ))
                             )}
@@ -471,7 +473,7 @@ function AdminUnsignedAssignBlock({
               <div className={userStyles.memberMeta}>Проктор</div>
             </div>
             <div className={userStyles.tableActions}>
-              <select
+              <ReadOnlyControl><select
                 className={userStyles.fieldSelect}
                 value={selection[`proctor_${proctor.proctor_id}`] ?? ""}
                 onChange={(e) =>
@@ -487,14 +489,14 @@ function AdminUnsignedAssignBlock({
                     {g.group_name}
                   </option>
                 ))}
-              </select>
-              <button
+              </select></ReadOnlyControl>
+              <EditOnly><button
                 type="button"
                 className={styles.actionBtn}
                 onClick={() => assignProctor(proctor.proctor_id)}
               >
                 Назначить
-              </button>
+              </button></EditOnly>
             </div>
           </div>
         ))}
@@ -505,7 +507,7 @@ function AdminUnsignedAssignBlock({
               <div className={userStyles.memberMeta}>Ученик</div>
             </div>
             <div className={userStyles.tableActions}>
-              <select
+              <ReadOnlyControl><select
                 className={userStyles.fieldSelect}
                 value={selection[`student_${student.student_id}`] ?? ""}
                 onChange={(e) =>
@@ -521,14 +523,14 @@ function AdminUnsignedAssignBlock({
                     {g.group_name}
                   </option>
                 ))}
-              </select>
-              <button
+              </select></ReadOnlyControl>
+              <EditOnly><button
                 type="button"
                 className={styles.actionBtn}
                 onClick={() => assignStudent(student.student_id)}
               >
                 Назначить
-              </button>
+              </button></EditOnly>
             </div>
           </div>
         ))}

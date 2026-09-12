@@ -1,5 +1,7 @@
 "use client";
 
+import { EditOnly, ReadOnlyControl } from "@/components/admin/admin-section-access";
+
 import { AdminHomeworkForm } from "@/components/admin/homework/admin-homework-form";
 import { AdminHomeworkWorkspace } from "@/components/admin/homework/admin-homework-workspace";
 import styles from "@/components/admin/tests/admin-tests.module.css";
@@ -188,9 +190,9 @@ export function AdminHomeworkSection() {
     <div className={styles.page}>
       <header className={styles.pageHeader}>
         <h1 className={styles.pageTitle}>Домашние задания</h1>
-        <Button type="button" onClick={() => setView("create")}>
+        <EditOnly><Button type="button" onClick={() => setView("create")}>
           + Создать задание
-        </Button>
+        </Button></EditOnly>
       </header>
 
       <div className={styles.directionTabs}>
@@ -276,7 +278,7 @@ export function AdminHomeworkSection() {
                   </dl>
 
                   <div className={styles.togglesRow}>
-                    <Toggle
+                    <ReadOnlyControl><Toggle
                       id={`admin-hw-published-${id}`}
                       label="Видимость для студентов"
                       variant="success"
@@ -285,7 +287,7 @@ export function AdminHomeworkSection() {
                       onChange={(checked) =>
                         handleTogglePublished(id, checked)
                       }
-                    />
+                    /></ReadOnlyControl>
                   </div>
 
                   <div className={styles.cardActions}>
@@ -299,20 +301,20 @@ export function AdminHomeworkSection() {
                     >
                       Открыть
                     </button>
-                    <button
+                    <EditOnly><button
                       type="button"
                       className={styles.actionBtn}
                       onClick={() => openEdit(id, "edit")}
                     >
                       Редактировать
-                    </button>
-                    <button
+                    </button></EditOnly>
+                    <EditOnly><button
                       type="button"
                       className={`${styles.actionBtn} ${styles.actionBtnDanger}`}
                       onClick={() => handleDelete(id)}
                     >
                       Удалить
-                    </button>
+                    </button></EditOnly>
                   </div>
                 </article>
               );

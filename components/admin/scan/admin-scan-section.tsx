@@ -1,5 +1,7 @@
 "use client";
 
+import { ReadOnlyControl, EditOnly } from "@/components/admin/admin-section-access";
+
 import { CameraScanModal } from "@/components/admin/scan/camera-scan-modal";
 import styles from "@/components/admin/scan/admin-scan.module.css";
 import { LoadingState } from "@/components/ui/loading-state";
@@ -382,7 +384,7 @@ export function AdminScanSection() {
             ← Выбрать другой день
           </button>
 
-          <input
+          <ReadOnlyControl><input
             ref={inputRef}
             className={styles.scanInput}
             value={studentId}
@@ -400,29 +402,29 @@ export function AdminScanSection() {
             placeholder="ID ученика"
             disabled={submitting}
             aria-label="ID ученика"
-          />
+          /></ReadOnlyControl>
           <p className={styles.scanHint}>
             Сканер штрих-кода или QR: после считывания нажмите Enter. С
             телефона можно открыть камеру ниже.
           </p>
 
           <div className={styles.actions}>
-            <button
+            <EditOnly><button
               type="button"
               className={styles.primaryBtn}
               disabled={submitting || !studentId.trim()}
               onClick={() => void submitStudentId()}
             >
               {submitting ? "Отправка…" : "Отметить (Enter)"}
-            </button>
-            <button
+            </button></EditOnly>
+            <EditOnly><button
               type="button"
               className={styles.cameraBtn}
               disabled={submitting}
               onClick={() => setCameraOpen(true)}
             >
               Камера
-            </button>
+            </button></EditOnly>
             <button
               type="button"
               className={styles.secondaryBtn}
@@ -471,7 +473,7 @@ export function AdminScanSection() {
         <div className={styles.historyHead}>
           <h2 className={styles.historyTitle}>Последние отметки</h2>
           {scanHistory.length > 0 ? (
-            <button
+            <EditOnly><button
               type="button"
               className={styles.clearBtn}
               onClick={() => {
@@ -480,7 +482,7 @@ export function AdminScanSection() {
               }}
             >
               Очистить
-            </button>
+            </button></EditOnly>
           ) : null}
         </div>
         {scanHistory.length === 0 ? (

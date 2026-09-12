@@ -1,5 +1,7 @@
 "use client";
 
+import { EditOnly } from "@/components/admin/admin-section-access";
+
 import { AdminFullscreenBack } from "@/components/admin/admin-fullscreen-back";
 import { ClassDayFormModal } from "@/components/admin/attendance/class-day-form-modal";
 import { EditAttendanceModal } from "@/components/admin/attendance/edit-attendance-modal";
@@ -256,7 +258,7 @@ export function AdminAttendanceSection() {
             </p>
           </div>
           <div className={attendanceStyles.headerActions}>
-            <Button
+            <EditOnly><Button
               type="button"
               variant="ghost"
               onClick={() => {
@@ -265,8 +267,8 @@ export function AdminAttendanceSection() {
               }}
             >
               Редактировать день
-            </Button>
-            <Button
+            </Button></EditOnly>
+            <EditOnly><Button
               type="button"
               variant="ghost"
               className={attendanceStyles.dangerBtn}
@@ -274,13 +276,13 @@ export function AdminAttendanceSection() {
               onClick={() => void handleDeleteDay()}
             >
               {deletingDay ? "Удаление…" : "Удалить день"}
-            </Button>
+            </Button></EditOnly>
           </div>
         </header>
 
         <div className={styles.detailCard}>
           <h3 className={styles.detailSectionTitle}>Добавить посещение</h3>
-          <form className={attendanceStyles.addBlock} onSubmit={(e) => void handleAdd(e)}>
+          <EditOnly><form className={attendanceStyles.addBlock} onSubmit={(e) => void handleAdd(e)}>
             <div className={attendanceStyles.field}>
               <label className={attendanceStyles.fieldLabel} htmlFor="add-student-id">
                 ID ученика
@@ -306,7 +308,7 @@ export function AdminAttendanceSection() {
             <Button type="submit" disabled={adding}>
               {adding ? "…" : "Добавить"}
             </Button>
-          </form>
+          </form></EditOnly>
 
           <h3 className={styles.detailSectionTitle}>Список</h3>
           {attendanceLoading ? (
@@ -337,21 +339,21 @@ export function AdminAttendanceSection() {
                       <td>{item.type_name}</td>
                       <td>
                         <div className={attendanceStyles.rowActions}>
-                          <button
+                          <EditOnly><button
                             type="button"
                             className={styles.actionBtn}
                             onClick={() => setEditingAttendance(item)}
                           >
                             Изменить
-                          </button>
-                          <button
+                          </button></EditOnly>
+                          <EditOnly><button
                             type="button"
                             className={`${styles.actionBtn} ${styles.actionBtnDanger}`}
                             disabled={deletingAttendanceId === item.id}
                             onClick={() => void handleDeleteAttendance(item)}
                           >
                             {deletingAttendanceId === item.id ? "…" : "Удалить"}
-                          </button>
+                          </button></EditOnly>
                         </div>
                       </td>
                     </tr>
@@ -409,9 +411,9 @@ export function AdminAttendanceSection() {
             <TableProperties size={16} style={{ marginRight: 6 }} />
             Отчёт
           </Button>
-          <Button type="button" onClick={() => setDayFormMode("create")}>
+          <EditOnly><Button type="button" onClick={() => setDayFormMode("create")}>
             + День занятий
-          </Button>
+          </Button></EditOnly>
         </div>
       </header>
 
@@ -487,20 +489,20 @@ export function AdminAttendanceSection() {
                 ) : null}
               </button>
               <div className={attendanceStyles.dayCardActions}>
-                <button
+                <EditOnly><button
                   type="button"
                   className={attendanceStyles.cardActionBtn}
                   onClick={(event) => openEditDayFromList(event, day)}
                 >
                   Изменить
-                </button>
-                <button
+                </button></EditOnly>
+                <EditOnly><button
                   type="button"
                   className={`${attendanceStyles.cardActionBtn} ${attendanceStyles.cardActionBtnDanger}`}
                   onClick={(event) => void handleDeleteDayFromList(event, day)}
                 >
                   Удалить
-                </button>
+                </button></EditOnly>
               </div>
             </article>
           ))}

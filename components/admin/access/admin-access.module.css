@@ -1,0 +1,44 @@
+.page { padding: 28px; max-width: 1400px; margin: auto; color: var(--ds-text, #182638); }
+.header, .dialogHeader { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+.header h1 { font-size: 28px; margin: 0 0 8px; }
+.header p, .meta { color: var(--ds-text-secondary, #697686); font-size: 14px; }
+.notice { padding: 16px 20px; background: var(--ds-surface-muted, #edf4fb); border-radius: 14px; line-height: 1.6; margin: 24px 0; }
+.tabs { display: flex; gap: 8px; margin: 20px 0; }
+.tabs button { border: 1px solid var(--ds-border, #dbe2ea); background: var(--ds-surface, white); padding: 12px 20px; border-radius: 12px; cursor: pointer; color: inherit; }
+.tabs .active { color: #fff; background: var(--ds-sidebar); border-color: var(--ds-sidebar); }
+.tabs span { margin-left: 8px; opacity: .75; }
+.list { display: grid; gap: 14px; }
+.card { display: flex; justify-content: space-between; align-items: center; gap: 20px; border: 1px solid var(--ds-border, #dbe2ea); background: var(--ds-surface, white); border-radius: 16px; padding: 22px; }
+.card h2 { font-size: 18px; margin: 0 0 8px; }
+.card p { margin: 6px 0; }
+.actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.tableWrap { overflow-x: auto; border-radius: 16px; border: 1px solid var(--ds-border, #dbe2ea); }
+.table { border-collapse: collapse; width: 100%; text-align: left; background: var(--ds-surface, white); }
+.table th { font-size: 13px; color: var(--ds-text-secondary, #697686); background: var(--ds-surface-muted, #f5f7fa); }
+.table th, .table td { padding: 14px 18px; border-bottom: 1px solid var(--ds-border, #e8ecf1); }
+.matrix th:not(:first-child), .matrix td:not(:first-child) { text-align: center; width: 130px; }
+.matrix input, .check input { width: 18px; height: 18px; accent-color: var(--ds-sidebar); cursor: pointer; }
+.empty { padding: 40px; text-align: center; }
+.empty h2 { font-size: 21px; }
+.empty p { color: var(--ds-text-secondary, #697686); margin-bottom: 20px; }
+.enabled, .disabled { padding: 5px 10px; border-radius: 8px; font-size: 13px; }
+.enabled { background: #e4f4ed; color: #176441; }
+.disabled { background: #f2eaea; color: #8a4141; }
+.error { background: #fff0f0; color: #a22828; padding: 14px; border-radius: 10px; }
+.overlay { position: fixed; inset: 0; background: #101c3590; z-index: 1200; display: flex; align-items: center; justify-content: center; padding: 24px; }
+.dialog { background: var(--ds-surface, white); color: var(--ds-text, #182638); border-radius: 20px; width: min(760px, 100%); max-height: 92vh; overflow-y: auto; padding: 24px; box-shadow: 0 20px 80px #0003; }
+.dialogHeader { margin-bottom: 20px; }
+.dialogHeader h2 { margin: 0; font-size: 23px; }
+.fields { border: 0; padding: 0; margin: 0; display: grid; gap: 18px; min-width: 0; }
+.fields label { display: grid; gap: 8px; font-size: 14px; font-weight: 500; }
+.fields label input:not([type=checkbox]), .fields textarea, .fields select { width: 100%; box-sizing: border-box; border: 1px solid var(--ds-border, #cdd6e0); border-radius: 10px; padding: 11px 13px; background: var(--ds-surface, white); color: inherit; font: inherit; }
+.fields .check { display: flex; align-items: center; }
+.footer { display: flex; justify-content: flex-end; gap: 12px; position: sticky; bottom: -24px; background: var(--ds-surface, white); padding: 18px 0 4px; margin-top: 18px; }
+.credentials { border: 1px solid #8ebd9d; background: var(--ds-surface); color: var(--ds-text); border-radius: 14px; padding: 20px; margin-bottom: 20px; }
+.credentials dl { display: grid; grid-template-columns: 80px 1fr; gap: 8px; }
+.credentials dd { margin: 0; font-family: monospace; overflow-wrap: anywhere; }
+@media (max-width: 700px) { .page { padding: 16px; } .header, .card { align-items: flex-start; flex-direction: column; } .overlay { padding: 10px; } .dialog { padding: 16px; } .matrix th, .matrix td { padding: 12px 7px; font-size: 13px; } }
+
+.dialogHeader { position: sticky; top: -24px; z-index: 3; background: var(--ds-surface); padding: 16px 0; }
+.matrix thead th { position: sticky; top: 44px; z-index: 2; }
+@media (max-width: 700px) { .dialogHeader { top: -16px; } .matrix thead th { top: 52px; } }

@@ -1,5 +1,7 @@
 "use client";
 
+import { EditOnly } from "@/components/admin/admin-section-access";
+
 import { AdminRatingDetailsView } from "@/components/admin/ratings/admin-rating-details-view";
 import { AdminRatingJobsTab } from "@/components/admin/ratings/admin-rating-jobs-tab";
 import { AdminRatingRecalcPanel } from "@/components/admin/ratings/admin-rating-recalc-panel";
@@ -8,6 +10,7 @@ import ratingStyles from "@/components/admin/ratings/admin-ratings.module.css";
 import styles from "@/components/admin/tests/admin-tests.module.css";
 import { Button } from "@/components/ui/button";
 import { LoadingState } from "@/components/ui/loading-state";
+import { canAccessSection } from "@/lib/auth/admin-access";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   fetchAdminRatings,
@@ -33,7 +36,7 @@ function placeClass(index: number): string {
 
 export function AdminRatingsSection() {
   const { user } = useAuth();
-  const isAdmin = user?.role === "admin";
+  const isAdmin = canAccessSection(user, "ratings", "edit");
 
   const [tab, setTab] = useState<AdminRatingsTab>("ratings");
   const [ratings, setRatings] = useState<AdminRatingRow[]>([]);
@@ -154,14 +157,14 @@ export function AdminRatingsSection() {
             Отчёт
           </Button>
           {isAdmin ? (
-            <Button
+            <EditOnly><Button
               type="button"
               onClick={() => setShowRecalc(true)}
               disabled={hasActiveJob || recalcBusy}
             >
               <Calculator size={16} style={{ marginRight: 6 }} />
               {hasActiveJob ? "Пересчёт выполняется…" : "Пересчитать"}
-            </Button>
+            </Button></EditOnly>
           ) : null}
         </div>
       </header>
@@ -202,14 +205,14 @@ export function AdminRatingsSection() {
                   : "Ничего не найдено по запросу."}
               </p>
               {isAdmin && ratings.length === 0 ? (
-                <Button
+                <EditOnly><Button
                   type="button"
                   style={{ marginTop: 16 }}
                   onClick={() => setShowRecalc(true)}
                   disabled={hasActiveJob}
                 >
                   Запустить пересчёт
-                </Button>
+                </Button></EditOnly>
               ) : null}
             </div>
           ) : null}

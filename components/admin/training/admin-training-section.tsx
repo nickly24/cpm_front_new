@@ -1,5 +1,7 @@
 "use client";
 
+import { EditOnly } from "@/components/admin/admin-section-access";
+
 import { AdminCardsToDraftModal } from "@/components/admin/training/admin-cards-to-draft-modal";
 import styles from "@/components/admin/training/admin-training.module.css";
 import { SectionHeroBanner } from "@/components/student/section-hero-banner";
@@ -41,6 +43,8 @@ import {
   Trash2,
   Wand2,
 } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { adminHref, canAccessSection } from "@/lib/auth/admin-access";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -340,6 +344,7 @@ function FormModal({
 
 export function AdminTrainingSection() {
   const router = useRouter();
+  const { user } = useAuth();
   const [view, setView] = useState<AdminView>("directions");
   const [directions, setDirections] = useState<AdminTrainingDirectionRow[]>([]);
   const [selectedDirection, setSelectedDirection] =
@@ -509,7 +514,8 @@ export function AdminTrainingSection() {
       direction: direction.name,
       test: section.test_id,
     });
-    router.push(`/cabinet/admin/tests?${params.toString()}`);
+    if (canAccessSection(user, "tests")) router.push(`${adminHref(user, "tests")}?${params.toString()}`);
+    else window.alert("Черновик создан. Для его просмотра нужно право просмотра раздела «Тесты».");
   };
 
   const openSection = (
@@ -590,14 +596,14 @@ export function AdminTrainingSection() {
         leading={breadcrumb ?? undefined}
         footer={
           view !== "directions" ? (
-            <Button
+            <EditOnly><Button
               type="button"
               className={styles.heroActionBtn}
               onClick={openCreate}
             >
               <Plus size={16} aria-hidden />
               {view === "sections" ? "Новый раздел" : "Новая карточка"}
-            </Button>
+            </Button></EditOnly>
           ) : undefined
         }
       />
@@ -758,7 +764,7 @@ export function AdminTrainingSection() {
                           </button>
                         ) : (
                           <>
-                            <button
+                            <EditOnly><button
                               type="button"
                               className={styles.iconBtn}
                               aria-label="Редактировать"
@@ -767,15 +773,15 @@ export function AdminTrainingSection() {
                               }
                             >
                               <Pencil size={16} />
-                            </button>
-                            <button
+                            </button></EditOnly>
+                            <EditOnly><button
                               type="button"
                               className={cn(styles.iconBtn, styles.iconBtnDanger)}
                               aria-label="Удалить"
                               onClick={() => void handleDeleteSection(section)}
                             >
                               <Trash2 size={16} />
-                            </button>
+                            </button></EditOnly>
                           </>
                         )}
                       </div>
@@ -791,7 +797,7 @@ export function AdminTrainingSection() {
         selectedSection.kind === "manual" ? (
         <>
           <div className={cn(styles.catalogHeader, styles.catalogHeaderEnd)}>
-            <Button
+            <EditOnly><Button
               type="button"
               variant="secondary"
               disabled={cards.length === 0}
@@ -799,7 +805,7 @@ export function AdminTrainingSection() {
             >
               <Wand2 size={16} aria-hidden />
               Трансформировать в тест
-            </Button>
+            </Button></EditOnly>
             <AdminSearchPopover
               value={searchTerm}
               onChange={setSearchTerm}
@@ -842,22 +848,22 @@ export function AdminTrainingSection() {
                       </p>
                     </div>
                     <div className={styles.rowActions}>
-                      <button
+                      <EditOnly><button
                         type="button"
                         className={styles.iconBtn}
                         aria-label="Редактировать"
                         onClick={() => setModal({ kind: "card-edit", card })}
                       >
                         <Pencil size={16} />
-                      </button>
-                      <button
+                      </button></EditOnly>
+                      <EditOnly><button
                         type="button"
                         className={cn(styles.iconBtn, styles.iconBtnDanger)}
                         aria-label="Удалить"
                         onClick={() => void handleDeleteCard(card)}
                       >
                         <Trash2 size={16} />
-                      </button>
+                      </button></EditOnly>
                     </div>
                   </div>
                 ))}

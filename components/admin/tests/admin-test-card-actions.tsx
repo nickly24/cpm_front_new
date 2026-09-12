@@ -1,5 +1,7 @@
 "use client";
 
+import { EditOnly } from "@/components/admin/admin-section-access";
+
 import styles from "@/components/admin/tests/admin-tests.module.css";
 import { cn } from "@/lib/cn";
 import {
@@ -83,7 +85,7 @@ export function AdminTestCardActions({
   if (external) {
     return (
       <div className={styles.listCardActions}>
-        <button
+        <EditOnly><button
           type="button"
           className={cn(styles.iconAction, styles.iconActionDanger)}
           aria-label="Удалить"
@@ -91,7 +93,7 @@ export function AdminTestCardActions({
           onClick={onDelete}
         >
           <Trash2 size={16} aria-hidden />
-        </button>
+        </button></EditOnly>
       </div>
     );
   }
@@ -113,7 +115,7 @@ export function AdminTestCardActions({
         onMouseEnter={openMenu}
         onMouseLeave={scheduleClose}
       >
-        <button
+        <EditOnly><button
           type="button"
           className={cn(styles.iconAction, menuOpen && styles.iconActionActive)}
           aria-label="Редактировать"
@@ -126,7 +128,7 @@ export function AdminTestCardActions({
           }}
         >
           <Pencil size={16} aria-hidden />
-        </button>
+        </button></EditOnly>
 
         {menuOpen ? (
           <div
@@ -136,7 +138,7 @@ export function AdminTestCardActions({
             onMouseEnter={openMenu}
             onMouseLeave={scheduleClose}
           >
-            <button
+            <EditOnly><button
               type="button"
               role="menuitem"
               className={styles.editMicroItem}
@@ -149,8 +151,8 @@ export function AdminTestCardActions({
                 <FilePenLine size={14} aria-hidden />
               </span>
               Старый редактор
-            </button>
-            <button
+            </button></EditOnly>
+            <EditOnly><button
               type="button"
               role="menuitem"
               className={styles.editMicroItem}
@@ -163,12 +165,12 @@ export function AdminTestCardActions({
                 <Wand2 size={14} aria-hidden />
               </span>
               Новый интерфейс
-            </button>
+            </button></EditOnly>
           </div>
         ) : null}
       </div>
 
-      <button
+      <EditOnly><button
         type="button"
         className={cn(styles.iconAction, styles.iconActionDanger)}
         aria-label="Удалить"
@@ -176,7 +178,7 @@ export function AdminTestCardActions({
         onClick={onDelete}
       >
         <Trash2 size={16} aria-hidden />
-      </button>
+      </button></EditOnly>
     </div>
   );
 }

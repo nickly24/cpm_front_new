@@ -1,5 +1,7 @@
 "use client";
 
+import { EditOnly, ReadOnlyControl } from "@/components/admin/admin-section-access";
+
 import { AdminFullscreenBack } from "@/components/admin/admin-fullscreen-back";
 import zapStyles from "@/components/admin/zaps/admin-zaps.module.css";
 import styles from "@/components/admin/tests/admin-tests.module.css";
@@ -348,7 +350,7 @@ export function AdminZapDetail({
                         <td>
                           {canRetryZapDate(zapInfo.status, row.status) &&
                           row.id != null ? (
-                            <Button
+                            <EditOnly><Button
                               type="button"
                               variant="ghost"
                               disabled={retryingId === row.id}
@@ -357,7 +359,7 @@ export function AdminZapDetail({
                               {retryingId === row.id
                                 ? "Привязка…"
                                 : "Привязать снова"}
-                            </Button>
+                            </Button></EditOnly>
                           ) : null}
                         </td>
                       </tr>
@@ -372,43 +374,43 @@ export function AdminZapDetail({
             <div className={zapStyles.processBlock}>
               <h3 className={styles.detailSectionTitle}>Обработка запроса</h3>
               <div className={zapStyles.actionRow}>
-                <button
+                <EditOnly><button
                   type="button"
                   className={`${zapStyles.actionBtn} ${action === "apr" ? zapStyles.actionBtnActive : ""}`}
                   onClick={() => setAction("apr")}
                 >
                   Одобрить
-                </button>
-                <button
+                </button></EditOnly>
+                <EditOnly><button
                   type="button"
                   className={`${zapStyles.actionBtn} ${action === "dec" ? zapStyles.actionBtnActive : ""}`}
                   onClick={() => setAction("dec")}
                 >
                   Отклонить
-                </button>
+                </button></EditOnly>
               </div>
               <label className={zapStyles.filterLabel} htmlFor="zap-answer">
                 Ответ ученику
               </label>
-              <textarea
+              <ReadOnlyControl><textarea
                 id="zap-answer"
                 className={zapStyles.answerArea}
                 value={answer}
                 onChange={(event) => setAnswer(event.target.value)}
                 placeholder="Введите ответ…"
                 rows={4}
-              />
+              /></ReadOnlyControl>
               {processError ? (
                 <p className={zapStyles.errorText}>{processError}</p>
               ) : null}
               <div>
-                <Button
+                <EditOnly><Button
                   type="button"
                   disabled={processing}
                   onClick={() => void handleProcess()}
                 >
                   {processing ? "Обработка…" : "Обработать запрос"}
-                </Button>
+                </Button></EditOnly>
               </div>
             </div>
           ) : null}

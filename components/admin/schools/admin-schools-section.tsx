@@ -1,5 +1,7 @@
 "use client";
 
+import { EditOnly } from "@/components/admin/admin-section-access";
+
 import styles from "@/components/admin/tests/admin-tests.module.css";
 import userStyles from "@/components/admin/users/admin-users.module.css";
 import { AdminSchoolPanel } from "@/components/admin/schools/admin-school-panel";
@@ -117,9 +119,9 @@ export function AdminSchoolsSection() {
           </p>
         </div>
         {tab === "catalog" ? (
-          <Button type="button" onClick={() => setPanelMode("create")}>
+          <EditOnly><Button type="button" onClick={() => setPanelMode("create")}>
             + Добавить школу
-          </Button>
+          </Button></EditOnly>
         ) : null}
       </header>
 
@@ -194,7 +196,7 @@ export function AdminSchoolsSection() {
                     >
                       Состав
                     </button>
-                    <button
+                    <EditOnly><button
                       type="button"
                       className={styles.actionBtn}
                       onClick={() => {
@@ -203,14 +205,14 @@ export function AdminSchoolsSection() {
                       }}
                     >
                       Изменить
-                    </button>
-                    <button
+                    </button></EditOnly>
+                    <EditOnly><button
                       type="button"
                       className={styles.actionBtn}
                       onClick={() => handleToggleActive(school)}
                     >
                       {school.is_active ? "Деактивировать" : "Активировать"}
-                    </button>
+                    </button></EditOnly>
                   </div>
                 </article>
               ))}

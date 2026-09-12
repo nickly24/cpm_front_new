@@ -2,7 +2,7 @@
 
 import styles from "@/components/admin/dashboard/admin-dashboard.module.css";
 import { useAuth } from "@/contexts/AuthContext";
-import { adminNavigation } from "@/lib/navigation/admin";
+import { getNavigation } from "@/lib/navigation";
 import {
   ADMIN_READY_SECTIONS,
   ADMIN_SECTION_DESCRIPTIONS,
@@ -63,7 +63,7 @@ export function AdminDashboardSection() {
         </p>
       </header>
 
-      {adminNavigation.groups.map((group) => {
+      {getNavigation(user?.role ?? "admin", user).groups.map((group) => {
         const items = group.items.filter((item) => item.id !== "dashboard");
 
         if (items.length === 0) {
@@ -85,7 +85,7 @@ export function AdminDashboardSection() {
                   return (
                     <Link
                       key={item.id}
-                      href={getSectionHref("admin", item.id)}
+                      href={getSectionHref(user?.role ?? "admin", item.id)}
                       className={`${styles.card} ${styles.cardReady}`}
                     >
                       <div className={styles.cardTop}>

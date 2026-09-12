@@ -1,5 +1,7 @@
 "use client";
 
+import { ReadOnlyControl, EditOnly } from "@/components/admin/admin-section-access";
+
 import styles from "@/components/admin/upload/admin-upload.module.css";
 import testStyles from "@/components/admin/tests/admin-tests.module.css";
 import { Button } from "@/components/ui/button";
@@ -417,7 +419,7 @@ export function AdminTestUploadPanel({ onImported }: AdminTestUploadPanelProps) 
         ))}
       </div>
 
-      <input
+      <ReadOnlyControl><input
         ref={inputRef}
         type="file"
         className={styles.fileInput}
@@ -428,7 +430,7 @@ export function AdminTestUploadPanel({ onImported }: AdminTestUploadPanelProps) 
             void handleFile(next);
           }
         }}
-      />
+      /></ReadOnlyControl>
 
       {error ? <div className={testStyles.stateBox}>{error}</div> : null}
 
@@ -449,7 +451,7 @@ export function AdminTestUploadPanel({ onImported }: AdminTestUploadPanelProps) 
           </Button>
         </div>
       ) : (
-        <div
+        <EditOnly><div
           role="button"
           tabIndex={0}
           className={styles.dropzone}
@@ -468,7 +470,7 @@ export function AdminTestUploadPanel({ onImported }: AdminTestUploadPanelProps) 
           <p className={styles.dropzoneText}>
             Один файл должен содержать один тест со всеми вопросами.
           </p>
-        </div>
+        </div></EditOnly>
       )}
 
       {metadata ? (
@@ -482,14 +484,14 @@ export function AdminTestUploadPanel({ onImported }: AdminTestUploadPanelProps) 
                 Эти поля попадут в тест CPM перед созданием.
               </p>
             </div>
-            <Button
+            <EditOnly><Button
               type="button"
               variant="secondary"
               onClick={() => void runPreview()}
               disabled={parsing || committing}
             >
               {previewStale ? "Обновить preview" : "Проверить ещё раз"}
-            </Button>
+            </Button></EditOnly>
           </div>
 
           <div className={styles.metaGrid}>
@@ -576,9 +578,9 @@ export function AdminTestUploadPanel({ onImported }: AdminTestUploadPanelProps) 
               <Button type="button" variant="ghost" onClick={reset}>
                 Сбросить
               </Button>
-              <Button type="button" disabled={!canCommit} onClick={() => void handleCommit()}>
+              <EditOnly><Button type="button" disabled={!canCommit} onClick={() => void handleCommit()}>
                 {committing ? "Создание…" : previewStale ? "Обновите preview" : "Создать тест"}
-              </Button>
+              </Button></EditOnly>
             </div>
           </div>
 

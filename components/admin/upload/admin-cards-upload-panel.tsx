@@ -1,5 +1,7 @@
 "use client";
 
+import { EditOnly, ReadOnlyControl } from "@/components/admin/admin-section-access";
+
 import { AdminCardsUploadPreview } from "@/components/admin/upload/admin-cards-upload-preview";
 import styles from "@/components/admin/upload/admin-upload.module.css";
 import testStyles from "@/components/admin/tests/admin-tests.module.css";
@@ -376,7 +378,7 @@ export function AdminCardsUploadPanel({ onCommitted }: AdminCardsUploadPanelProp
         </p>
       </section>
 
-      <input
+      <ReadOnlyControl><input
         ref={inputRef}
         type="file"
         className={styles.fileInput}
@@ -387,7 +389,7 @@ export function AdminCardsUploadPanel({ onCommitted }: AdminCardsUploadPanelProp
             void handleParse(next);
           }
         }}
-      />
+      /></ReadOnlyControl>
 
       {parsing ? (
         <LoadingState label="Разбор файла…" variant="block" className={testStyles.stateBox} />
@@ -406,7 +408,7 @@ export function AdminCardsUploadPanel({ onCommitted }: AdminCardsUploadPanelProp
           </Button>
         </div>
       ) : (
-        <div
+        <EditOnly><div
           role="button"
           tabIndex={canUploadFile ? 0 : -1}
           className={`${styles.dropzone} ${!canUploadFile ? styles.dropzoneDisabled : ""}`.trim()}
@@ -436,7 +438,7 @@ export function AdminCardsUploadPanel({ onCommitted }: AdminCardsUploadPanelProp
                 : "Сначала выберите направление и раздел"}
           </p>
           <p className={styles.dropzoneText}>Колонки: Вопрос, Ответ</p>
-        </div>
+        </div></EditOnly>
       )}
 
       <div className={styles.actions}>

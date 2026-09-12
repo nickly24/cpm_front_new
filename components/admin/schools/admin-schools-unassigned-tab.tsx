@@ -1,5 +1,7 @@
 "use client";
 
+import { ReadOnlyControl, EditOnly } from "@/components/admin/admin-section-access";
+
 import styles from "@/components/admin/tests/admin-tests.module.css";
 import userStyles from "@/components/admin/users/admin-users.module.css";
 import { LoadingState } from "@/components/ui/loading-state";
@@ -101,7 +103,7 @@ export function AdminSchoolsUnassignedTab({
               </div>
             </div>
             <div className={userStyles.tableActions}>
-              <select
+              <ReadOnlyControl><select
                 className={userStyles.fieldSelect}
                 value={selection[student.student_id] ?? ""}
                 onChange={(e) =>
@@ -117,14 +119,14 @@ export function AdminSchoolsUnassignedTab({
                     {school.short_name || school.name}
                   </option>
                 ))}
-              </select>
-              <button
+              </select></ReadOnlyControl>
+              <EditOnly><button
                 type="button"
                 className={styles.actionBtn}
                 onClick={() => assign(student.student_id)}
               >
                 Привязать
-              </button>
+              </button></EditOnly>
             </div>
           </div>
         ))}

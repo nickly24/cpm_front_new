@@ -1,6 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/cn";
+import { useAuth } from "@/contexts/AuthContext";
 import type { UserRole } from "@/lib/auth/types";
 import { getNavigation, getSectionHref } from "@/lib/navigation";
 import { PanelLeftClose, PanelLeftOpen, X } from "lucide-react";
@@ -30,7 +31,8 @@ export function Sidebar({
   onClose,
 }: SidebarProps) {
   const pathname = usePathname();
-  const navigation = getNavigation(role);
+  const { user } = useAuth();
+  const navigation = getNavigation(role, user);
   const isDrawer = variant === "drawer";
   const isCompact = !isDrawer && collapsed;
 

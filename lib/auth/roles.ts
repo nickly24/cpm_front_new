@@ -7,6 +7,7 @@ export const ROLE_LABELS: Record<UserRole, string> = {
   admin: "администратора",
   examinator: "экзаменатора",
   supervisor: "супервайзера",
+  staff_admin: "сотрудника",
 };
 
 export function getCabinetPath(role: UserRole): string {

@@ -1,5 +1,7 @@
 "use client";
 
+import { EditOnly } from "@/components/admin/admin-section-access";
+
 import styles from "@/components/admin/tests/admin-tests.module.css";
 import userStyles from "@/components/admin/users/admin-users.module.css";
 import { AdminStaffPanel } from "@/components/admin/users/admin-staff-panel";
@@ -145,7 +147,7 @@ export function AdminStaffTab() {
         <span className={userStyles.statPill}>
           Всего: <strong>{users.length}</strong>
         </span>
-        <Button
+        <EditOnly><Button
           type="button"
           onClick={() => {
             setPanelMode("add");
@@ -153,7 +155,7 @@ export function AdminStaffTab() {
           }}
         >
           Добавить
-        </Button>
+        </Button></EditOnly>
       </div>
 
       <p className={userStyles.hint}>
@@ -219,7 +221,7 @@ export function AdminStaffTab() {
                   ) : null}
                   <td>
                     <div className={userStyles.tableActions}>
-                      <button
+                      <EditOnly><button
                         type="button"
                         className={styles.actionBtn}
                         onClick={() => {
@@ -228,22 +230,22 @@ export function AdminStaffTab() {
                         }}
                       >
                         Изменить
-                      </button>
-                      <button
+                      </button></EditOnly>
+                      <EditOnly><button
                         type="button"
                         className={styles.actionBtn}
                         disabled={resettingId === user.id}
                         onClick={() => void handleResetPassword(user)}
                       >
                         {resettingId === user.id ? "Сброс…" : "Новый пароль"}
-                      </button>
-                      <button
+                      </button></EditOnly>
+                      <EditOnly><button
                         type="button"
                         className={`${styles.actionBtn} ${styles.actionBtnDanger}`}
                         onClick={() => void handleDelete(user)}
                       >
                         Удалить
-                      </button>
+                      </button></EditOnly>
                     </div>
                   </td>
                 </tr>

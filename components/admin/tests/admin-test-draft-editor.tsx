@@ -1344,7 +1344,7 @@ function AdminTestDraftEditorInner({
   );
   const isTestPersistence = persistenceMode === "test";
   const canEdit =
-    isTestPersistence || !draft.lockedBy || String(draft.lockedBy) === String(user?.id);
+    isTestPersistence || !draft.lockedBy || (String(draft.lockedBy) === String(user?.id) && (draft.lockedByRole ?? "admin") === user?.role);
   const requireExplicitSave = isTestPersistence;
   const currentAutosaveSnapshot = useMemo(() => autosaveSnapshot(draft), [draft]);
   const hasUnsavedChanges =

@@ -10,6 +10,8 @@ import {
   createCardTransformSession,
 } from "@/lib/admin/admin-upload-api";
 import type { AdminTrainingCardRow, AdminTrainingSectionRow } from "@/lib/training/admin-training-types";
+import { useAuth } from "@/contexts/AuthContext";
+import { adminHref, canAccessSection } from "@/lib/auth/admin-access";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
@@ -25,6 +27,7 @@ export function AdminCardsToDraftModal({
   onClose,
 }: AdminCardsToDraftModalProps) {
   const router = useRouter();
+  const { user } = useAuth();
   const [selectedIds, setSelectedIds] = useState<Set<number>>(
     () => new Set(cards.map((card) => card.id)),
   );
@@ -101,7 +104,8 @@ export function AdminCardsToDraftModal({
       }
       await commitCardTransformSession(session.session_id);
       onClose();
-      router.push("/cabinet/admin/upload");
+      if (canAccessSection(user, "upload")) router.push(adminHref(user, "upload"));
+      else window.alert("Преобразование запущено. Готовый черновик появится в разделе «Тесты».");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Не удалось запустить трансформацию");
     } finally {

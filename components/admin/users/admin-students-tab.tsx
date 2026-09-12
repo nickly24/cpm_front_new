@@ -1,5 +1,7 @@
 "use client";
 
+import { EditOnly, ReadOnlyControl } from "@/components/admin/admin-section-access";
+
 import { AdminListPaginationBar } from "@/components/admin/tests/admin-list-pagination";
 import styles from "@/components/admin/tests/admin-tests.module.css";
 import userStyles from "@/components/admin/users/admin-users.module.css";
@@ -19,12 +21,15 @@ import {
   toClientPagination,
 } from "@/lib/admin/admin-users-utils";
 import { useDebouncedValue } from "@/lib/hooks/use-debounced-value";
+import { useAuth } from "@/contexts/AuthContext";
+import { adminHref, canAccessSection } from "@/lib/auth/admin-access";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 const PAGE_SIZE = 15;
 
 export function AdminStudentsTab() {
+  const { user } = useAuth();
   const [students, setStudents] = useState<AdminStudent[]>([]);
   const [groups, setGroups] = useState<AdminGroupItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -195,9 +200,9 @@ export function AdminStudentsTab() {
               ))}
             </select>
           </label>
-          <Button type="button" onClick={() => setPanelMode("add")}>
+          <EditOnly><Button type="button" onClick={() => setPanelMode("add")}>
             + Добавить ученика
-          </Button>
+          </Button></EditOnly>
         </div>
       </div>
 
@@ -247,7 +252,7 @@ export function AdminStudentsTab() {
                       )}
                     </td>
                     <td>
-                      <select
+                      <ReadOnlyControl><select
                         className={userStyles.fieldSelect}
                         value={student.group_id ?? "none"}
                         onChange={(e) => handleGroupChange(student, e.target.value)}
@@ -258,25 +263,25 @@ export function AdminStudentsTab() {
                             {group.group_name}
                           </option>
                         ))}
-                      </select>
+                      </select></ReadOnlyControl>
                     </td>
                     <td>
                       {student.school_id ? (
                         <span className={userStyles.metaTag}>
                           {schoolLabel(student.school_name, student.school_short_name)}
                         </span>
-                      ) : (
+                      ) : canAccessSection(user, "schools") ? (
                         <Link
-                          href="/cabinet/admin/schools"
+                          href={adminHref(user, "schools")}
                           className={`${userStyles.metaTag} ${userStyles.metaTagMuted}`}
                         >
                           Не указана →
                         </Link>
-                      )}
+                      ) : <span>Не указана</span>}
                     </td>
                     <td>
                       <div className={userStyles.tableActions}>
-                        <button
+                        <EditOnly><button
                           type="button"
                           className={styles.actionBtn}
                           onClick={() => {
@@ -285,14 +290,14 @@ export function AdminStudentsTab() {
                           }}
                         >
                           Изменить
-                        </button>
-                        <button
+                        </button></EditOnly>
+                        <EditOnly><button
                           type="button"
                           className={`${styles.actionBtn} ${styles.actionBtnDanger}`}
                           onClick={() => handleDelete(student)}
                         >
                           Удалить
-                        </button>
+                        </button></EditOnly>
                       </div>
                     </td>
                   </tr>

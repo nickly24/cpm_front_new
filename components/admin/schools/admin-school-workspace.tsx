@@ -1,5 +1,7 @@
 "use client";
 
+import { EditOnly } from "@/components/admin/admin-section-access";
+
 import styles from "@/components/admin/tests/admin-tests.module.css";
 import userStyles from "@/components/admin/users/admin-users.module.css";
 import { AdminFullscreenBack } from "@/components/admin/admin-fullscreen-back";
@@ -143,14 +145,14 @@ export function AdminSchoolWorkspace({ schoolId, onBack }: AdminSchoolWorkspaceP
                   {student.group_name ? ` · ${student.group_name}` : ""}
                 </div>
               </div>
-              <button
+              <EditOnly><button
                 type="button"
                 className={styles.actionBtn}
                 disabled={student.school_id === schoolId}
                 onClick={() => handleAssign(student.id)}
               >
                 {student.school_id === schoolId ? "Уже здесь" : "Добавить"}
-              </button>
+              </button></EditOnly>
             </div>
           ))}
         </div>
@@ -173,13 +175,13 @@ export function AdminSchoolWorkspace({ schoolId, onBack }: AdminSchoolWorkspaceP
                   {student.group_id ? ` · группа #${student.group_id}` : ""}
                 </div>
               </div>
-              <button
+              <EditOnly><button
                 type="button"
                 className={`${styles.actionBtn} ${styles.actionBtnDanger}`}
                 onClick={() => handleRemove(student.id)}
               >
                 Убрать
-              </button>
+              </button></EditOnly>
             </div>
           ))}
         </div>

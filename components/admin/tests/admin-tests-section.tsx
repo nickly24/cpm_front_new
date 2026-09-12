@@ -1,5 +1,7 @@
 "use client";
 
+import { EditOnly, ReadOnlyControl, useAdminSectionAccess } from "@/components/admin/admin-section-access";
+
 import { AdminCreateTestMenu } from "@/components/admin/tests/admin-create-test-menu";
 import { AdminDirectionCombobox } from "@/components/admin/tests/admin-direction-combobox";
 import { AdminExternalTestDeleteDialog } from "@/components/admin/tests/admin-external-test-delete-dialog";
@@ -9,6 +11,7 @@ import {
   AdminTestCardSchedule,
   AdminTestStatusBadge,
 } from "@/components/admin/tests/admin-test-card-meta";
+import { AdminTestDraftPreview } from "./admin-test-draft-preview";
 import { AdminTestDraftEditor } from "@/components/admin/tests/admin-test-draft-editor";
 import { AdminTestForm } from "@/components/admin/tests/admin-test-form";
 import { AdminTestWorkspace } from "@/components/admin/tests/admin-test-workspace";
@@ -67,6 +70,7 @@ const PAGE_SIZE = 6;
 
 export function AdminTestsSection() {
   const searchParams = useSearchParams();
+  const { canEdit } = useAdminSectionAccess("tests");
   const openedFromUrlRef = useRef(false);
   const [directions, setDirections] = useState<Direction[]>([]);
   const [directionName, setDirectionName] = useState("");
@@ -434,6 +438,7 @@ export function AdminTestsSection() {
   }
 
   if (view === "draftEditor" && editingDraft) {
+    if (!canEdit) return <AdminTestDraftPreview draft={editingDraft} onBack={() => { setView("list"); setEditingDraft(null); }} />;
     const isTestEdit = draftEditorMode === "testEdit" && editingTestId;
 
     return (
@@ -548,7 +553,7 @@ export function AdminTestsSection() {
             </div>
             <div className={styles.draftsDrawerBody}>
               <div className={styles.draftsDrawerActions}>
-                <Button
+                <EditOnly><Button
                   type="button"
                   size="sm"
                   onClick={() => {
@@ -557,7 +562,7 @@ export function AdminTestsSection() {
                 >
                   <Plus size={15} aria-hidden />
                   Новый драфт
-                </Button>
+                </Button></EditOnly>
                 <button
                   type="button"
                   className={styles.headerGhostBtn}
@@ -606,7 +611,7 @@ export function AdminTestsSection() {
                         {draft.canvas?.questions?.length ?? 0} вопросов ·{" "}
                         {draft.direction || "направление не выбрано"}
                       </span>
-                      <button
+                      <EditOnly><button
                         type="button"
                         className={styles.draftDeleteButton}
                         aria-label="Удалить драфт"
@@ -617,7 +622,7 @@ export function AdminTestsSection() {
                         }}
                       >
                         <Trash2 size={14} />
-                      </button>
+                      </button></EditOnly>
                     </article>
                   ))}
                 </div>
@@ -644,7 +649,7 @@ export function AdminTestsSection() {
               <span className={styles.draftsTriggerBadge}>{drafts.length}</span>
             ) : null}
           </button>
-          <AdminCreateTestMenu
+          <EditOnly><AdminCreateTestMenu
             onCreateTest={() => {
               setEditingTest(null);
               setView("create");
@@ -653,7 +658,7 @@ export function AdminTestsSection() {
               setEditingTest(null);
               setView("createExternal");
             }}
-          />
+          /></EditOnly>
         </div>
       </header>
 
@@ -760,16 +765,16 @@ export function AdminTestsSection() {
           <p>{tests.length === 0 ? "Тестов пока нет" : "По фильтрам ничего не найдено"}</p>
           {tests.length === 0 ? (
             <div className={styles.emptyActions}>
-              <Button type="button" size="sm" onClick={() => setView("create")}>
+              <EditOnly><Button type="button" size="sm" onClick={() => setView("create")}>
                 Создать первый тест
-              </Button>
-              <button
+              </Button></EditOnly>
+              <EditOnly><button
                 type="button"
                 className={styles.headerGhostBtn}
                 onClick={() => setView("createExternal")}
               >
                 Вне системы
-              </button>
+              </button></EditOnly>
             </div>
           ) : (
             <button type="button" className={styles.listClearBtn} onClick={clearFilters}>
@@ -807,7 +812,7 @@ export function AdminTestsSection() {
 
                   {!external ? (
                     <div className={styles.togglesRow}>
-                      <Toggle
+                      <ReadOnlyControl><Toggle
                         id={`admin-test-published-${testId}`}
                         label="Видимость теста"
                         variant="success"
@@ -816,8 +821,8 @@ export function AdminTestsSection() {
                         onChange={(checked) =>
                           handleTogglePublished(testId, checked)
                         }
-                      />
-                      <Toggle
+                      /></ReadOnlyControl>
+                      <ReadOnlyControl><Toggle
                         id={`admin-test-visible-${testId}`}
                         label="Показ ответов студентам"
                         variant="success"
@@ -826,7 +831,7 @@ export function AdminTestsSection() {
                         onChange={(checked) =>
                           handleToggleVisible(testId, checked)
                         }
-                      />
+                      /></ReadOnlyControl>
                     </div>
                   ) : (
                     <p className={styles.externalNotice}>

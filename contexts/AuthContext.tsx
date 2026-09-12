@@ -49,6 +49,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     void checkAuth();
   }, [checkAuth]);
 
+  useEffect(() => {
+    if (user?.role !== "staff_admin") return;
+    let active = true;
+    const refresh = async () => {
+      try {
+        const current = await checkAuthRequest(true);
+        if (active) setUser(current);
+      } catch { /* A temporary network failure does not invalidate the session. */ }
+    };
+    const focus = () => { void refresh(); };
+    window.addEventListener("focus", focus);
+    const timer = window.setInterval(focus, 30_000);
+    return () => { active = false; window.removeEventListener("focus", focus); window.clearInterval(timer); };
+  }, [user?.role]);
+
   const login = useCallback(async (username: string, password: string) => {
     const result = await loginRequest(username, password);
 

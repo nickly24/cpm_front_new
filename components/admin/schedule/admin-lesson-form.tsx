@@ -1,5 +1,7 @@
 "use client";
 
+import { ReadOnlyControl, EditOnly } from "@/components/admin/admin-section-access";
+
 import styles from "@/components/schedule/schedule.module.css";
 import { TimeField } from "@/components/schedule/time-field";
 import { Button } from "@/components/ui/button";
@@ -72,13 +74,13 @@ function LessonFormFields({
     <div className={styles.formGrid}>
       <label className={styles.field}>
         <span className={styles.fieldLabel}>Дата</span>
-        <input
+        <ReadOnlyControl><input
           type="date"
           className={styles.fieldInput}
           value={form.date}
           onChange={(event) => update("date", event.target.value)}
           required
-        />
+        /></ReadOnlyControl>
       </label>
 
       <div className={styles.fieldRow}>
@@ -98,43 +100,43 @@ function LessonFormFields({
 
       <label className={styles.field}>
         <span className={styles.fieldLabel}>Предмет</span>
-        <input
+        <ReadOnlyControl><input
           className={styles.fieldInput}
           value={form.lesson_name}
           onChange={(event) => update("lesson_name", event.target.value)}
           required
-        />
+        /></ReadOnlyControl>
       </label>
 
       <label className={styles.field}>
         <span className={styles.fieldLabel}>Преподаватель</span>
-        <input
+        <ReadOnlyControl><input
           className={styles.fieldInput}
           value={form.teacher_name}
           onChange={(event) => update("teacher_name", event.target.value)}
           required
-        />
+        /></ReadOnlyControl>
       </label>
 
       <label className={styles.field}>
         <span className={styles.fieldLabel}>Локация (вуз)</span>
-        <input
+        <ReadOnlyControl><input
           className={styles.fieldInput}
           value={form.location}
           onChange={(event) => update("location", event.target.value)}
           required
-        />
+        /></ReadOnlyControl>
       </label>
 
       <label className={styles.field}>
         <span className={styles.fieldLabel}>Аудитория</span>
-        <input
+        <ReadOnlyControl><input
           className={styles.fieldInput}
           value={form.classroom}
           onChange={(event) => update("classroom", event.target.value)}
           placeholder="301А"
           required
-        />
+        /></ReadOnlyControl>
       </label>
 
       <div className={styles.field}>
@@ -159,7 +161,7 @@ function LessonFormFields({
               style={{ background: form.color }}
             />
             <Pipette size={14} strokeWidth={2.25} />
-            <input
+            <ReadOnlyControl><input
               type="color"
               className={styles.colorNativeHidden}
               value={/^#[0-9A-Fa-f]{6}$/.test(form.color) ? form.color : "#5B8DEF"}
@@ -167,7 +169,7 @@ function LessonFormFields({
                 update("color", event.target.value.toUpperCase())
               }
               aria-label="Свой цвет"
-            />
+            /></ReadOnlyControl>
           </label>
         </div>
       </div>
@@ -180,11 +182,11 @@ function LessonFormFields({
               Выкл. — дистанционно (онлайн)
             </span>
           </div>
-          <Toggle
+          <ReadOnlyControl><Toggle
             checked={form.is_in_person}
             onChange={(checked) => update("is_in_person", checked)}
             variant="accent"
-          />
+          /></ReadOnlyControl>
         </div>
 
         <div className={styles.toggleCard}>
@@ -194,11 +196,11 @@ function LessonFormFields({
               Выкл. — частично (кто именно — вне сервиса)
             </span>
           </div>
-          <Toggle
+          <ReadOnlyControl><Toggle
             checked={form.is_for_all}
             onChange={(checked) => update("is_for_all", checked)}
             variant="accent"
-          />
+          /></ReadOnlyControl>
         </div>
 
         <div className={styles.toggleCard}>
@@ -208,11 +210,11 @@ function LessonFormFields({
               Пометит карточку бейджем «Изменено»
             </span>
           </div>
-          <Toggle
+          <ReadOnlyControl><Toggle
             checked={form.is_changed}
             onChange={(checked) => update("is_changed", checked)}
             variant="accent"
-          />
+          /></ReadOnlyControl>
         </div>
 
         <div className={styles.toggleCard}>
@@ -222,7 +224,7 @@ function LessonFormFields({
               Видно всем школам в календаре «Общие»
             </span>
           </div>
-          <Toggle
+          <ReadOnlyControl><Toggle
             checked={form.is_public}
             onChange={(isPublic) => {
               setForm((prev) => ({
@@ -232,7 +234,7 @@ function LessonFormFields({
               }));
             }}
             variant="success"
-          />
+          /></ReadOnlyControl>
         </div>
       </div>
 
@@ -344,9 +346,9 @@ export function AdminLessonForm({
         error={error}
       />
       <div className={styles.formActions}>
-        <Button type="submit" disabled={submitting}>
+        <EditOnly><Button type="submit" disabled={submitting}>
           {submitting ? "Сохранение…" : "Сохранить"}
-        </Button>
+        </Button></EditOnly>
         <Button
           type="button"
           variant="ghost"
@@ -356,14 +358,14 @@ export function AdminLessonForm({
           Отмена
         </Button>
         {mode === "edit" && onDelete ? (
-          <Button
+          <EditOnly><Button
             type="button"
             variant="ghost"
             disabled={submitting}
             onClick={() => void onDelete()}
           >
             Удалить
-          </Button>
+          </Button></EditOnly>
         ) : null}
       </div>
     </form>

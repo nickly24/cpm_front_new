@@ -1,5 +1,7 @@
 "use client";
 
+import { EditOnly, ReadOnlyControl } from "@/components/admin/admin-section-access";
+
 import { AdminUploadJobsTab } from "@/components/admin/upload/admin-upload-jobs-tab";
 import { AdminUploadPreview } from "@/components/admin/upload/admin-upload-preview";
 import { AdminUploadReportWorkspace } from "@/components/admin/upload/admin-upload-report-workspace";
@@ -328,7 +330,7 @@ export function AdminUploadSection() {
             </ol>
           </section>
 
-          <input
+          <ReadOnlyControl><input
             ref={inputRef}
             type="file"
             className={styles.fileInput}
@@ -339,7 +341,7 @@ export function AdminUploadSection() {
                 void handleParse(next);
               }
             }}
-          />
+          /></ReadOnlyControl>
 
           {parsing ? (
             <LoadingState label="Разбор файла…" variant="block" className={testStyles.stateBox} />
@@ -358,7 +360,7 @@ export function AdminUploadSection() {
               </Button>
             </div>
           ) : (
-            <div
+            <EditOnly><div
               role="button"
               tabIndex={0}
               className={styles.dropzone}
@@ -377,7 +379,7 @@ export function AdminUploadSection() {
               <p className={styles.dropzoneText}>
                 Колонки: ФИО, Класс, Школа, Проктор
               </p>
-            </div>
+            </div></EditOnly>
           )}
 
           <div className={styles.actions}>

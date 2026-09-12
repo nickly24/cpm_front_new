@@ -1,5 +1,7 @@
 "use client";
 
+import { ReadOnlyControl, EditOnly } from "@/components/admin/admin-section-access";
+
 import styles from "@/components/admin/schedule/table/schedule-table.module.css";
 import { SCHEDULE_PRESET_COLORS } from "@/lib/schedule/constants";
 import {
@@ -104,68 +106,68 @@ export function ScheduleTableGrid({
                       className={`${styles.row} ${incomplete ? styles.rowIncomplete : ""}`}
                     >
                       <td>
-                        <input
+                        <ReadOnlyControl><input
                           type="time"
                           className={`${styles.cellInput} ${styles.cellTime}`}
                           value={row.start_time}
                           onChange={(e) =>
                             setField(row.key, "start_time", e.target.value)
                           }
-                        />
+                        /></ReadOnlyControl>
                       </td>
                       <td>
-                        <input
+                        <ReadOnlyControl><input
                           type="time"
                           className={`${styles.cellInput} ${styles.cellTime}`}
                           value={row.end_time}
                           onChange={(e) =>
                             setField(row.key, "end_time", e.target.value)
                           }
-                        />
+                        /></ReadOnlyControl>
                       </td>
                       <td>
-                        <input
+                        <ReadOnlyControl><input
                           className={styles.cellInput}
                           value={row.lesson_name}
                           onChange={(e) =>
                             setField(row.key, "lesson_name", e.target.value)
                           }
                           placeholder="Предмет"
-                        />
+                        /></ReadOnlyControl>
                       </td>
                       <td>
-                        <input
+                        <ReadOnlyControl><input
                           className={styles.cellInput}
                           value={row.teacher_name}
                           onChange={(e) =>
                             setField(row.key, "teacher_name", e.target.value)
                           }
                           placeholder="ФИО"
-                        />
+                        /></ReadOnlyControl>
                       </td>
                       <td>
-                        <input
+                        <ReadOnlyControl><input
                           className={styles.cellInput}
                           value={row.location}
                           onChange={(e) =>
                             setField(row.key, "location", e.target.value)
                           }
                           placeholder="Вуз"
-                        />
+                        /></ReadOnlyControl>
                       </td>
                       <td>
-                        <input
+                        <ReadOnlyControl><input
                           className={styles.cellInput}
                           value={row.classroom}
                           onChange={(e) =>
                             setField(row.key, "classroom", e.target.value)
                           }
                           placeholder="301А"
-                        />
+                        /></ReadOnlyControl>
                       </td>
                       <td>
                         <div className={styles.colorCell}>
-                          <select
+                          <ReadOnlyControl><select
                             className={styles.cellSelect}
                             value={
                               (SCHEDULE_PRESET_COLORS as readonly string[]).includes(
@@ -186,8 +188,8 @@ export function ScheduleTableGrid({
                               </option>
                             ))}
                             <option value="__custom__">Свой…</option>
-                          </select>
-                          <input
+                          </select></ReadOnlyControl>
+                          <ReadOnlyControl><input
                             type="color"
                             className={styles.colorNative}
                             value={
@@ -203,12 +205,12 @@ export function ScheduleTableGrid({
                               )
                             }
                             aria-label="Свой цвет"
-                          />
+                          /></ReadOnlyControl>
                         </div>
                       </td>
                       <td>
                         <div className={styles.cellCheck}>
-                          <input
+                          <ReadOnlyControl><input
                             type="checkbox"
                             checked={row.is_in_person !== false}
                             onChange={(e) =>
@@ -216,12 +218,12 @@ export function ScheduleTableGrid({
                             }
                             aria-label="Очно"
                             title="Очно (выкл. = дистанционно)"
-                          />
+                          /></ReadOnlyControl>
                         </div>
                       </td>
                       <td>
                         <div className={styles.cellCheck}>
-                          <input
+                          <ReadOnlyControl><input
                             type="checkbox"
                             checked={row.is_for_all !== false}
                             onChange={(e) =>
@@ -229,24 +231,24 @@ export function ScheduleTableGrid({
                             }
                             aria-label="Для всех"
                             title="Все (выкл. = частично)"
-                          />
+                          /></ReadOnlyControl>
                         </div>
                       </td>
                       <td>
                         <div className={styles.cellCheck}>
-                          <input
+                          <ReadOnlyControl><input
                             type="checkbox"
                             checked={row.is_changed}
                             onChange={(e) =>
                               setField(row.key, "is_changed", e.target.checked)
                             }
                             aria-label="Расписание изменено"
-                          />
+                          /></ReadOnlyControl>
                         </div>
                       </td>
                       <td>
                         <div className={styles.rowAction}>
-                          <button
+                          <EditOnly><button
                             type="button"
                             className={styles.deleteBtn}
                             aria-label="Удалить строку"
@@ -254,7 +256,7 @@ export function ScheduleTableGrid({
                             onClick={() => removeRow(row.key)}
                           >
                             <Trash2 size={14} strokeWidth={2.25} />
-                          </button>
+                          </button></EditOnly>
                         </div>
                       </td>
                     </tr>
@@ -263,14 +265,14 @@ export function ScheduleTableGrid({
               </tbody>
             </table>
             <div className={styles.addRowWrap}>
-              <button
+              <EditOnly><button
                 type="button"
                 className={styles.addRowBtn}
                 onClick={() => addRow(date)}
               >
                 <Plus size={14} strokeWidth={2.4} />
                 Строка
-              </button>
+              </button></EditOnly>
             </div>
           </div>
         );

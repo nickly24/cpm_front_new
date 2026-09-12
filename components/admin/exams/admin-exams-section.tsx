@@ -1,5 +1,7 @@
 "use client";
 
+import { EditOnly } from "@/components/admin/admin-section-access";
+
 import { AdminExamDeleteDialog } from "@/components/admin/exams/admin-exam-delete-dialog";
 import { AdminExamsBulkDeleteDialog } from "@/components/admin/exams/admin-exams-bulk-delete-dialog";
 import { AdminFullscreenBack } from "@/components/admin/admin-fullscreen-back";
@@ -90,7 +92,7 @@ function ExamSessionDetail({
           <div className={examStyles.statCard}>
             <span className={examStyles.statLabel}>Баллы</span>
             <span className={examStyles.statValue}>{session.points}</span>
-            <span className={examStyles.statHint}>из 6 максимальных</span>
+            <span className={examStyles.statHint}>Баллы за экзамен</span>
           </div>
           {session.examinator ? (
             <div className={examStyles.statCard}>
@@ -455,14 +457,14 @@ export function AdminExamsSection() {
             </p>
           </div>
           <div className={examStyles.examHeaderActions}>
-            <button
+            <EditOnly><button
               type="button"
               className={examStyles.examDeleteBtn}
               onClick={() => openDeleteDialog(selectedExam)}
             >
               <Trash2 size={14} />
               Удалить экзамен
-            </button>
+            </button></EditOnly>
           </div>
         </header>
 
@@ -564,7 +566,7 @@ export function AdminExamsSection() {
           </p>
         </div>
         <div className={examStyles.examHeaderActions}>
-          <button
+          <EditOnly><button
             type="button"
             className={`${examStyles.selectionModeBtn} ${
               selectionMode ? examStyles.selectionModeBtnActive : ""
@@ -573,7 +575,7 @@ export function AdminExamsSection() {
           >
             <ListChecks size={16} />
             {selectionMode ? "Выйти из выбора" : "Режим выбора"}
-          </button>
+          </button></EditOnly>
         </div>
       </header>
 
@@ -602,7 +604,7 @@ export function AdminExamsSection() {
             >
               Снять всё
             </button>
-            <button
+            <EditOnly><button
               type="button"
               className={`${examStyles.selectionActionBtn} ${examStyles.selectionDeleteBtn}`}
               onClick={openBulkDeleteDialog}
@@ -610,7 +612,7 @@ export function AdminExamsSection() {
             >
               <Trash2 size={14} />
               Удалить выбранные ({selectedCount})
-            </button>
+            </button></EditOnly>
           </div>
         </div>
       ) : null}
@@ -695,14 +697,14 @@ export function AdminExamsSection() {
                   </div>
                   {!selectionMode ? (
                     <div className={examStyles.examListCardActions}>
-                      <button
+                      <EditOnly><button
                         type="button"
                         className={examStyles.examDeleteBtn}
                         onClick={() => openDeleteDialog(exam)}
                       >
                         <Trash2 size={14} />
                         Удалить
-                      </button>
+                      </button></EditOnly>
                     </div>
                   ) : null}
                 </article>

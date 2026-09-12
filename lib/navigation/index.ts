@@ -1,4 +1,5 @@
-import type { UserRole } from "@/lib/auth/types";
+import type { User, UserRole } from "@/lib/auth/types";
+import { canAccessSection } from "@/lib/auth/admin-access";
 import { adminNavigation } from "./admin";
 import { examinatorNavigation } from "./examinator";
 import { proctorNavigation } from "./proctor";
@@ -12,10 +13,13 @@ export const navigationByRole: Record<UserRole, RoleNavigation> = {
   admin: adminNavigation,
   examinator: examinatorNavigation,
   supervisor: supervisorNavigation,
+  staff_admin: { ...adminNavigation, brand: "CPM Кабинет", groups: adminNavigation.groups.map((group) => ({ ...group, items: group.items.filter((item) => item.id !== "access") })) },
 };
 
-export function getNavigation(role: UserRole): RoleNavigation {
-  return navigationByRole[role];
+export function getNavigation(role: UserRole, user?: User | null): RoleNavigation {
+  const navigation = navigationByRole[role];
+  if (role !== "staff_admin") return navigation;
+  return { ...navigation, groups: navigation.groups.map((group) => ({ ...group, items: group.items.filter((item) => canAccessSection(user ?? null, item.id)) })).filter((group) => group.items.length > 0) };
 }
 
 export function getDefaultSection(role: UserRole): string {

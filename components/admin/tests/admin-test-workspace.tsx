@@ -1,5 +1,7 @@
 "use client";
 
+import { EditOnly } from "@/components/admin/admin-section-access";
+
 import { AdminFullscreenBack } from "@/components/admin/admin-fullscreen-back";
 import { AdminTestAttemptsPanel } from "@/components/admin/tests/admin-test-attempts-panel";
 import { AdminTestOverviewTab } from "@/components/admin/tests/admin-test-overview-tab";
@@ -70,7 +72,7 @@ export function AdminTestWorkspace({
           <div className={styles.fullscreenHeaderMain}>
             <h1 className={styles.fullscreenTitle}>{title}</h1>
             <div className={styles.fullscreenHeaderActions}>
-            <Button
+            <EditOnly><Button
               type="button"
               variant="ghost"
               size="sm"
@@ -78,15 +80,15 @@ export function AdminTestWorkspace({
               disabled={!testDetail}
             >
               Редактировать
-            </Button>
-            <Button
+            </Button></EditOnly>
+            <EditOnly><Button
               type="button"
               variant="ghost"
               size="sm"
               onClick={() => onEditInNew(testId)}
             >
               Редактировать в новом интерфейсе
-            </Button>
+            </Button></EditOnly>
             <Button type="button" variant="ghost" size="sm" onClick={loadMeta}>
               Обновить
             </Button>

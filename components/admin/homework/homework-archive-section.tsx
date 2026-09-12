@@ -1,5 +1,7 @@
 "use client";
 
+import { EditOnly } from "@/components/admin/admin-section-access";
+
 import { homeworkFilesApi, type ArchiveItem } from "@/lib/homework-files/api";
 import styles from "@/components/homework/review-queue.module.css";
 import { useCallback, useEffect, useState } from "react";
@@ -20,7 +22,7 @@ export function HomeworkArchiveSection() {
   return (
     <div className={styles.page}>
       <header><div><span>Хранилище</span><h1>Архив работ</h1><p>Хранятся только итоговые оценённые PDF.</p></div><div><input type="date" value={from} onChange={(event)=>setFrom(event.target.value)}/><input type="date" value={to} onChange={(event)=>setTo(event.target.value)}/><button onClick={()=>void load()}>Найти</button></div></header>
-      <div className={styles.list}>{items.map((item)=><article key={item.id}><div><h2>{item.student_name}</h2><p>{item.homework_name} · {item.group_name??"Без группы"} · {item.page_count} стр.</p><span>{new Date(item.submitted_at_utc).toLocaleString("ru-RU",{timeZone:"Europe/Moscow"})}</span></div><div className={styles.actions}><button onClick={()=>void open(item)}>Открыть</button><button onClick={()=>void open(item,true)}>Скачать</button><button onClick={()=>void editGrade(item)}>Изменить балл</button><button onClick={()=>void resubmit(item)}>Пересдача</button></div></article>)}</div>
+      <div className={styles.list}>{items.map((item)=><article key={item.id}><div><h2>{item.student_name}</h2><p>{item.homework_name} · {item.group_name??"Без группы"} · {item.page_count} стр.</p><span>{new Date(item.submitted_at_utc).toLocaleString("ru-RU",{timeZone:"Europe/Moscow"})}</span></div><div className={styles.actions}><button onClick={()=>void open(item)}>Открыть</button><button onClick={()=>void open(item,true)}>Скачать</button><EditOnly><button onClick={()=>void editGrade(item)}>Изменить балл</button></EditOnly><EditOnly><button onClick={()=>void resubmit(item)}>Пересдача</button></EditOnly></div></article>)}</div>
     </div>
   );
 }

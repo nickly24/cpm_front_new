@@ -1,5 +1,7 @@
 "use client";
 
+import { EditOnly } from "@/components/admin/admin-section-access";
+
 import styles from "@/components/schedule/schedule.module.css";
 import { cn } from "@/lib/cn";
 import { CalendarPlus, Plus, Table2 } from "lucide-react";
@@ -103,7 +105,7 @@ export function AdminCreateScheduleMenu({
           onMouseEnter={openMenu}
           onMouseLeave={scheduleClose}
         >
-          <button
+          <EditOnly><button
             type="button"
             role="menuitem"
             className={styles.createMicroItem}
@@ -118,7 +120,7 @@ export function AdminCreateScheduleMenu({
               <CalendarPlus size={14} aria-hidden />
             </span>
             Добавить занятие
-          </button>
+          </button></EditOnly>
           <button
             type="button"
             role="menuitem"

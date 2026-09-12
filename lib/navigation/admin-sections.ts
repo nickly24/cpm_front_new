@@ -1,6 +1,10 @@
 /** Разделы админки с готовым UI (остальные — заглушки). */
 export const ADMIN_READY_SECTIONS = new Set([
   "users",
+  "access",
+  "review-queue",
+  "homework-archive",
+  "monitoring",
   "schools",
   "upload",
   "schedule",
@@ -18,6 +22,10 @@ export const ADMIN_READY_SECTIONS = new Set([
 
 export const ADMIN_SECTION_DESCRIPTIONS: Record<string, string> = {
   users: "Ученики, группы и персонал",
+  access: "Роли и пользователи административного кабинета",
+  "review-queue": "Проверка отправленных домашних работ",
+  "homework-archive": "Итоговые работы и пересдачи",
+  monitoring: "Состояние обработки файлов",
   schools: "Справочник школ и привязка учеников",
   upload: "Массовый импорт данных из Excel",
   schedule: "Расписание занятий и пары",

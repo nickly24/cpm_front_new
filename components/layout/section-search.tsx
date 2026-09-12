@@ -1,6 +1,7 @@
 "use client";
 
 import type { UserRole } from "@/lib/auth/types";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   filterSections,
   getSearchableSections,
@@ -21,6 +22,7 @@ interface SectionSearchProps {
 }
 
 export function SectionSearch({ role }: SectionSearchProps) {
+  const { user } = useAuth();
   const router = useRouter();
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -29,7 +31,7 @@ export function SectionSearch({ role }: SectionSearchProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
 
-  const sections = useMemo(() => getSearchableSections(role), [role]);
+  const sections = useMemo(() => getSearchableSections(role, user), [role, user]);
   const results = useMemo(
     () => filterSections(sections, query),
     [query, sections],

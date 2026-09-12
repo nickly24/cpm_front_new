@@ -1,5 +1,6 @@
 "use client";
 
+import { useAdminSectionAccess } from "@/components/admin/admin-section-access";
 import { ReportGrid } from "@/components/admin/attendance/report/report-grid";
 import { ReportMacClose } from "@/components/admin/attendance/report/report-mac-close";
 import reportStyles from "@/components/admin/attendance/report/report.module.css";
@@ -65,10 +66,12 @@ interface ReportWorkspaceProps {
 export function ReportWorkspace({
   period,
   onBack,
-  readOnly = false,
+  readOnly: requestedReadOnly = false,
   title,
 }: ReportWorkspaceProps) {
   const { setImmersive } = useCabinetChrome();
+  const { canEdit } = useAdminSectionAccess("attendance");
+  const readOnly = requestedReadOnly || !canEdit;
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [exporting, setExporting] = useState(false);

@@ -1,5 +1,7 @@
 "use client";
 
+import { EditOnly } from "@/components/admin/admin-section-access";
+
 import { ReportMacClose } from "@/components/admin/attendance/report/report-mac-close";
 import reportStyles from "@/components/admin/attendance/report/report.module.css";
 import { ScheduleTableGrid } from "@/components/admin/schedule/table/schedule-table-grid";
@@ -431,14 +433,14 @@ export function ScheduleTableWorkspace({
               >
                 <RefreshCw size={14} />
               </button>
-              <button
+              <EditOnly><button
                 type="button"
                 className={styles.saveBtn}
                 onClick={() => void handleSave()}
                 disabled={!dirty || saving || loading}
               >
                 {saving ? "Сохранение…" : "Сохранить"}
-              </button>
+              </button></EditOnly>
             </div>
           </div>
         </div>

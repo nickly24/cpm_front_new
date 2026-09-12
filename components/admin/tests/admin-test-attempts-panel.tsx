@@ -1,5 +1,7 @@
 "use client";
 
+import { EditOnly } from "@/components/admin/admin-section-access";
+
 import {
   AdminAnswerItemsList,
   attemptItemsToRows,
@@ -190,20 +192,20 @@ export function AdminTestAttemptsPanel({ testId }: AdminTestAttemptsPanelProps) 
                     >
                       Детали
                     </button>
-                    <button
+                    <EditOnly><button
                       type="button"
                       className={styles.linkBtn}
                       onClick={() => handleForceSubmit(row.attemptId)}
                     >
                       Завершить
-                    </button>
-                    <button
+                    </button></EditOnly>
+                    <EditOnly><button
                       type="button"
                       className={styles.linkBtnDanger}
                       onClick={() => handleDelete(row.attemptId)}
                     >
                       Удалить
-                    </button>
+                    </button></EditOnly>
                   </td>
                 </tr>
               ))}
@@ -245,7 +247,7 @@ export function AdminTestAttemptsPanel({ testId }: AdminTestAttemptsPanelProps) 
           <h4 className={styles.detailSectionTitle}>Ответы по вопросам</h4>
           <AdminAnswerItemsList items={attemptItemsToRows(detail.items)} />
           <div className={styles.detailCardActions}>
-            <Button
+            <EditOnly><Button
               type="button"
               variant="primary"
               size="sm"
@@ -258,8 +260,8 @@ export function AdminTestAttemptsPanel({ testId }: AdminTestAttemptsPanelProps) 
               }
             >
               Завершить попытку
-            </Button>
-            <Button
+            </Button></EditOnly>
+            <EditOnly><Button
               type="button"
               variant="ghost"
               size="sm"
@@ -272,7 +274,7 @@ export function AdminTestAttemptsPanel({ testId }: AdminTestAttemptsPanelProps) 
               }
             >
               Удалить попытку
-            </Button>
+            </Button></EditOnly>
           </div>
         </div>
       ) : null}

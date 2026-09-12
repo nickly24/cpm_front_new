@@ -9,6 +9,8 @@ import {
   editAdminStudent,
 } from "@/lib/admin/admin-users-api";
 import type { AdminGroupItem, AdminStudent } from "@/lib/admin/admin-users-types";
+import { useAuth } from "@/contexts/AuthContext";
+import { adminHref, canAccessSection } from "@/lib/auth/admin-access";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
@@ -27,6 +29,7 @@ export function AdminStudentPanel({
   onClose,
   onSaved,
 }: AdminStudentPanelProps) {
+  const { user } = useAuth();
   const [fullName, setFullName] = useState(student?.full_name ?? "");
   const [classNumber, setClassNumber] = useState(String(student?.class ?? 9));
   const [tgName, setTgName] = useState(student?.tg_name ?? "");
@@ -152,11 +155,11 @@ export function AdminStudentPanel({
           {mode === "add" ? "Новый ученик" : "Редактирование ученика"}
         </h2>
 
-        {mode === "edit" && student?.school_id ? (
+        {mode === "edit" && student?.school_id && canAccessSection(user, "schools") ? (
           <p className={userStyles.hint}>
             Школа: {student.school_name ?? `#${student.school_id}`}. Изменить привязку
             можно в разделе{" "}
-            <Link href="/cabinet/admin/schools" className={userStyles.hintLink}>
+            <Link href={adminHref(user, "schools")} className={userStyles.hintLink}>
               Школы
             </Link>
             .

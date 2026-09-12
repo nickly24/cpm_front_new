@@ -53,6 +53,7 @@ export interface AdminTestDraft {
   updatedByName?: string | null;
   publishedTestId?: string | null;
   lockedBy?: number | null;
+  lockedByRole?: string | null;
   lockedByName?: string | null;
   lockedUntil?: string | null;
 }

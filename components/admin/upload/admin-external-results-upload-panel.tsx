@@ -1,5 +1,7 @@
 "use client";
 
+import { ReadOnlyControl, EditOnly } from "@/components/admin/admin-section-access";
+
 import styles from "@/components/admin/upload/admin-upload.module.css";
 import testStyles from "@/components/admin/tests/admin-tests.module.css";
 import { Button } from "@/components/ui/button";
@@ -242,7 +244,7 @@ export function AdminExternalResultsUploadPanel({
         <LoadingState label="Загрузка тестов…" variant="block" className={testStyles.stateBox} />
       ) : null}
 
-      <input
+      <ReadOnlyControl><input
         ref={inputRef}
         type="file"
         className={styles.fileInput}
@@ -253,7 +255,7 @@ export function AdminExternalResultsUploadPanel({
             void handleParse(next);
           }
         }}
-      />
+      /></ReadOnlyControl>
 
       {parsing ? (
         <LoadingState label="Разбор результатов…" variant="block" className={testStyles.stateBox} />
@@ -275,7 +277,7 @@ export function AdminExternalResultsUploadPanel({
           </Button>
         </div>
       ) : (
-        <div
+        <EditOnly><div
           role="button"
           tabIndex={0}
           className={styles.dropzone}
@@ -294,7 +296,7 @@ export function AdminExternalResultsUploadPanel({
           <p className={styles.dropzoneText}>
             Лист Статистика: ФИО, процент правильных ответов и дата завершения
           </p>
-        </div>
+        </div></EditOnly>
       )}
 
       {preview ? (
@@ -396,10 +398,10 @@ export function AdminExternalResultsUploadPanel({
             <Button type="button" variant="secondary" onClick={resetFile}>
               Выбрать другой файл
             </Button>
-            <Button type="button" disabled={!canCommit} onClick={() => void handleCommit()}>
+            <EditOnly><Button type="button" disabled={!canCommit} onClick={() => void handleCommit()}>
               <FileUp size={16} aria-hidden />
               {committing ? "Запуск…" : "Запустить загрузку"}
-            </Button>
+            </Button></EditOnly>
           </div>
         </section>
       ) : (

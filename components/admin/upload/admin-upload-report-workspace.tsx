@@ -17,6 +17,8 @@ import type {
 } from "@/lib/admin/admin-upload-types";
 import { useCabinetChrome } from "@/contexts/cabinet-chrome-context";
 import { ArrowLeft, Download } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { adminHref, canAccessSection } from "@/lib/auth/admin-access";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -82,6 +84,7 @@ export function AdminUploadReportWorkspace({
   onBack,
 }: AdminUploadReportWorkspaceProps) {
   const router = useRouter();
+  const { user } = useAuth();
   const { setImmersive } = useCabinetChrome();
   const [report, setReport] = useState<UserImportReport | null>(null);
   const [loading, setLoading] = useState(true);
@@ -202,7 +205,8 @@ export function AdminUploadReportWorkspace({
                 <Button
                   type="button"
                   variant="secondary"
-                  onClick={() => router.push("/cabinet/admin/tests")}
+                  disabled={!canAccessSection(user, "tests")}
+                  onClick={() => router.push(adminHref(user, "tests"))}
                 >
                   Открыть драфт
                 </Button>

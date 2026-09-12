@@ -1,4 +1,4 @@
-import type { UserRole } from "@/lib/auth/types";
+import type { User, UserRole } from "@/lib/auth/types";
 import { getNavigation, getSectionHref } from "./index";
 import type { NavItem } from "./types";
 
@@ -10,8 +10,8 @@ export interface SearchableSection {
   groupTitle: string;
 }
 
-export function getSearchableSections(role: UserRole): SearchableSection[] {
-  const navigation = getNavigation(role);
+export function getSearchableSections(role: UserRole, user?: User | null): SearchableSection[] {
+  const navigation = getNavigation(role, user);
 
   return navigation.groups.flatMap((group) =>
     group.items.map((item) => ({

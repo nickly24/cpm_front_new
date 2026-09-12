@@ -1,5 +1,9 @@
 "use client";
 
+import { AdminSectionAccess } from "@/components/admin/admin-section-access";
+import { AdminAccessSection } from "@/components/admin/access/admin-access-section";
+import { isAdminCabinet } from "@/lib/auth/admin-access";
+
 import { AdminAttendanceSection } from "@/components/admin/attendance/admin-attendance-section";
 import { AdminScanSection } from "@/components/admin/scan/admin-scan-section";
 import { AdminZapsSection } from "@/components/admin/zaps/admin-zaps-section";
@@ -44,7 +48,14 @@ interface SectionContentProps {
   trainPathSegments?: string[];
 }
 
-export function SectionContent({
+export function SectionContent(props: SectionContentProps) {
+  if (isAdminCabinet(props.role)) {
+    return <AdminSectionAccess section={props.section}><SectionBody {...props} role="admin" /></AdminSectionAccess>;
+  }
+  return <SectionBody {...props} />;
+}
+
+function SectionBody({
   role,
   section,
   trainPathSegments = [],
@@ -82,6 +93,8 @@ export function SectionContent({
       <StudentTrainingSection role={role} pathSegments={trainPathSegments} />
     );
   }
+
+  if (role === "admin" && section === "access") return <AdminAccessSection />;
 
   if (role === "admin" && section === "dashboard") {
     return <AdminDashboardSection />;

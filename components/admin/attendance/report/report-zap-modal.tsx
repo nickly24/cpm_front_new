@@ -1,5 +1,7 @@
 "use client";
 
+import { EditOnly } from "@/components/admin/admin-section-access";
+
 import attendanceStyles from "@/components/admin/attendance/admin-attendance.module.css";
 import zapStyles from "@/components/admin/zaps/admin-zaps.module.css";
 import reportStyles from "@/components/admin/attendance/report/report.module.css";
@@ -254,7 +256,7 @@ export function ReportZapModal({
 
         <div className={attendanceStyles.modalActions}>
           {zapDateId ? (
-            <Button
+            <EditOnly><Button
               type="button"
               variant="ghost"
               className={attendanceStyles.dangerBtn}
@@ -262,7 +264,7 @@ export function ReportZapModal({
               onClick={() => void handleUnlink()}
             >
               {unlinking ? "…" : "Убрать дату из отгула"}
-            </Button>
+            </Button></EditOnly>
           ) : null}
           <Button type="button" variant="ghost" onClick={onClose}>
             Закрыть

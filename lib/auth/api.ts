@@ -1,4 +1,4 @@
-import { apiRequest } from "@/lib/api/client";
+import { ApiError, apiRequest } from "@/lib/api/client";
 import type { AunResponse, AuthResponse, User } from "./types";
 import { isUserRole } from "./roles";
 import { getToken, removeToken, setToken } from "./storage";
@@ -17,6 +17,9 @@ function mapAunToUser(data: AunResponse): User | null {
     id: data.entity_id,
     full_name: data.full_name,
     group_id: data.group_id ?? null,
+    role_id: data.role_id,
+    role_name: data.role_name,
+    permissions: data.permissions,
   };
 }
 
@@ -46,6 +49,9 @@ export async function loginRequest(
         id: data.user.id,
         full_name: data.user.full_name,
         group_id: data.user.group_id ?? null,
+        role_id: data.user.role_id,
+        role_name: data.user.role_name,
+        permissions: data.user.permissions,
       },
     };
   } catch (error) {
@@ -55,7 +61,7 @@ export async function loginRequest(
   }
 }
 
-export async function checkAuthRequest(): Promise<User | null> {
+export async function checkAuthRequest(preserveOnNetworkError = false): Promise<User | null> {
   const token = getToken();
 
   if (!token) {
@@ -68,7 +74,8 @@ export async function checkAuthRequest(): Promise<User | null> {
     });
 
     return mapAunToUser(data);
-  } catch {
+  } catch (error) {
+    if (preserveOnNetworkError && !(error instanceof ApiError && error.status === 401)) throw error;
     removeToken();
     return null;
   }

@@ -24,6 +24,7 @@ const ROLE_TITLES: Record<UserRole, string> = {
   admin: "Администратор",
   examinator: "Экзаменатор",
   supervisor: "Супервайзер",
+  staff_admin: "Сотрудник",
 };
 
 const SIDEBAR_COLLAPSED_KEY = "cpm-sidebar-collapsed";
@@ -108,7 +109,7 @@ function CabinetLayout({
           variant="desktop"
           role={role}
           userName={userName}
-          userRoleLabel={ROLE_TITLES[role]}
+          userRoleLabel={user?.role_name || ROLE_TITLES[role]}
           collapsed={sidebarCollapsed}
           onToggleCollapsed={() => setSidebarCollapsed((value) => !value)}
         />
@@ -119,7 +120,7 @@ function CabinetLayout({
           variant="drawer"
           role={role}
           userName={userName}
-          userRoleLabel={ROLE_TITLES[role]}
+          userRoleLabel={user?.role_name || ROLE_TITLES[role]}
           collapsed={false}
           onToggleCollapsed={() => {}}
           isOpen={mobileMenuOpen}
