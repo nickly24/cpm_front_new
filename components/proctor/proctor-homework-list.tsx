@@ -99,11 +99,6 @@ export function ProctorHomeworkList({ proctorId }: ProctorHomeworkListProps) {
     return homeworks.slice(start, start + HOMEWORK_PAGE_SIZE);
   }, [currentPage, homeworks]);
 
-  useEffect(() => {
-    if (currentPage > totalPages) {
-      setCurrentPage(totalPages);
-    }
-  }, [currentPage, totalPages]);
 
   if (loading) {
     return <LoadingState label="Загрузка заданий…" variant="panel" />;
@@ -176,6 +171,7 @@ export function ProctorHomeworkList({ proctorId }: ProctorHomeworkListProps) {
                     <div className={styles.hwDetails}>
                       <ProctorHomeworkSessions
                         homeworkId={homework.id}
+                        homeworkName={homework.name}
                         proctorId={proctorId}
                       />
                       <Button

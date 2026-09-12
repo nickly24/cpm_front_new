@@ -1,5 +1,5 @@
 export type HomeworkTypeFilter = "all" | "ОВ" | "ДЗНВ";
-export type HomeworkStatusFilter = "all" | "done" | "undone";
+export type HomeworkStatusFilter = "all" | "done" | "undone" | "in_review" | "revision";
 
 export type HomeworkDeadlineState =
   | "submitted"
@@ -16,6 +16,12 @@ export interface StudentHomeworkItem {
   deadline: string | null;
   status: string;
   result: number | null;
+  submission_id?: number | null;
+  submission_state?: import("@/lib/homework-files/types").SubmissionState | null;
+  has_file?: boolean;
+  has_draft?: boolean;
+  submitted_at_utc?: string | null;
+  revision_comment?: string | null;
 }
 
 export interface HomeworkPagination {

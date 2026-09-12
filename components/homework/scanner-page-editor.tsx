@@ -2,8 +2,6 @@
 
 import { Spinner } from "@/components/ui/spinner";
 import {
-  ChevronDown,
-  ChevronUp,
   Eraser,
   Minus,
   MousePointer2,
@@ -30,6 +28,8 @@ export function ScannerPageEditor({
   onClose:()=>void;
 }){
   const element=useRef<HTMLCanvasElement>(null);
+  const stage=useRef<HTMLDivElement>(null);
+  const restoring=useRef(false);
   const fabricCanvas=useRef<import("fabric").Canvas|null>(null);
   const history=useRef<string[]>([]);
   const cursor=useRef(-1);
@@ -40,18 +40,22 @@ export function ScannerPageEditor({
   const [tool,setTool]=useState<Tool>("select");
   const [ready,setReady]=useState(false);
   const [saving,setSaving]=useState(false);
-  const [panelOpen,setPanelOpen]=useState(true);
+  const [error,setError]=useState<string|null>(null);
   const [zoom,setZoom]=useState(1);
   const [historyState,setHistoryState]=useState({index:-1,length:0});
 
   useEffect(()=>{
     let disposed=false;
+    let sourceUrl:string|null=null;
     void(async()=>{
       const {Canvas,FabricImage}=await import("fabric");
       if(disposed||!element.current)return;
       const dimensions=await createImageBitmap(image);
+      if(disposed){dimensions.close();return;}
       originalSize.current={width:dimensions.width,height:dimensions.height};
-      const scale=Math.min(1,1000/dimensions.width,700/dimensions.height);
+      const availableWidth=Math.max(180,(stage.current?.clientWidth??1024)-32);
+      const availableHeight=Math.max(180,(stage.current?.clientHeight??724)-32);
+      const scale=Math.min(1,1000/dimensions.width,700/dimensions.height,availableWidth/dimensions.width,availableHeight/dimensions.height);
       const canvasWidth=Math.round(dimensions.width*scale);
       const canvasHeight=Math.round(dimensions.height*scale);
       baseSize.current={width:canvasWidth,height:canvasHeight};
@@ -63,9 +67,9 @@ export function ScannerPageEditor({
         preserveObjectStacking:true,
       });
       fabricCanvas.current=canvas;
-      const url=URL.createObjectURL(image);
-      const picture=await FabricImage.fromURL(url);
-      URL.revokeObjectURL(url);
+      sourceUrl=URL.createObjectURL(image);
+      const picture=await FabricImage.fromURL(sourceUrl);
+      if(disposed)return;
       picture.set({
         left:0,
         top:0,
@@ -77,6 +81,7 @@ export function ScannerPageEditor({
       canvas.add(picture);
       canvas.sendObjectToBack(picture);
       const snapshot=()=>{
+        if(restoring.current)return;
         const value=JSON.stringify(canvas.toJSON());
         if(history.current[cursor.current]===value)return;
         history.current=history.current.slice(0,cursor.current+1);
@@ -88,10 +93,12 @@ export function ScannerPageEditor({
       canvas.on("object:added",snapshot);
       canvas.on("object:modified",snapshot);
       canvas.on("path:created",snapshot);
+      canvas.on("text:changed",snapshot);
       if(!disposed)setReady(true);
-    })();
+    })().catch(()=>{if(!disposed)setError("Не удалось открыть разметку. Вернитесь к страницам и попробуйте ещё раз.")});
     return()=>{
       disposed=true;
+      if(sourceUrl)URL.revokeObjectURL(sourceUrl);
       fabricCanvas.current?.dispose();
       fabricCanvas.current=null;
     };
@@ -155,7 +162,7 @@ export function ScannerPageEditor({
       left:Math.max(24,baseSize.current.width/2-90),
       top:Math.max(24,baseSize.current.height/2-20),
       fill:color,
-      fontSize:28,
+      fontSize:Math.max(12,baseSize.current.width/22),
       fontFamily:"Arial",
     });
     canvas.add(object);
@@ -172,8 +179,8 @@ export function ScannerPageEditor({
     const region=new Rect({
       left:Math.max(20,baseSize.current.width/2-110),
       top:Math.max(20,baseSize.current.height/2-50),
-      width:220,
-      height:100,
+      width:Math.min(220,baseSize.current.width*.6),
+      height:Math.min(100,baseSize.current.height*.2),
       fill:"rgba(100,116,139,.65)",
       stroke:"#ff6b00",
       strokeWidth:2,
@@ -185,17 +192,24 @@ export function ScannerPageEditor({
 
   const restore=async(index:number)=>{
     const canvas=fabricCanvas.current;
-    if(!canvas||index<0||index>=history.current.length)return;
-    cursor.current=index;
-    await canvas.loadFromJSON(history.current[index]);
-    canvas.requestRenderAll();
-    setHistoryState({index,length:history.current.length});
+    if(!canvas||restoring.current||index<0||index>=history.current.length)return;
+    restoring.current=true;
+    try{
+      await canvas.loadFromJSON(history.current[index]);
+      canvas.getObjects()[0]?.set({selectable:false,evented:false});
+      cursor.current=index;
+      canvas.requestRenderAll();
+      setHistoryState({index,length:history.current.length});
+    }catch{setError("Не удалось отменить изменение. Текущая разметка осталась открыта.")}
+    finally{restoring.current=false;}
   };
 
   const save=()=>{
     const canvas=fabricCanvas.current;
     if(!canvas||saving)return;
+    if(cursor.current===0){onClose();return;}
     setSaving(true);
+    setError(null);
     select();
     canvas.discardActiveObject();
     const currentZoom=zoom;
@@ -213,10 +227,11 @@ export function ScannerPageEditor({
     );
     const rendered=canvas.toCanvasElement(multiplier);
     const output=document.createElement("canvas");
-    output.width=rendered.width;
-    output.height=rendered.height;
+    output.width=originalSize.current.width;
+    output.height=originalSize.current.height;
     const context=output.getContext("2d")!;
-    context.drawImage(rendered,0,0);
+    context.drawImage(rendered,0,0,output.width,output.height);
+    const outputScaleX=output.width/rendered.width,outputScaleY=output.height/rendered.height;
     for(const object of regions){
       const left=object.left*multiplier;
       const top=object.top*multiplier;
@@ -224,7 +239,7 @@ export function ScannerPageEditor({
       const regionHeight=object.getScaledHeight()*multiplier;
       context.save();
       context.filter=`blur(${Math.max(12,14*multiplier)}px)`;
-      context.drawImage(rendered,left,top,regionWidth,regionHeight,left,top,regionWidth,regionHeight);
+      context.drawImage(rendered,left,top,regionWidth,regionHeight,left*outputScaleX,top*outputScaleY,regionWidth*outputScaleX,regionHeight*outputScaleY);
       context.restore();
     }
     regions.forEach(object=>object.set({visible:true}));
@@ -236,7 +251,7 @@ export function ScannerPageEditor({
     canvas.requestRenderAll();
     output.toBlob(blob=>{
       if(blob)onSave(blob);
-      else setSaving(false);
+      else {setSaving(false);setError("Не удалось сохранить разметку. Попробуйте ещё раз.");}
     },"image/jpeg",.92);
   };
 
@@ -245,18 +260,15 @@ export function ScannerPageEditor({
 
   return <div className={styles.editor}>
     <header>
-      <div><span>Разметка</span><h2>Добавьте пометки</h2><p>Рисуйте, подписывайте и скрывайте личные данные</p></div>
-      <button className={styles.close} onClick={onClose} aria-label="Закрыть"><X/></button>
+      <div><span>Разметка страницы</span><h2>Добавьте пометки</h2><p>Перо, текст и размытие сохранятся прямо на снимке.</p></div>
+      <button className={styles.close} disabled={saving} onClick={onClose} aria-label="Вернуться к страницам без изменений"><X/></button>
     </header>
     <div className={styles.editorToolbar}>
-      <button className={styles.panelToggle} onClick={()=>setPanelOpen(open=>!open)} aria-label={panelOpen?"Скрыть инструменты":"Показать инструменты"}>
-        {panelOpen?<ChevronDown/>:<ChevronUp/>}
-      </button>
-      <div className={styles.toolbarContent} data-open={panelOpen}>
+      <div className={styles.toolbarContent}>
         <div className={styles.toolGroup}>
           <button data-active={tool==="select"} disabled={!ready} onClick={select}><MousePointer2/><span>Выбор</span></button>
           <button data-active={tool==="pen"} disabled={!ready} onClick={()=>void drawing("pen")}><PenLine/><span>Перо</span></button>
-          <button data-active={tool==="eraser"} disabled={!ready} onClick={()=>void drawing("eraser")}><Eraser/><span>Ластик</span></button>
+          <button data-active={tool==="eraser"} disabled={!ready} onClick={()=>void drawing("eraser")}><Eraser/><span>Белая кисть</span></button>
           <button disabled={!ready} onClick={()=>void addText()}><Type/><span>Текст</span></button>
           <button disabled={!ready} onClick={()=>void addBlur()}><Waves/><span>Размыть</span></button>
         </div>
@@ -270,19 +282,21 @@ export function ScannerPageEditor({
         </div>
       </div>
     </div>
-    <div className={styles.editorCanvas}>
-      {!ready?<div className={styles.loading}><Spinner/>Загружаем редактор…</div>:null}
-      <div className={styles.zoomControls}>
+    <div className={styles.zoomControls}>
         <button onClick={()=>changeZoom(zoom-.25)} aria-label="Уменьшить"><Minus/></button>
         <span>{Math.round(zoom*100)}%</span>
         <button onClick={()=>changeZoom(zoom+.25)} aria-label="Увеличить"><Plus/></button>
       </div>
+    <div ref={stage} className={styles.editorCanvas}>
+      {!ready?<div className={styles.loading}><Spinner/>Загружаем редактор…</div>:null}
+
       <canvas ref={element}/>
     </div>
+    {error?<div className={styles.error} role="alert">{error}</div>:null}
     <footer>
       <button disabled={saving} onClick={onClose}>Отмена</button>
       <button disabled={!ready||saving} className={styles.primary} onClick={save}>
-        {saving?<><Spinner size="sm"/>Применяем…</>:"Сохранить разметку"}
+        {saving?<><Spinner size="sm"/>Применяем…</>:"Сохранить"}
       </button>
     </footer>
   </div>;

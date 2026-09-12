@@ -32,7 +32,7 @@ export async function fetchStudentHomework(
 }
 
 export function isHomeworkSubmitted(item: StudentHomeworkItem): boolean {
-  return item.status.includes("сдано");
+  return ["submitted", "in_review", "graded"].includes(item.submission_state || "") || (!item.submission_state || item.submission_state === "none") && item.status.includes("сдано");
 }
 
 export function filterHomeworkByStatus(
@@ -44,8 +44,10 @@ export function filterHomeworkByStatus(
   }
 
   return items.filter((item) => {
-    const submitted = isHomeworkSubmitted(item);
-    return statusFilter === "done" ? submitted : !submitted;
+    if (statusFilter === "revision") return item.submission_state === "revision_requested";
+    if (statusFilter === "in_review") return ["submitted", "in_review"].includes(item.submission_state || "");
+    if (statusFilter === "done") return item.submission_state === "graded" || ((!item.submission_state || item.submission_state === "none") && item.result !== null);
+    return !isHomeworkSubmitted(item);
   });
 }
 
@@ -113,8 +115,7 @@ export function formatHomeworkDate(value: string | null): string {
   return date.toLocaleDateString("ru-RU", {
     day: "numeric",
     month: "long",
-    hour: "2-digit",
-    minute: "2-digit",
+    timeZone: "Europe/Moscow",
   });
 }
 

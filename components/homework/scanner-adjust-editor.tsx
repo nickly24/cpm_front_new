@@ -12,10 +12,9 @@ import {
   type PagePoint,
 } from "@/lib/homework-scanner/opencv-crop";
 import type { ScannerPage } from "@/lib/homework-scanner/project-store";
+import { renderScannerPage } from "@/lib/homework-scanner/page-render";
 import {
   Check,
-  ChevronDown,
-  ChevronUp,
   Crop,
   Eye,
   Minus,
@@ -38,8 +37,8 @@ import styles from "./scanner-adjust-editor.module.css";
 interface Dimensions { width:number; height:number }
 type DragTarget={kind:"corner"|"edge";index:number};
 
-const insetPoints=(width:number,height:number):PagePoint[]=>{
-  const x=width*.035,y=height*.035;
+const fullPagePoints=(width:number,height:number):PagePoint[]=>{
+  const x=0,y=0;
   return[
     {x,y},
     {x:width-x,y},
@@ -60,17 +59,19 @@ export function ScannerAdjustEditor({
   onClose,
 }:{
   page:ScannerPage;
-  onSave:(patch:Pick<ScannerPage,"image"|"mode"|"brightness"|"contrast">)=>void;
+  onSave:(patch:Pick<ScannerPage,"image"|"rotation"|"mode"|"brightness"|"contrast">)=>void;
   onClose:()=>void;
 }){
   const preview=useRef<HTMLCanvasElement>(null);
+  const stage=useRef<HTMLElement>(null);
+  const [fitWidth,setFitWidth]=useState(0);
   const source=useRef<HTMLCanvasElement|null>(null);
   const previewSource=useRef<HTMLCanvasElement|null>(null);
   const overlay=useRef<SVGSVGElement>(null);
   const [dimensions,setDimensions]=useState<Dimensions|null>(null);
   const [points,setPoints]=useState<PagePoint[]>([]);
   const [dragging,setDragging]=useState<DragTarget|null>(null);
-  const [panelOpen,setPanelOpen]=useState(true);
+  const [cropChanged,setCropChanged]=useState(false);
   const [zoom,setZoom]=useState(1);
   const [tab,setTab]=useState<"crop"|"filters">("crop");
   const [mode,setMode]=useState<ScannerFilterMode>(page.mode);
@@ -79,7 +80,7 @@ export function ScannerAdjustEditor({
   const [compare,setCompare]=useState(false);
   const [detecting,setDetecting]=useState(false);
   const [saving,setSaving]=useState(false);
-  const [hint,setHint]=useState("Перетащите точки точно к углам листа");
+  const [hint,setHint]=useState("Лист сохранится целиком. Переместите углы, если нужно обрезать фон.");
   const [error,setError]=useState<string|null>(null);
 
   const draw=useCallback(()=>{
@@ -95,15 +96,8 @@ export function ScannerAdjustEditor({
 
   useEffect(()=>{
     let stopped=false;
-    const url=URL.createObjectURL(page.image);
-    const picture=new Image();
-    picture.onload=()=>{
-      URL.revokeObjectURL(url);
+    void renderScannerPage(page,{filters:false}).then(canvas=>{
       if(stopped)return;
-      const canvas=document.createElement("canvas");
-      canvas.width=picture.naturalWidth;
-      canvas.height=picture.naturalHeight;
-      canvas.getContext("2d")!.drawImage(picture,0,0);
       source.current=canvas;
       const previewScale=Math.min(1,1100/Math.max(canvas.width,canvas.height));
       const display=document.createElement("canvas");
@@ -112,12 +106,20 @@ export function ScannerAdjustEditor({
       display.getContext("2d")!.drawImage(canvas,0,0,display.width,display.height);
       previewSource.current=display;
       setDimensions({width:canvas.width,height:canvas.height});
-      setPoints(insetPoints(canvas.width,canvas.height));
-    };
-    picture.onerror=()=>{URL.revokeObjectURL(url);setError("Не удалось открыть изображение")};
-    picture.src=url;
-    return()=>{stopped=true;URL.revokeObjectURL(url);source.current=null;previewSource.current=null};
-  },[page.image]);
+      setPoints(fullPagePoints(canvas.width,canvas.height));
+    }).catch(()=>{if(!stopped)setError("Не удалось открыть изображение")});
+    return()=>{stopped=true;source.current=null;previewSource.current=null};
+  },[page]);
+
+  useEffect(()=>{
+    const element=stage.current;
+    if(!element||!dimensions)return;
+    const fit=()=>setFitWidth(Math.max(100,Math.min(element.clientWidth-36,(element.clientHeight-36)*dimensions.width/dimensions.height)));
+    const observer=new ResizeObserver(fit);
+    observer.observe(element);
+    fit();
+    return()=>observer.disconnect();
+  },[dimensions]);
 
   useEffect(()=>draw(),[draw,dimensions]);
 
@@ -130,6 +132,7 @@ export function ScannerAdjustEditor({
       const detected=await detectPageCorners(source.current);
       if(detected){
         setPoints(detected);
+        setCropChanged(true);
         setHint("Границы найдены — при необходимости поправьте точки");
       }else{
         setHint("Лист не найден автоматически — расставьте точки вручную");
@@ -141,13 +144,6 @@ export function ScannerAdjustEditor({
     }
   };
 
-  useEffect(()=>{
-    if(!dimensions)return;
-    const timer=window.setTimeout(()=>void detect(),120);
-    return()=>window.clearTimeout(timer);
-    // Autodetect should run once for the loaded source.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[dimensions]);
 
   const pointerPosition=(event:ReactPointerEvent<SVGSVGElement>)=>{
     if(!dimensions||!overlay.current)return null;
@@ -162,6 +158,7 @@ export function ScannerAdjustEditor({
     if(dragging===null)return;
     const position=pointerPosition(event);
     if(!position)return;
+    setCropChanged(true);
     if(dragging.kind==="corner"){
       setPoints(current=>current.map((point,index)=>index===dragging.index?position:point));
       return;
@@ -186,8 +183,9 @@ export function ScannerAdjustEditor({
     setSaving(true);
     setError(null);
     try{
-      const cropped=await perspectiveCrop(source.current,points);
-      onSave({image:await toBlob(cropped),mode,brightness,contrast});
+      // Opening the editor or changing a filter must never silently crop the page.
+      const image=cropChanged?await toBlob(await perspectiveCrop(source.current,points)):page.image;
+      onSave({image,rotation:cropChanged?0:page.rotation,mode,brightness,contrast});
     }catch{
       setError("Не удалось применить границы. Поправьте точки и попробуйте снова.");
       setSaving(false);
@@ -206,7 +204,7 @@ export function ScannerAdjustEditor({
         <h2>{tab==="crop"?"Выровняйте лист":"Настройте изображение"}</h2>
         <p>{tab==="crop"?hint:"Изменения сразу видны на странице"}</p>
       </div>
-      <button className={styles.close} onClick={onClose} aria-label="Закрыть редактор"><X/></button>
+      <button className={styles.close} disabled={saving} onClick={onClose} aria-label="Вернуться к страницам без изменений"><X/></button>
     </header>
 
     <div className={styles.tabs}>
@@ -214,15 +212,17 @@ export function ScannerAdjustEditor({
       <button data-active={tab==="filters"} onClick={()=>setTab("filters")}><SlidersHorizontal/>Фильтры</button>
     </div>
 
-    <main>
-      <section className={styles.stage}>
-        {!dimensions?<div className={styles.loading}><Spinner/>Открываем фотографию…</div>:null}
-        <div className={styles.zoomControls} aria-label="Масштаб">
+    <div className={styles.zoomControls} aria-label="Масштаб">
           <button onClick={()=>setZoom(value=>Math.max(.75,Number((value-.25).toFixed(2))))} aria-label="Уменьшить"><Minus/></button>
           <span>{Math.round(zoom*100)}%</span>
           <button onClick={()=>setZoom(value=>Math.min(2.5,Number((value+.25).toFixed(2))))} aria-label="Увеличить"><Plus/></button>
         </div>
-        {dimensions?<div className={styles.canvasFrame} style={{aspectRatio:`${dimensions.width}/${dimensions.height}`,width:`${zoom*100}%`,maxWidth:`${1000*zoom}px`}}>
+
+    <main>
+      <section ref={stage} className={styles.stage}>
+        {!dimensions?<div className={styles.loading}><Spinner/>Открываем фотографию…</div>:null}
+
+        {dimensions?<div className={styles.canvasFrame} style={{aspectRatio:`${dimensions.width}/${dimensions.height}`,width:fitWidth?`${fitWidth*zoom}px`:"100%"}}>
           <canvas ref={preview}/>
           {tab==="crop"?<svg
             ref={overlay}
@@ -247,17 +247,14 @@ export function ScannerAdjustEditor({
               />;
             })}
             {points.map((point,index)=><g key={index}>
-              <circle className={styles.handleHit} cx={point.x} cy={point.y} r={Math.max(48,Math.min(dimensions.width,dimensions.height)*.055)} onPointerDown={event=>startDrag(event,{kind:"corner",index})}/>
-              <circle className={styles.handle} cx={point.x} cy={point.y} r={Math.max(16,Math.min(dimensions.width,dimensions.height)*.018)}/>
+              <circle className={styles.handleHit} cx={point.x} cy={point.y} r={Math.max(22*dimensions.width/((fitWidth||dimensions.width)*zoom),Math.min(dimensions.width,dimensions.height)*.055)} onPointerDown={event=>startDrag(event,{kind:"corner",index})}/>
+              <circle className={styles.handle} cx={point.x} cy={point.y} r={7*dimensions.width/((fitWidth||dimensions.width)*zoom)}/>
             </g>)}
           </svg>:null}
         </div>:null}
       </section>
 
-      <button className={styles.panelToggle} onClick={()=>setPanelOpen(open=>!open)} aria-label={panelOpen?"Скрыть инструменты":"Показать инструменты"}>
-        {panelOpen?<ChevronDown/>:<ChevronUp/>}
-      </button>
-      <aside className={styles.controls} data-tab={tab} data-open={panelOpen}>
+      <aside className={styles.controls} data-tab={tab}>
         {tab==="crop"?<>
           <div className={styles.controlIntro}>
             <WandSparkles/>
@@ -266,10 +263,10 @@ export function ScannerAdjustEditor({
           <button className={styles.controlButton} disabled={detecting||!dimensions} onClick={()=>void detect()}>
             {detecting?<Spinner size="sm"/>:<Sparkles/>}{detecting?"Ищем лист…":"Найти границы"}
           </button>
-          <button className={styles.controlButton} disabled={!dimensions} onClick={()=>dimensions&&setPoints(insetPoints(dimensions.width,dimensions.height))}>
-            <RotateCcw/>Сбросить рамку
+          <button className={styles.controlButton} disabled={!dimensions} onClick={()=>{if(dimensions)setPoints(fullPagePoints(dimensions.width,dimensions.height));setCropChanged(false);setHint("Лист сохранится целиком, без обрезки.")}}>
+            <RotateCcw/>Без обрезки
           </button>
-          <div className={styles.tip}><strong>Совет</strong><span>Оставьте небольшой запас вокруг текста — фон будет выровнен при сохранении.</span></div>
+          <div className={styles.tip}><span>{cropChanged?"При сохранении фон за рамкой будет удалён.":"Обрезка выключена. Все края снимка сохранятся."}</span></div>
         </>:<>
           <div className={styles.presets}>
             {(Object.keys(scannerFilterLabels) as ScannerFilterMode[]).map(value=><button
@@ -301,11 +298,11 @@ export function ScannerAdjustEditor({
       </aside>
     </main>
 
-    {error?<div className={styles.error}>{error}</div>:null}
+    {error?<div className={styles.error} role="alert">{error}</div>:null}
     <footer>
-      <button onClick={onClose}>Отмена</button>
-      <button className={styles.primary} disabled={!dimensions||saving} onClick={()=>void save()}>
-        {saving?<><Spinner size="sm"/>Применяем…</>:<><Check/>Готово</>}
+      <button disabled={saving} onClick={onClose}>Отмена</button>
+      <button className={styles.primary} disabled={!dimensions||saving||detecting} onClick={()=>void save()}>
+        {saving?<><Spinner size="sm"/>Применяем…</>:<><Check/>Сохранить</>}
       </button>
     </footer>
   </div>;

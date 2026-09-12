@@ -3,12 +3,11 @@ type OpenCv=typeof globalThis.cv;
 let cvPromise:Promise<OpenCv>|null=null;
 function getCv(){
  if(cvPromise)return cvPromise;
- cvPromise=import("@techstark/opencv-js").then(async module=>{
-  const ready=(module as unknown as {default:OpenCv|Promise<OpenCv>}).default;
-  const cv=await ready;
+ cvPromise=import("./opencv-runtime").then(async module=>{
+  const cv=await module.loadOpenCv();
   if(typeof cv.getBuildInformation!=="function")throw new Error("opencv_unavailable");
   return cv;
- });
+ }).catch(error=>{cvPromise=null;throw error});
  return cvPromise;
 }
 const distance=(a:PagePoint,b:PagePoint)=>Math.hypot(a.x-b.x,a.y-b.y);

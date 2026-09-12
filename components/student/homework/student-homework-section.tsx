@@ -1,185 +1,81 @@
 "use client";
 
-import { HomeworkCard } from "@/components/student/homework/homework-card";
-import { HomeworkPagination } from "@/components/student/homework/homework-pagination";
-import styles from "@/components/student/homework/homework.module.css";
+import { HomeworkCard } from "./homework-card";
+import { HomeworkPagination } from "./homework-pagination";
+import styles from "./homework.module.css";
 import { LoadingState } from "@/components/ui/loading-state";
-import {
-  fetchStudentHomework,
-  filterHomeworkByStatus,
-  paginateHomework,
-} from "@/lib/student/homework-api";
-import { HomeworkFilterSelect } from "@/components/student/homework/homework-filter-select";
-import {
-  HOMEWORK_STATUS_FILTER_OPTIONS,
-  HOMEWORK_TYPE_FILTER_OPTIONS,
-} from "@/components/student/homework/homework-filter-options";
-import {
-  HOMEWORK_FETCH_LIMIT,
-  HOMEWORK_PAGE_SIZE,
-  type HomeworkStatusFilter,
-  type HomeworkTypeFilter,
-  type StudentHomeworkItem,
-} from "@/lib/student/homework-types";
-import { Grid2X2, List, SlidersHorizontal } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { fetchStudentHomework, filterHomeworkByStatus, paginateHomework } from "@/lib/student/homework-api";
+import { HOMEWORK_FETCH_LIMIT, HOMEWORK_PAGE_SIZE, type HomeworkStatusFilter, type HomeworkTypeFilter, type StudentHomeworkItem } from "@/lib/student/homework-types";
+import type { HomeworkWorkspace } from "@/lib/homework-files/types";
+import { BookOpen, RefreshCw, Search } from "lucide-react";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { HomeworkWorkspaceModal } from "@/components/homework/homework-workspace";
 
+const tabs: { value: HomeworkStatusFilter; label: string }[] = [{ value: "all", label: "Все задания" }, { value: "undone", label: "К сдаче" }, { value: "in_review", label: "На проверке" }, { value: "revision", label: "Доработка" }, { value: "done", label: "Проверено" }];
 export function StudentHomeworkSection() {
+  return <Suspense fallback={<LoadingState label="Открываем домашние задания…" variant="block" />}><StudentHomeworkContent /></Suspense>;
+}
+function StudentHomeworkContent() {
   const [items, setItems] = useState<StudentHomeworkItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [typeFilter, setTypeFilter] = useState<HomeworkTypeFilter>("all");
-  const [statusFilter, setStatusFilter] =
-    useState<HomeworkStatusFilter>("all");
+  const [statusFilter, setStatusFilter] = useState<HomeworkStatusFilter>("all");
   const [currentPage, setCurrentPage] = useState(1);
-  const [openHomeworkId, setOpenHomeworkId] = useState<number | null>(null);
-  const [sort, setSort] = useState<"deadline-new" | "deadline-old" | "name">("deadline-new");
-  const [view, setView] = useState<"grid" | "list">("grid");
-
+  const [search, setSearch] = useState("");
+  const [refresh, setRefresh] = useState(0);
+  const params = useSearchParams();
+  const pathname = usePathname();
+  const router = useRouter();
+  const openHomeworkId = Number(params.get("work")) || null;
   useEffect(() => {
     let cancelled = false;
-
-    async function loadHomeworks() {
-      setLoading(true);
-      setError(null);
-
+    const load = async () => {
+      setLoading(true); setError(null);
       try {
-        const response = await fetchStudentHomework({
-          page: 1,
-          limit: HOMEWORK_FETCH_LIMIT,
-          type: typeFilter,
-        });
-
-        if (cancelled) {
-          return;
+        const response = await fetchStudentHomework({ page: 1, limit: HOMEWORK_FETCH_LIMIT, type: typeFilter });
+        if (!response.status) throw new Error("Не удалось загрузить домашние задания");
+        const all = [...response.res];
+        for (let page = 2; page <= (response.pagination?.total_pages || 1) && !cancelled; page++) {
+          const next = await fetchStudentHomework({ page, limit: HOMEWORK_FETCH_LIMIT, type: typeFilter });
+          if (!next.status) throw new Error("Часть заданий не загрузилась. Обновите список.");
+          all.push(...next.res);
         }
-
-        if (response.status && Array.isArray(response.res)) {
-          setItems(response.res);
-        } else {
-          setItems([]);
-          setError("Не удалось загрузить домашние задания");
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setItems([]);
-          setError(
-            err instanceof Error
-              ? err.message
-              : "Ошибка при загрузке домашних заданий",
-          );
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      }
-    }
-
-    void loadHomeworks();
-
-    return () => {
-      cancelled = true;
+        if (!cancelled) setItems(all);
+      } catch (reason) { if (!cancelled) setError(reason instanceof Error ? reason.message : "Не удалось загрузить задания"); }
+      finally { if (!cancelled) setLoading(false); }
     };
-  }, [typeFilter]);
-
+    void load(); return () => { cancelled = true; };
+  }, [typeFilter, refresh]);
   useEffect(() => {
-    const openFromUpload = (event: Event) => {
-      const homeworkId = (event as CustomEvent<{ homeworkId?: number }>).detail?.homeworkId;
-      if (homeworkId) setOpenHomeworkId(homeworkId);
+    const update = (event: Event) => {
+      const { homeworkId, workspace } = (event as CustomEvent<{ homeworkId: number; workspace: HomeworkWorkspace }>).detail;
+      setItems(previous => previous.map(item => item.homework_id === homeworkId ? { ...item, submission_id: workspace.submission.id, submission_state: workspace.submission.state, has_file: workspace.submission.has_file, has_draft: workspace.submission.has_draft, submitted_at_utc: workspace.submission.submitted_at_utc, revision_comment: workspace.submission.revision_comment, result: workspace.legacy_result?.status ? workspace.legacy_result.result : null } : item));
     };
-    window.addEventListener("homework-upload-open", openFromUpload);
-    return () => window.removeEventListener("homework-upload-open", openFromUpload);
+    window.addEventListener("homework-workspace-updated", update);
+    const focus = () => { if (!new URLSearchParams(window.location.search).has("work")) setRefresh(value => value + 1); };
+    window.addEventListener("focus", focus);
+    return () => { window.removeEventListener("homework-workspace-updated", update); window.removeEventListener("focus", focus); };
   }, []);
-
-  const filteredItems = useMemo(() => {
-    const result = [...filterHomeworkByStatus(items, statusFilter)];
-    result.sort((left, right) => {
-      if (sort === "name") return left.homework_name.localeCompare(right.homework_name, "ru");
-      const leftDate = left.deadline ? new Date(left.deadline).getTime() : Number.MAX_SAFE_INTEGER;
-      const rightDate = right.deadline ? new Date(right.deadline).getTime() : Number.MAX_SAFE_INTEGER;
-      return sort === "deadline-new" ? leftDate - rightDate : rightDate - leftDate;
-    });
-    return result;
-  }, [items, sort, statusFilter]);
-
-  const pagination = useMemo(
-    () => paginateHomework(filteredItems, currentPage, HOMEWORK_PAGE_SIZE),
-    [filteredItems, currentPage],
-  );
-
-  if (loading) {
-    return (
-      <div className={styles.page}>
-        <div className={styles.pageHeading}><h1>Домашние задания</h1><p>Ваши задания и работы</p></div>
-        <LoadingState label="Загрузка домашних заданий…" variant="block" />
-      </div>
-    );
-  }
-
-  return (
-    <div className={styles.page}>
-      <div className={styles.pageHeading}><h1>Домашние задания</h1><p>Ваши задания и работы</p></div>
-
-      {error ? <div className={styles.alert}>{error}</div> : null}
-
-      <section className={styles.toolbar}>
-        <div className={styles.filters}>
-          <HomeworkFilterSelect
-            className={styles.filterSelect}
-            label="Статус"
-            value={statusFilter}
-            options={HOMEWORK_STATUS_FILTER_OPTIONS}
-            onChange={(value) => { setStatusFilter(value); setCurrentPage(1); }}
-          />
-
-          <HomeworkFilterSelect
-            className={styles.filterSelect}
-            label="Тип"
-            value={typeFilter}
-            options={HOMEWORK_TYPE_FILTER_OPTIONS}
-            onChange={(value) => { setTypeFilter(value); setCurrentPage(1); }}
-          />
-        </div>
-        <div className={styles.toolbarRight}>
-          <label className={styles.sortField}>Сортировка:
-            <select value={sort} onChange={(event) => setSort(event.target.value as typeof sort)}>
-              <option value="deadline-new">Срок сдачи: новые</option>
-              <option value="deadline-old">Срок сдачи: поздние</option>
-              <option value="name">По названию</option>
-            </select>
-          </label>
-          <div className={styles.viewSwitch} aria-label="Вид списка">
-            <button type="button" data-active={view === "grid"} onClick={() => setView("grid")} aria-label="Плитка"><Grid2X2 /></button>
-            <button type="button" data-active={view === "list"} onClick={() => setView("list")} aria-label="Список"><List /></button>
-          </div>
-          <button type="button" className={styles.mobileFilterIcon} aria-label="Фильтры"><SlidersHorizontal /></button>
-        </div>
-      </section>
-
-      {pagination.items.length > 0 ? (
-        <section className={styles.grid} data-view={view}>
-          {pagination.items.map((item) => (
-            <HomeworkCard key={item.homework_id} item={item} onOpen={() => setOpenHomeworkId(item.homework_id)} />
-          ))}
-        </section>
-      ) : (
-        <div className={styles.empty}>
-          <h2 className={styles.emptyTitle}>Заданий не найдено</h2>
-          <p className={styles.emptyText}>
-            Попробуйте изменить фильтры или дождитесь новых домашних заданий.
-          </p>
-        </div>
-      )}
-
-      <HomeworkPagination
-        currentPage={pagination.currentPage}
-        totalPages={pagination.totalPages}
-        onPageChange={setCurrentPage}
-      />
-      <p className={styles.resultMeta}>Показано {pagination.items.length} из {pagination.totalItems}</p>
-      {openHomeworkId ? <HomeworkWorkspaceModal homeworkId={openHomeworkId} onClose={() => setOpenHomeworkId(null)} /> : null}
-    </div>
-  );
+  const filtered = useMemo(() => filterHomeworkByStatus(items, statusFilter).filter(item => `${item.homework_name} ${item.homework_type}`.toLowerCase().includes(search.trim().toLowerCase())).sort((a, b) => {
+    const aDate = a.deadline ? new Date(a.deadline).getTime() : Number.MAX_SAFE_INTEGER;
+    const bDate = b.deadline ? new Date(b.deadline).getTime() : Number.MAX_SAFE_INTEGER;
+    return aDate - bDate;
+  }), [items, search, statusFilter]);
+  const pagination = paginateHomework(filtered, currentPage, HOMEWORK_PAGE_SIZE);
+  const revisions = items.filter(item => item.submission_state === "revision_requested").length;
+  const open = (id: number) => { const next = new URLSearchParams(params); next.set("work", String(id)); router.push(`${pathname}?${next}`, { scroll: false }); };
+  const close = () => { const next = new URLSearchParams(params); next.delete("work"); router.replace(`${pathname}${next.size ? `?${next}` : ""}`, { scroll: false }); };
+  return <div className={styles.page}>
+    <header className={styles.pageHeading}><div><span className={styles.eyebrow}>Учёба · Мои работы</span><h1>Домашние задания</h1><p>Подготовьте работу, отправьте PDF и следите за проверкой.</p></div><button type="button" className={styles.refresh} aria-label="Обновить задания" disabled={loading} onClick={() => setRefresh(value => value + 1)}><RefreshCw size={18} /></button></header>
+    {revisions ? <button type="button" className={styles.revisionBanner} onClick={() => { setStatusFilter("revision"); setCurrentPage(1); }}>Есть работы на доработке: {revisions}<span>Посмотреть комментарии →</span></button> : null}
+    <div className={styles.tabs} role="group" aria-label="Статус заданий">{tabs.map(tab => <button key={tab.value} type="button" aria-pressed={statusFilter === tab.value} onClick={() => { setStatusFilter(tab.value); setCurrentPage(1); }}>{tab.label}<span>{filterHomeworkByStatus(items, tab.value).length}</span></button>)}</div>
+    <section className={styles.toolbar}><label className={styles.search}><Search size={18} /><input type="search" value={search} onChange={event => { setSearch(event.target.value); setCurrentPage(1); }} placeholder="Найти задание" aria-label="Найти задание" /></label><label className={styles.typeFilter}><span>Тип</span><select value={typeFilter} onChange={event => { setTypeFilter(event.target.value as HomeworkTypeFilter); setCurrentPage(1); }}><option value="all">Все типы</option><option value="ОВ">ОВ</option><option value="ДЗНВ">ДЗНВ</option></select></label></section>
+    {error ? <div className={styles.alert} role="alert">{error}</div> : null}
+    {loading && !items.length ? <LoadingState label="Загружаем задания…" variant="block" /> : pagination.items.length ? <section className={styles.grid} aria-label="Задания">{pagination.items.map(item => <HomeworkCard key={item.homework_id} item={item} onOpen={() => open(item.homework_id)} />)}</section> : !error ? <div className={styles.empty}><BookOpen size={32} /><h2>Здесь пока нет заданий</h2><p>Попробуйте другой статус или измените поиск.</p></div> : null}
+    {pagination.totalPages > 1 ? <HomeworkPagination currentPage={pagination.currentPage} totalPages={pagination.totalPages} onPageChange={setCurrentPage} /> : null}
+    <p className={styles.resultMeta}>{pagination.totalItems ? `Показано ${pagination.items.length} из ${pagination.totalItems} · Ближайшие сроки сначала` : ""}</p>
+    {openHomeworkId ? <HomeworkWorkspaceModal key={openHomeworkId} homeworkId={openHomeworkId} onClose={close} /> : null}
+  </div>;
 }

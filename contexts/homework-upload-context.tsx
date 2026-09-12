@@ -1,171 +1,167 @@
 "use client";
 
 import { Spinner } from "@/components/ui/spinner";
-import { homeworkFilesApi, uploadHomeworkFile } from "@/lib/homework-files/api";
+import { homeworkErrorMessage, homeworkFilesApi, postFileToS3 } from "@/lib/homework-files/api";
 import type { UploadJob } from "@/lib/homework-files/types";
 import { useAuth } from "@/contexts/AuthContext";
 import { AlertTriangle, CheckCircle2, ChevronRight, CloudUpload, FileText, RotateCw, X } from "lucide-react";
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
+import { useHomeworkDialog } from "@/lib/homework-files/use-dialog";
 import styles from "@/components/homework/upload-center.module.css";
 
-interface QueuedUpload extends UploadJob { file?: File; clientId?: string }
-interface UploadContextValue { jobs: QueuedUpload[]; enqueue: (homeworkId: number, file: File) => void; cancel: (id: string) => Promise<void>; retry: (id: string) => Promise<void> }
+export interface QueuedUpload extends UploadJob { file?: File; clientId?: string; transferFailed?: boolean; filename?: string; serverStatus?: string }
+interface UploadContextValue { jobs: QueuedUpload[]; enqueue: (homeworkId: number, file: File) => void; cancel: (id: string) => Promise<void>; retry: (id: string) => Promise<void>; dismiss: (id: string) => void }
 const Context = createContext<UploadContextValue | null>(null);
+const active = (job: UploadJob) => ["local", "uploading", "queued", "running", "retry"].includes(job.status);
 
 export function HomeworkUploadProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
-  const [jobs, setJobs] = useState<QueuedUpload[]>([]);
-  const jobsRef = useRef<QueuedUpload[]>([]);
-  const running = useRef(false);
-  const uploadControllers = useRef(new Map<string, AbortController>());
-  const upsertJob = useCallback((incoming: UploadJob) => setJobs((items) => {
-    const index=items.findIndex((item)=>item.id===incoming.id);
-    if(index<0)return[...items,incoming];
-    return items.map((item)=>item.id===incoming.id?{...item,...incoming}:item);
-  }),[]);
-  useEffect(() => { jobsRef.current = jobs; }, [jobs]);
-  const pump = useCallback(async () => {
-    if(user?.role!=="student")return;
-    if (running.current) return;
-    const next = jobs.find((item) => item.status === "local" && item.file && item.clientId);
-    if (!next) return;
-    running.current = true;
-    try {
-      setJobs((items) => items.map((item) => item.id === next.id ? { ...item, status: "uploading", stage: "uploading", progress: 1 } : item));
-      try {
-        const controller = new AbortController();
-        uploadControllers.current.set(next.id, controller);
-        const server = await uploadHomeworkFile(next.homework_id!, next.file!, next.clientId!, (progress) => setJobs((items) => items.map((item) => item.id === next.id ? { ...item, progress } : item)), controller.signal);
-        uploadControllers.current.delete(next.id);
-        setJobs((items) => {
-          const replaced=items.map((item) => item.id === next.id ? { ...item, ...server, homework_id:server.homework_id??next.homework_id, file: undefined } : item);
-          const byId=new Map<string,QueuedUpload>();replaced.forEach((item)=>byId.set(item.id,{...byId.get(item.id),...item}));return[...byId.values()];
-        });
-      } catch (error) {
-        uploadControllers.current.delete(next.id);
-        setJobs((items) => items.map((item) => item.id === next.id ? { ...item, status: "failed", stage: "error", error_code: error instanceof Error ? error.message : "upload_failed" } : item));
-      }
-    } finally {
-      running.current = false;
-      setJobs((items) => [...items]);
-    }
-  }, [jobs,user?.role]);
-  useEffect(() => { void pump(); }, [jobs, pump]);
-  const refreshJobs = useCallback(async () => {
-    const response = await homeworkFilesApi.jobs();
-    const activeIds = new Set(response.items.map((item) => item.id));
-    const tracked = jobsRef.current.filter((item) =>
-      !item.id.startsWith("local-") && ["uploading", "queued", "running", "retry"].includes(item.status),
-    );
-    const terminal = await Promise.all(
-      tracked.filter((item) => !activeIds.has(item.id)).map((item) => homeworkFilesApi.job(item.id).catch(() => item)),
-    );
-    setJobs((current) => {
-      const byId = new Map<string, QueuedUpload>();
-      current.forEach((item) => byId.set(item.id, item));
-      response.items.forEach((item) => byId.set(item.id, { ...byId.get(item.id), ...item }));
-      terminal.forEach((item) => byId.set(item.id, { ...byId.get(item.id), ...item }));
-      return [...byId.values()];
-    });
-  }, []);
-  useEffect(() => {
-    if (user?.role !== "student") return;
-    void refreshJobs().catch(() => undefined);
-  }, [refreshJobs, user?.role]);
-  const pollingRequired = jobs.some((item) =>
-    !item.id.startsWith("local-") && ["uploading", "queued", "running", "retry"].includes(item.status),
-  );
-  useEffect(() => {
-    if (user?.role !== "student" || !pollingRequired) return;
-    let stopped = false;
-    const timer = window.setTimeout(() => {
-      if (!stopped) void refreshJobs().catch(() => undefined);
-    }, 10_000);
-    return () => { stopped = true; window.clearTimeout(timer); };
-  }, [pollingRequired, refreshJobs, jobs, user?.role]);
-  const enqueue = useCallback((homeworkId: number, file: File) => {
-    const id = crypto.randomUUID();
-    setJobs((items) => [...items, { id: `local-${id}`, clientId: id, homework_id: homeworkId, file, status: "local", stage: "queue", progress: 0 }]);
-  }, []);
-  const cancel = useCallback(async (id: string) => {
-    if (id.startsWith("local-")) {
-      uploadControllers.current.get(id)?.abort();
-      uploadControllers.current.delete(id);
-      setJobs((items) => items.filter((job) => job.id !== id));
-      return;
-    }
-    const cancelled = await homeworkFilesApi.cancel(id);
-    upsertJob(cancelled);
-  }, [upsertJob]);
-  const retry = useCallback(async (id: string) => {
-    upsertJob(await homeworkFilesApi.retry(id));
-  }, [upsertJob]);
-  return <Context.Provider value={{ jobs, enqueue, cancel, retry }}>{children}{user?.role==="student"?<UploadCenter jobs={jobs} cancel={cancel} retry={retry} />:null}</Context.Provider>;
+  return <UploadProvider key={`${user?.role}:${user?.id}`} enabled={user?.role === "student"}>{children}</UploadProvider>;
 }
 
-function UploadCenter({ jobs, cancel, retry }: { jobs: QueuedUpload[]; cancel: (id: string) => Promise<void>; retry: (id: string) => Promise<void> }) {
-  const storageKey = "cpm-homework-upload-seen-ready";
-  const [seenReady, setSeenReady] = useState<Set<string>>(() => {
-    if (typeof window === "undefined") return new Set();
-    try { return new Set(JSON.parse(localStorage.getItem(storageKey) ?? "[]") as string[]); } catch { return new Set(); }
-  });
-  const visible = jobs.filter((job) => job.status !== "cancelled" && !(job.status === "ready" && seenReady.has(job.id))).slice(-8);
-  const [open, setOpen] = useState(false);
-  const [busyId, setBusyId] = useState<string | null>(null);
-  const hadJobs = useRef(false);
+function UploadProvider({ children, enabled }: { children: ReactNode; enabled: boolean }) {
+  const [jobs, setJobs] = useState<QueuedUpload[]>([]);
+  const ref = useRef<QueuedUpload[]>([]);
+  const transfer = useRef<{ id: string; controller: AbortController } | null>(null);
+  const mounted = useRef(true);
+  const polling = useRef(false);
+  const [pollSeconds, setPollSeconds] = useState(10);
+  const update = useCallback((change: (items: QueuedUpload[]) => QueuedUpload[]) => {
+    if (!mounted.current) return;
+    ref.current = change(ref.current); setJobs(ref.current);
+  }, []);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; transfer.current?.controller.abort(); }; }, []);
+
+  const refresh = useCallback(async () => {
+    if (!enabled || polling.current || document.visibilityState === "hidden") return;
+    polling.current = true;
+    try {
+      const response = await homeworkFilesApi.jobs();
+      setPollSeconds(Math.max(10, response.poll_after_seconds || 10));
+      const activeIds = new Set(response.items.map(job => job.id));
+      const tracked = ref.current.filter(job => !job.id.startsWith("local-") && (active(job) || job.serverStatus === "uploading") && job.id !== transfer.current?.id && !activeIds.has(job.id));
+      const terminal = await Promise.all(tracked.map(job => homeworkFilesApi.job(job.id).catch(() => job)));
+      update(items => {
+        const map = new Map(items.map(job => [job.id, job]));
+        for (const incoming of [...response.items, ...terminal]) {
+          const previous = map.get(incoming.id);
+          if (incoming.id === transfer.current?.id) continue;
+          // An interrupted transfer cannot continue without a File from this browser session.
+          if (incoming.status === "uploading" && !previous?.file) {
+            map.set(incoming.id, { ...previous, ...incoming, status: "failed", serverStatus: "uploading", transferFailed: true, error_code: "Загрузка началась в другой вкладке или прервалась. Можно дождаться её или отменить и выбрать файл снова." });
+          } else if (previous?.transferFailed && incoming.status === "uploading") {
+            map.set(incoming.id, { ...previous, serverStatus: incoming.status });
+          } else {
+            map.set(incoming.id, { ...previous, ...incoming, serverStatus: incoming.status, file: incoming.status === "ready" ? undefined : previous?.file, transferFailed: false });
+          }
+        }
+        return [...map.values()];
+      });
+    } catch { /* Keep local progress during a temporary network interruption. */ }
+    finally { polling.current = false; }
+  }, [enabled, update]);
+
   useEffect(() => {
-    if (visible.length && !hadJobs.current) setOpen(true);
-    hadJobs.current = Boolean(visible.length);
-  }, [visible.length]);
+    if (!enabled) return;
+    void refresh();
+    const focus = () => { void refresh(); };
+    window.addEventListener("focus", focus); document.addEventListener("visibilitychange", focus);
+    return () => { window.removeEventListener("focus", focus); document.removeEventListener("visibilitychange", focus); };
+  }, [enabled, refresh]);
+  const needsPolling = jobs.some(job => (active(job) || job.serverStatus === "uploading") && !job.id.startsWith("local-"));
+  useEffect(() => {
+    if (!needsPolling) return;
+    const timer = window.setInterval(() => void refresh(), pollSeconds * 1000);
+    return () => window.clearInterval(timer);
+  }, [needsPolling, pollSeconds, refresh]);
+
+  useEffect(() => {
+    if (!enabled || transfer.current) return;
+    const next = ref.current.find(job => job.status === "local" && job.file && job.clientId);
+    if (!next) return;
+    const controller = new AbortController();
+    const current = { id: next.id, controller };
+    transfer.current = current;
+    update(items => items.map(job => job.id === next.id ? { ...job, status: "uploading", stage: "uploading", progress: 0, error_code: null } : job));
+    const run = async () => {
+      try {
+        const initialization = await homeworkFilesApi.createUpload(next.homework_id!, next.clientId!);
+        if (controller.signal.aborted) { await homeworkFilesApi.cancel(initialization.job.id).catch(() => undefined); return; }
+        current.id = initialization.job.id;
+        update(items => [...items.filter(job => job.id !== next.id && job.id !== current.id), { ...next, ...initialization.job, serverStatus: initialization.job.status, filename: next.file?.name, id: current.id }]);
+        if (initialization.upload) {
+          await postFileToS3(initialization, next.file!, progress => update(items => items.map(job => job.id === current.id ? { ...job, progress } : job)), controller.signal);
+          const complete = await homeworkFilesApi.completeUpload(current.id);
+          if (!controller.signal.aborted) update(items => items.map(job => job.id === current.id ? { ...job, ...complete, serverStatus: complete.status, file: undefined, transferFailed: false } : job));
+        } else update(items => items.map(job => job.id === current.id ? { ...job, ...initialization.job, serverStatus: initialization.job.status, file: undefined, transferFailed: false } : job));
+      } catch (error) {
+        if (!controller.signal.aborted) update(items => items.map(job => job.id === current.id ? { ...job, status: "failed", stage: "failed", transferFailed: true, error_code: error instanceof Error ? error.message : "upload_failed" } : job));
+      } finally {
+        if (controller.signal.aborted && !current.id.startsWith("local-")) await homeworkFilesApi.cancel(current.id).catch(() => undefined);
+        transfer.current = null;
+        update(items => [...items]);
+      }
+    };
+    void run();
+  }, [enabled, jobs, update]);
+
+  const enqueue = useCallback((homeworkId: number, file: File) => {
+    if (ref.current.some(job => job.homework_id === homeworkId && active(job))) throw new Error("Для этой работы уже загружается PDF");
+    const id = crypto.randomUUID();
+    update(items => [...items.filter(job => !(job.homework_id === homeworkId && job.status === "failed" && job.id.startsWith("local-"))), { id: `local-${id}`, clientId: id, homework_id: homeworkId, filename: file.name, file, status: "local", stage: "queue", progress: 0 }]);
+  }, [update]);
+  const cancel = useCallback(async (id: string) => {
+    if (transfer.current?.id === id) transfer.current.controller.abort();
+    if (!id.startsWith("local-")) {
+      try { await homeworkFilesApi.cancel(id); }
+      catch (reason) {
+        const latest = await homeworkFilesApi.job(id).catch(() => null);
+        if (!latest || !["ready", "failed", "cancelled"].includes(latest.status)) throw reason;
+      }
+    }
+    update(items => items.filter(job => job.id !== id));
+  }, [update]);
+  const retry = useCallback(async (id: string) => {
+    const job = ref.current.find(item => item.id === id);
+    if (job?.file && job.clientId) {
+      update(items => items.map(item => item.id === id ? { ...item, status: "local", stage: "queue", error_code: null, transferFailed: false } : item));
+    } else {
+      const next = await homeworkFilesApi.retry(id);
+      update(items => items.map(item => item.id === id ? { ...item, ...next } : item));
+    }
+  }, [update]);
+  const dismiss = useCallback((id: string) => update(items => items.filter(job => job.id !== id)), [update]);
+  return <Context.Provider value={{ jobs, enqueue, cancel, retry, dismiss }}>{children}{enabled ? <UploadCenter jobs={jobs} cancel={cancel} retry={retry} dismiss={dismiss} /> : null}</Context.Provider>;
+}
+
+function UploadCenter({ jobs, cancel, retry, dismiss }: Omit<UploadContextValue, "enqueue">) {
+  const [open, setOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const dialog = useRef<HTMLElement>(null);
+  const router = useRouter();
+  const visible = jobs.filter(job => job.status !== "cancelled");
+  useHomeworkDialog(dialog, () => setOpen(false), open && visible.length > 0);
   if (!visible.length) return null;
-  const labels: Record<string, string> = { queue: "В очереди", uploading: "Загружается", queued: "В очереди", checking: "Проверка", optimizing: "Оптимизация", saving: "Сохранение", ready: "Готово", failed: "Ошибка" };
-  const active = visible.filter((job) => !["ready", "failed"].includes(job.status));
-  const complete = visible.filter((job) => job.status === "ready");
-  const failed = visible.filter((job) => job.status === "failed");
-  const dismissReady = (ids: string[]) => {
-    if (!ids.length) return;
-    setSeenReady((current) => {
-      const next = new Set([...current, ...ids]);
-      const compact = [...next].slice(-200);
-      try { localStorage.setItem(storageKey, JSON.stringify(compact)); } catch { /* storage unavailable */ }
-      return new Set(compact);
-    });
-  };
-  const closeCenter = () => {
+  const running = visible.filter(active).length;
+  const failed = visible.filter(job => job.status === "failed").length;
+  const labels: Record<string, string> = { queue: "Ожидает загрузки", uploading: "Загружается", queued: "Ожидает обработки", checking: "Проверяем PDF", optimizing: "Обрабатываем PDF", saving: "Сохраняем", ready: "Готов к отправке", failed: "Не удалось загрузить" };
+  const action = async (id: string, fn: () => Promise<void>) => { setBusy(id); setError(null); try { await fn(); } catch (reason) { setError(reason instanceof Error ? reason.message : "Не удалось выполнить действие"); } finally { setBusy(null); } };
+  const openWork = (job: QueuedUpload) => {
     setOpen(false);
-    dismissReady(complete.map((job) => job.id));
-  };
-  const run = async (id: string, action: () => Promise<void>) => { setBusyId(id); try { await action(); } finally { setBusyId(null); } };
-  const openHomework = (job: QueuedUpload) => {
-    if (!job.homework_id) return;
-    if (job.status === "ready") dismissReady([job.id]);
-    window.dispatchEvent(new CustomEvent("homework-upload-open", { detail: { homeworkId: job.homework_id } }));
-    setOpen(false);
-  };
-  const renderJob = (job: QueuedUpload) => {
-    const isFailed = job.status === "failed";
-    const isReady = job.status === "ready";
-    const busy = busyId === job.id;
-    return <div className={styles.item} data-state={isFailed ? "failed" : isReady ? "ready" : "active"} key={job.id}>
-      <div className={styles.fileIcon}>{isFailed ? <AlertTriangle /> : isReady ? <CheckCircle2 /> : <FileText />}</div>
-      <button type="button" className={styles.itemMain} onClick={() => openHomework(job)}>
-        <strong>{job.file?.name ?? `Домашняя работа №${job.homework_id ?? ""}`}</strong>
-        <span>{labels[job.stage] ?? job.stage}{!isReady && !isFailed ? ` · ${job.progress}%` : ""}</span>
-        {!isReady && !isFailed ? <i><em style={{ width: `${Math.max(2, job.progress)}%` }} /></i> : null}
-      </button>
-      {isFailed ? <button type="button" className={styles.action} disabled={busy} onClick={() => void run(job.id, () => retry(job.id))}>{busy ? <Spinner size="sm" /> : <RotateCw />}Повторить</button> : !isReady ? <button type="button" className={styles.action} disabled={busy} onClick={() => void run(job.id, () => cancel(job.id))}>{busy ? <Spinner size="sm" /> : null}{busy ? "Отменяем…" : "Отменить"}</button> : <button type="button" className={styles.arrow} onClick={() => openHomework(job)} aria-label="Открыть"><ChevronRight /></button>}
-    </div>;
+    if (job.homework_id) router.push(`/cabinet/student/homework?work=${job.homework_id}`);
   };
   return <>
-    <button type="button" className={styles.launcher} onClick={() => setOpen(true)} aria-label="Открыть центр загрузок"><CloudUpload /><span>{active.length || visible.length}</span></button>
-    {open ? <div className={styles.backdrop} role="dialog" aria-modal="true"><section className={styles.center}>
-      <header><div><CloudUpload /><div><h2>Центр загрузок</h2><p>{active.length ? `Идёт загрузка ${active.length} файла` : "Последние загрузки"}</p></div></div><button type="button" onClick={closeCenter} aria-label="Закрыть"><X /></button></header>
-      <div className={styles.list}>
-        {active.length ? <><h3>Сейчас загружается и очередь</h3>{active.map(renderJob)}</> : null}
-        {complete.length ? <><h3>Завершено</h3>{complete.map(renderJob)}</> : null}
-        {failed.length ? <><h3>Ошибка</h3>{failed.map(renderJob)}</> : null}
-      </div>
-      <footer><span>Одновременно загружается только один файл</span></footer>
+    <button type="button" className={styles.launcher} onClick={() => setOpen(true)} aria-label="Открыть загрузки"><CloudUpload size={20} /><span>{running ? `Загрузка · ${running}` : failed ? `Ошибка загрузки · ${failed}` : "PDF готов"}</span></button>
+    {open ? <div className={styles.backdrop} onClick={event => { if (event.target === event.currentTarget) setOpen(false); }}><section className={styles.center} ref={dialog} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Загрузки домашних работ">
+      <header><div><h2>Загрузки</h2><p>Готовый PDF нужно отправить на проверку.</p></div><button type="button" className={styles.iconButton} onClick={() => setOpen(false)} aria-label="Закрыть загрузки"><X /></button></header>
+      {error ? <p className={styles.error} role="alert">{error}</p> : null}
+      <div className={styles.list}>{visible.map(job => <article className={styles.item} key={job.id} data-state={job.status}>
+        <div className={styles.fileIcon}>{job.status === "ready" ? <CheckCircle2 /> : job.status === "failed" ? <AlertTriangle /> : <FileText />}</div>
+        <div className={styles.itemMain}><strong>{job.filename || `Домашняя работа №${job.homework_id}`}</strong><span>{labels[job.stage] || "Обрабатываем"}{active(job) ? ` · ${job.progress}%` : ""}</span>{active(job) ? <progress max={100} value={job.progress} aria-label="Прогресс загрузки" /> : null}{job.status === "failed" ? <p role="alert">{homeworkErrorMessage(job.error_code)}</p> : null}</div>
+        <div className={styles.actions}>{job.status === "ready" ? <><button type="button" onClick={() => openWork(job)}>Открыть работу<ChevronRight size={16} /></button><button className={styles.iconButton} type="button" onClick={() => dismiss(job.id)} aria-label="Скрыть завершённую загрузку"><X size={16} /></button></> : job.status === "failed" ? <>{(!job.transferFailed || job.file) ? <button type="button" disabled={busy === job.id} onClick={() => void action(job.id, () => retry(job.id))}><RotateCw size={16} />Повторить</button> : null}<button type="button" disabled={busy === job.id} onClick={() => void action(job.id, async () => { if (job.transferFailed && !job.id.startsWith("local-")) await cancel(job.id); else dismiss(job.id); openWork(job); })}>Выбрать другой</button></> : <button type="button" disabled={busy === job.id} onClick={() => void action(job.id, () => cancel(job.id))}>{busy === job.id ? <Spinner size="sm" /> : null}Отменить</button>}</div>
+      </article>)}</div><footer>Окно работы можно закрыть. До завершения передачи файла оставьте вкладку открытой.</footer>
     </section></div> : null}
   </>;
 }

@@ -168,6 +168,7 @@ function SectionBody({
     return <ProctorStudentsSection />;
   }
   if (role === "proctor" && section === "review-queue") return <ReviewQueueSection />;
+  if (role === "proctor" && section === "homework-archive") return <HomeworkArchiveSection />;
 
   if (role === "supervisor" && section === "dashboard") {
     return <SupervisorDashboardSection />;

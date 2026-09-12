@@ -28,6 +28,9 @@ export interface ProctorGroupStudentsResponse {
 }
 
 export interface ProctorHomeworkSession {
+  file_managed?: boolean;
+  file_submission_id?: number | null;
+  file_submission_state?: import("@/lib/homework-files/types").SubmissionState | null;
   id: number | null;
   status: number;
   result: number;

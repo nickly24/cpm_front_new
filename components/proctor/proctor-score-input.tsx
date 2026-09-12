@@ -1,5 +1,7 @@
 "use client";
 
+import { useId } from "react";
+import { parseHomeworkScore } from "@/components/homework/staff-homework-utils";
 import { Minus, Plus } from "lucide-react";
 import styles from "./proctor.module.css";
 
@@ -20,41 +22,13 @@ export function ProctorScoreInput({
   label = "Баллы",
   disabled = false,
 }: ProctorScoreInputProps) {
-  const numeric = Number(value);
-  const canStep = !disabled && !Number.isNaN(numeric);
-
+  const numeric = parseHomeworkScore(value);
+  const hintId = useId();
+  const invalid = value.length > 0 && numeric === null;
+  const canStep = !disabled && numeric !== null;
   const applyDelta = (delta: number) => {
-    const base = Number.isNaN(numeric) ? 100 : numeric;
-    onChange(String(clampScore(base + delta)));
-  };
-
-  const handleInputChange = (next: string) => {
-    if (next === "") {
-      onChange("");
-      return;
-    }
-    if (!/^\d{0,3}$/.test(next)) {
-      return;
-    }
-    const parsed = Number(next);
-    if (parsed > 100) {
-      onChange("100");
-      return;
-    }
-    onChange(next);
-  };
-
-  const handleBlur = () => {
-    if (value === "") {
-      onChange("0");
-      return;
-    }
-    const parsed = Number(value);
-    if (Number.isNaN(parsed)) {
-      onChange("0");
-      return;
-    }
-    onChange(String(clampScore(parsed)));
+    if (numeric === null) return;
+    onChange(String(clampScore(numeric + delta)));
   };
 
   return (
@@ -64,7 +38,7 @@ export function ProctorScoreInput({
         <button
           type="button"
           className={styles.scoreStepBtn}
-          disabled={!canStep || numeric <= 0}
+          disabled={!canStep || (numeric ?? 0) <= 0}
           aria-label="Уменьшить балл"
           onClick={() => applyDelta(-5)}
         >
@@ -78,19 +52,21 @@ export function ProctorScoreInput({
           value={value}
           disabled={disabled}
           aria-label={label}
-          onChange={(event) => handleInputChange(event.target.value)}
-          onBlur={handleBlur}
+          aria-invalid={invalid}
+          aria-describedby={hintId}
+          onChange={(event) => onChange(event.target.value)}
         />
         <button
           type="button"
           className={styles.scoreStepBtn}
-          disabled={!canStep || numeric >= 100}
+          disabled={!canStep || (numeric ?? 100) >= 100}
           aria-label="Увеличить балл"
           onClick={() => applyDelta(5)}
         >
           <Plus size={16} />
         </button>
       </div>
+      <small id={hintId} className={styles.scoreLabel}>{invalid ? "Введите целое число от 0 до 100" : "От 0 до 100 баллов"}</small>
     </div>
   );
 }

@@ -1,5 +1,9 @@
 "use client";
 
+import Link from "next/link";
+import { ReviewWorkspace } from "@/components/homework/review-workspace";
+import { parseHomeworkScore, submissionLabels, type StaffHomeworkIdentity } from "@/components/homework/staff-homework-utils";
+import fileStyles from "@/components/homework/review-queue.module.css";
 import { Button } from "@/components/ui/button";
 import { LoadingState } from "@/components/ui/loading-state";
 import {
@@ -27,6 +31,7 @@ type SessionFilter = "all" | "submitted" | "pending";
 
 interface ProctorHomeworkSessionsProps {
   homeworkId: number;
+  homeworkName?: string;
   proctorId: number;
 }
 
@@ -36,8 +41,10 @@ function todayInputValue(): string {
 
 export function ProctorHomeworkSessions({
   homeworkId,
+  homeworkName,
   proctorId,
 }: ProctorHomeworkSessionsProps) {
+  const [fileWork, setFileWork] = useState<StaffHomeworkIdentity | null>(null);
   const [sessions, setSessions] = useState<ProctorHomeworkSession[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -62,8 +69,8 @@ export function ProctorHomeworkSessions({
   const [pendingDeleteSession, setPendingDeleteSession] =
     useState<ProctorHomeworkSession | null>(null);
 
-  const loadSessions = useCallback(async () => {
-    setLoading(true);
+  const loadSessions = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     setError(null);
 
     try {
@@ -85,7 +92,8 @@ export function ProctorHomeworkSessions({
   }, [homeworkId, proctorId]);
 
   useEffect(() => {
-    void loadSessions();
+    const timer = window.setTimeout(() => void loadSessions(), 0);
+    return () => window.clearTimeout(timer);
   }, [loadSessions]);
 
   useEffect(() => {
@@ -98,7 +106,7 @@ export function ProctorHomeworkSessions({
 
   const stats = useMemo(() => {
     const submitted = sessions.filter((session) => session.status === 1).length;
-    return { submitted, pending: sessions.length - submitted, total: sessions.length };
+    return { submitted, pending: sessions.filter((session) => session.status !== 1 && !session.file_managed).length, total: sessions.length };
   }, [sessions]);
 
   const filteredSessions = useMemo(() => {
@@ -118,13 +126,7 @@ export function ProctorHomeworkSessions({
     setScoreInput("100");
   };
 
-  const parseScore = (value: string): number | undefined => {
-    const parsed = Number(value);
-    if (Number.isNaN(parsed)) {
-      return undefined;
-    }
-    return Math.max(0, Math.min(100, Math.round(parsed)));
-  };
+  const parseScore = (value: string): number | undefined => parseHomeworkScore(value) ?? undefined;
 
   const resolveSessionId = (session: ProctorHomeworkSession): number | null => {
     if (session.id != null && session.id > 0) {
@@ -334,7 +336,7 @@ export function ProctorHomeworkSessions({
     setConfirmDialog({
       kind: "bulk",
       title: "Сдали все?",
-      description: `Занести сдачу всем, кто ещё не сдал. Уже отмеченные ученики будут пропущены.`,
+      description: `Занести сдачу ученикам без файла, кто ещё не сдал. Уже отмеченные и работы с прикреплёнными файлами будут пропущены.`,
       pending: stats.pending,
     });
   };
@@ -460,7 +462,12 @@ export function ProctorHomeworkSessions({
                 <span className={styles.studentId}>ID: {session.student_id}</span>
               </div>
 
-              {submitted ? (
+              {session.file_managed ? (
+                <div className={fileStyles.legacyFileNotice}>
+                  <div><b>{session.file_submission_state ? submissionLabels[session.file_submission_state] : "Работа с файлом"}</b><p>Файл, оценка и доработка управляются в проверке работ.</p></div>
+                  {session.file_submission_id ? <Button size="sm" onClick={() => setFileWork({ id: session.file_submission_id!, homework_id: homeworkId, student_id: session.student_id, student_name: session.student_full_name, homework_name: homeworkName ?? `Домашняя работа №${homeworkId}`, group_name: "Ваша группа" })}>Открыть работу</Button> : <Link href={`/cabinet/proctor/${session.file_submission_state === "graded" ? "homework-archive" : "review-queue"}`}>К работе →</Link>}
+                </div>
+              ) : submitted ? (
                 <div className={styles.sessionActions}>
                   <div className={styles.sessionMeta}>
                     <span>Баллы: {session.result}</span>
@@ -627,6 +634,8 @@ export function ProctorHomeworkSessions({
           </div>
         </div>
       ) : null}
+
+      {fileWork ? <ReviewWorkspace work={fileWork} onClose={() => setFileWork(null)} onChanged={() => loadSessions(true)} /> : null}
 
       {confirmDialog ? (
         <ProctorConfirmDialog

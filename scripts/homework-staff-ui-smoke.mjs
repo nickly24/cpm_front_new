@@ -1,0 +1,206 @@
+/* Synthetic staff homework UI checks. No real API or storage requests are allowed.
+ * Start Next on 3010 with both NEXT_PUBLIC_* URLs http://127.0.0.1:5099.
+ * PLAYWRIGHT_MODULE=/path/to/playwright/index.mjs node scripts/homework-staff-ui-smoke.mjs
+ */
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
+const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright');
+const base = process.env.SMOKE_BASE || 'http://localhost:3010';
+const api = 'http://127.0.0.1:5099';
+const output = process.env.SMOKE_OUTPUT || '/Users/nikolajpribys/Desktop/cpm/outputs/homework-redesign/staff';
+fs.mkdirSync(output, { recursive: true });
+const pdf = await PDFDocument.create();
+const font = await pdf.embedFont(StandardFonts.Helvetica);
+for (let i = 1; i <= 3; i++) {
+  const sheet = pdf.addPage([595, 842]);
+  sheet.drawText(`Mathematics homework / page ${i}`, { x: 45, y: 775, size: 21, font, color: rgb(.16, .22, .3) });
+  sheet.drawText('Solve: 3x + 7 = 22', { x: 45, y: 700, size: 17, font });
+  sheet.drawText('3x = 15; x = 5. Answer: 5.', { x: 45, y: 650, size: 16, font });
+  for (let n = 0; n < 12; n++) sheet.drawLine({ start: { x: 45, y: 595 - n * 30 }, end: { x: 550, y: 595 - n * 30 }, color: rgb(.84, .88, .91), thickness: .5 });
+}
+const pdfBytes = Buffer.from(await pdf.save());
+const names = ['Анна Соколова', 'Илья Миронов', 'Мария Волкова'];
+const records = Array.from({ length: 55 }, (_, i) => ({ id: i + 1, homework_id: 100 + i, student_id: 200 + i, student_name: names[i] ?? `Ученик ${String(i + 1).padStart(2, '0')}`, homework_name: i % 2 ? 'Геометрия. Подобие треугольников' : 'Алгебра. Квадратные уравнения', group_name: '9А · Математика', state: i === 1 ? 'in_review' : i === 2 ? 'revision_requested' : 'submitted', reviewer_role: i === 1 ? 'admin' : null, reviewer_id: i === 1 ? 90 : null, reviewer_name: i === 1 ? 'Елена Андреева' : null, revision_comment: i === 2 ? 'Проверьте решение второго уравнения на странице 2.' : null, submitted_at_utc: '2026-09-10T12:25:00Z', deadline: '2026-09-12', suggested_score: 100, page_count: 3, size_bytes: pdfBytes.length, filename: 'homework.pdf', result: null }));
+records.push({ ...records[0], id: 901, homework_id: 901, student_id: 901, student_name: 'Денис Лебедев', state: 'graded', result: 85 });
+let user = { role: 'proctor', id: 7, full_name: 'Ольга Смирнова', group_id: 11 };
+const calls = [], unexpected = [], errors = [], mockedFonts = [];
+const browser = await chromium.launch({ channel: 'chrome', headless: true });
+try {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, serviceWorkers: 'block', reducedMotion: 'reduce' });
+  await context.addInitScript(() => localStorage.setItem('auth_token', 'synthetic-homework-smoke'));
+  await context.route('**/*', async route => {
+    const req = route.request(), url = new URL(req.url());
+    if (url.origin === base) return route.continue();
+    if (url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com') { mockedFonts.push(req.url()); return route.fulfill({status:200, contentType:'text/css', body:''}); }
+    if (url.origin !== api) { unexpected.push(req.url()); return route.abort(); }
+    const path = url.pathname, method = req.method();
+    calls.push({ path, method, query: url.search, body: req.postData() });
+    const headers = { 'Access-Control-Allow-Origin': base, 'Access-Control-Allow-Credentials': 'true', 'Access-Control-Allow-Headers': '*', 'Access-Control-Allow-Methods': '*' };
+    const reply = (data, status = 200) => route.fulfill({ status, headers, contentType: 'application/json', body: JSON.stringify(data) });
+    if (method === 'OPTIONS') return route.fulfill({ status: 204, headers });
+    if (path === '/api/aun') return reply({ status: true, ...user, entity_id: user.id });
+    if (path === '/api/get-homeworks') return reply({status:true,res:[{id:901,name:'Журнал · Алгебра',type:'ДЗНВ',deadline:'2026-09-12'}]});
+    if (path === '/api/get-homework-sessions') return reply({status:true,res:[{id:901,homework_id:901,student_id:901,student_full_name:'Денис Лебедев',status:1,result:85,date_pass:'2026-09-10',file_managed:true,file_submission_id:901,file_submission_state:'graded'},{id:null,homework_id:901,student_id:402,student_full_name:'Виктор Громов',status:0,result:0,date_pass:null,file_managed:false}]});
+    if (path === '/synthetic.pdf') return route.fulfill({ status: 200, headers, contentType: 'application/pdf', body: pdfBytes });
+    if (path === '/api/review-queue' || path === '/api/archive') {
+      const archived = path.endsWith('/archive');
+      const after = Number(url.searchParams.get('after') || 0), limit = Number(url.searchParams.get('limit') || 24);
+      const state = url.searchParams.get('state'), search = (url.searchParams.get('search') || '').toLowerCase();
+      const all = records.filter(item => (archived ? item.state === 'graded' : ['submitted', 'in_review', 'revision_requested'].includes(item.state)) && (!state || item.state === state) && (!search || `${item.student_name} ${item.homework_name} ${item.group_name}`.toLowerCase().includes(search)));
+      const remaining = all.filter(item => item.id > after), items = remaining.slice(0, limit), more = remaining.length > limit;
+      return reply({ items, total: all.length, next_cursor: more ? items.at(-1).id : null, has_more: more });
+    }
+    const workspace = path.match(/^\/api\/workspaces\/(\d+)$/);
+    if (workspace) {
+      const item = records.find(row => row.homework_id === Number(workspace[1]) && row.student_id === Number(url.searchParams.get('student_id')));
+      if (!item) return reply({ error: 'not_found' }, 404);
+      if(user.role==='staff_admin' && (item.state==='none'||!user.permissions?.[item.state==='graded'?'homework-archive':'review-queue']?.view)) return reply({error:'forbidden'},403);
+      return reply({ homework: { id: item.homework_id, name: item.homework_name, deadline: item.deadline, published: true }, submission: { id: item.id, state: item.state, submitted_at_utc: item.submitted_at_utc, revision_comment: item.revision_comment, reviewer: item.reviewer_id ? { role: item.reviewer_role, id: item.reviewer_id, full_name: item.reviewer_name } : null, has_file: item.state !== 'none', has_draft: false, current_file: item.state !== 'none' ? { id: item.id, filename: item.filename, page_count: 3, size_bytes: pdfBytes.length } : null }, legacy_result: item.state === 'graded' ? { id: item.id, status: 1, result: item.result, date_pass: item.submitted_at_utc } : null, suggested_score: 100, permissions: { upload: false, submit: false } });
+    }
+    const file = path.match(/^\/api\/submissions\/(\d+)\/file-url$/);
+    if (file) return reply({ url: `${api}/synthetic.pdf`, filename: 'homework.pdf' });
+    const action = path.match(/^\/api\/submissions\/(\d+)\/(claim|release|request-revision|grade|edit-grade|resubmit|takeover)$/);
+    if (action && method === 'POST') {
+      const item = records.find(row => row.id === Number(action[1])), payload = req.postDataJSON() || {};
+      if (user.role === 'staff_admin' && !user.permissions?.[item.state==='graded'?'homework-archive':'review-queue']?.edit) return reply({ error: 'forbidden' }, 403);
+      if (action[2] === 'claim' || action[2] === 'takeover') Object.assign(item, { state: 'in_review', reviewer_id: user.id, reviewer_role: user.role, reviewer_name: user.full_name });
+      if (action[2] === 'release') Object.assign(item, { state: 'submitted', reviewer_id: null, reviewer_role: null, reviewer_name: null });
+      if (action[2] === 'request-revision') Object.assign(item, { state: 'revision_requested', revision_comment: payload.message, reviewer_id: null, reviewer_role: null, reviewer_name: null });
+      if (action[2] === 'grade' || action[2] === 'edit-grade') { assert(payload.result === undefined || (Number.isInteger(payload.result) && payload.result >= 0 && payload.result <= 100)); Object.assign(item, { state: 'graded', result: payload.result ?? 100, reviewer_id: null, reviewer_role: null, reviewer_name: null }); }
+      if (action[2] === 'resubmit') Object.assign(item, { state: 'none', result: null });
+      return reply({ ok: true, result: item.result });
+    }
+    unexpected.push(`${method} ${path}`); return reply({ error: 'unmocked_request' }, 500);
+  });
+  const page = await context.newPage();
+  page.on('pageerror', error => errors.push(error.message));
+  page.setDefaultTimeout(20000);
+  const shot = async name => { if(name.includes('pdf')||name==='desktop-review') await page.waitForFunction(()=>{const canvas=document.querySelector('[role=dialog] canvas');return canvas&&canvas.width>200&&canvas.closest('[aria-busy]')?.getAttribute('aria-busy')==='false'}); return page.screenshot({ path: `${output}/${name}.png`, fullPage: false }); };
+  const open = async name => {
+    const card = page.getByRole('article').filter({ has: page.getByRole('heading', { name, exact: true }) });
+    await card.getByRole('button', { name: /Открыть|Продолжить|Файл и оценка/ }).click();
+    await page.getByRole('dialog').waitFor();
+    await page.getByRole('dialog').getByText('Отправлено', { exact: true }).waitFor();
+  };
+  const close = () => page.getByRole('button', { name: 'К списку', exact: true }).click();
+  const noOverflow = async () => { await page.waitForFunction(() => document.documentElement.scrollWidth <= innerWidth + 1, null, {timeout:3000}).catch(()=>undefined); const overflow = await page.evaluate(() => ({width:innerWidth,scroll:document.documentElement.scrollWidth,items:[...document.querySelectorAll('body *')].filter(el=>{const r=el.getBoundingClientRect();return r.right>innerWidth+1&&getComputedStyle(el).position!=='fixed'}).slice(0,15).map(el=>({tag:el.tagName,cls:el.className,w:el.getBoundingClientRect().width,right:el.getBoundingClientRect().right}))})); if(overflow.scroll>overflow.width+1){await shot('debug-overflow');console.log(overflow);} assert(overflow.scroll<=overflow.width+1); };
+  await page.goto(`${base}/cabinet/proctor/review-queue`);
+  await page.getByRole('heading', { name: 'Анна Соколова', exact: true }).waitFor();
+  assert.equal(await page.getByRole('article').count(), 24);
+  await page.getByRole('button', { name: 'Показать ещё', exact: true }).click();
+  await page.waitForFunction(() => document.querySelectorAll('article').length === 48);
+  assert(calls.some(call => call.query.includes('after=24')));
+  await shot('desktop-queue');
+  await open('Илья Миронов');
+  assert.equal(await page.getByRole('button', { name: /Сохранить оценку|Отправить на доработку|Вернуть в очередь/ }).count(), 0);
+  await close();
+  await open('Анна Соколова');
+  await page.getByRole('button', { name: 'Взять на проверку', exact: true }).click();
+  await page.getByLabel('Оценка', { exact: true }).waitFor().catch(async error => { await shot('debug-review'); console.log(await page.getByRole('dialog').innerText(), calls.slice(-8), errors); throw error; });
+  const gradeInput = page.getByLabel('Оценка', { exact: true });
+  const beforeGrade = calls.filter(call => call.path.endsWith('/grade')).length;
+  await gradeInput.fill('abc');
+  assert.equal(await page.getByRole('button', { name: /^Сохранить оценку/ }).isDisabled(), true);
+  await gradeInput.fill('1000');
+  assert.equal(await page.getByRole('button', { name: /^Сохранить оценку/ }).isDisabled(), true);
+  await gradeInput.fill('101');
+  assert.equal(await page.getByRole('button', { name: /^Сохранить оценку/ }).isDisabled(), true);
+  assert.equal(calls.filter(call => call.path.endsWith('/grade')).length, beforeGrade);
+  await gradeInput.fill('87');
+  await page.locator('canvas').first().waitFor({ state: 'visible' });
+  await shot('desktop-review');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await noOverflow();
+  await shot('mobile-review');
+  await page.setViewportSize({width:375,height:812}); await noOverflow(); await shot('mobile-review-375');
+  await page.setViewportSize({width:390,height:844});
+  await page.getByRole('button', { name: 'Файл работы', exact: true }).click();
+  await page.locator('canvas').first().waitFor({ state: 'visible' });
+  await shot('mobile-pdf');
+  await page.getByRole('button', { name: 'Проверка', exact: true }).click();
+  await page.getByRole('button', { name: 'Сохранить оценку · 87', exact: true }).click();
+  await page.getByRole('dialog').getByText('Работа проверена. Оценка сохранена.', { exact: true }).waitFor();
+  assert.equal(records[0].result, 87);
+  await close();
+  await page.goto(`${base}/cabinet/proctor/homework-archive`);
+  await page.getByRole('heading', { name: 'Анна Соколова', exact: true }).waitFor();
+  await noOverflow(); await shot('mobile-archive');
+  await open('Анна Соколова');
+  await page.getByLabel('Изменить оценку', { exact: true }).fill('92');
+  await page.getByRole('button', { name: 'Сохранить изменение', exact: true }).click();
+  await page.getByRole('dialog').getByText('Оценка обновлена.', { exact: true }).waitFor();
+  assert.equal(records[0].result, 92);
+  await page.getByRole('button', { name: 'Открыть пересдачу', exact: true }).click();
+  await page.getByRole('heading', { name: 'Открыть новую пересдачу?', exact: true }).waitFor();
+  await shot('mobile-resubmit-confirmation');
+  await page.getByRole('button', { name: 'Отмена', exact: true }).click();
+  assert.equal(records[0].state, 'graded');
+  await page.getByRole('button', { name: 'Открыть пересдачу', exact: true }).click();
+  await page.getByRole('button', { name: 'Удалить результат и открыть пересдачу', exact: true }).click();
+  await page.getByRole('dialog').getByText('Пересдача открыта. Ученик может прикрепить новую работу.', {exact:true}).waitFor();
+  assert.equal(records[0].state, 'none');
+  await close();
+  await page.goto(`${base}/cabinet/proctor/review-queue`);
+  await page.getByRole('button', { name: 'В очереди', exact: true }).click();
+  await page.getByLabel('Поиск работ').fill('Ученик 04');
+  await page.getByRole('heading', { name: 'Ученик 04', exact: true }).waitFor();
+  await open('Ученик 04');
+  await page.getByRole('button', { name: 'Взять на проверку', exact: true }).click();
+  await page.getByRole('button', { name: 'На доработку', exact: true }).click();
+  await page.getByLabel('Что нужно исправить', { exact: true }).fill('Проверьте преобразование во второй строке на странице 2.');
+  await page.getByRole('button', { name: 'Отправить на доработку', exact: true }).click();
+  await page.getByRole('dialog').getByText('Работа возвращена ученику на доработку.', { exact: true }).waitFor();
+  assert.equal(records[3].state, 'revision_requested');
+  await close();
+  await page.goto(`${base}/cabinet/proctor/homework`);
+  await page.getByRole('button', {name:/Журнал · Алгебра/}).click();
+  await page.getByText('Денис Лебедев', {exact:true}).waitFor();
+  assert.equal(await page.getByRole('button', {name:'Занести ДЗ',exact:true}).count(),1);
+  assert.equal(await page.getByRole('button', {name:'Удалить сдачу',exact:true}).count(),0);
+  await page.getByRole('button', {name:'Занести ДЗ',exact:true}).click();
+  await page.getByRole('tab', {name:'Свой балл', exact:true}).first().click();
+  await page.getByLabel('Баллы', {exact:true}).first().fill('101');
+  await page.getByLabel('Баллы', {exact:true}).first().press('Tab');
+  assert.equal(await page.getByLabel('Баллы', {exact:true}).first().inputValue(),'101');
+  await page.getByRole('button', {name:'Занести',exact:true}).click();
+  await page.getByText('Укажите корректный балл от 0 до 100', {exact:true}).waitFor();
+  assert.equal(calls.filter(call=>call.path==='/api/pass_homework').length,0);
+  await page.getByRole('button', {name:'Открыть работу',exact:true}).click();
+  await page.getByRole('dialog').getByLabel('Изменить оценку', {exact:true}).waitFor();
+  await close();
+  user = { role: 'staff_admin', id: 19, full_name: 'Наблюдатель', role_name: 'Просмотр работ', permissions: { 'review-queue': { view: true, edit: false }, 'homework-archive': { view: true, edit: false } } };
+  await page.goto(`${base}/cabinet/staff_admin/homework-archive`);
+  await page.getByRole('heading', { name: 'Денис Лебедев', exact: true }).waitFor();
+  await open('Денис Лебедев');
+  assert.equal(await page.getByLabel('Изменить оценку', { exact: true }).count(), 0);
+  assert.equal(await page.getByRole('button', { name: 'Открыть пересдачу', exact: true }).count(), 0);
+  await shot('mobile-archive-view-only');
+  await close();
+  await page.goto(`${base}/cabinet/staff_admin/review-queue`);
+  await open('Ученик 05');
+  assert.equal(await page.getByRole('button', { name: 'Взять на проверку', exact: true }).count(), 0);
+  await noOverflow();
+  await close();
+  user = { role: 'staff_admin', id: 21, full_name: 'Проверяющий без архива', permissions: {'review-queue':{view:true,edit:true}} };
+  await page.goto(`${base}/cabinet/staff_admin/review-queue`);
+  await open('Ученик 05');
+  await page.getByRole('button',{name:'Взять на проверку',exact:true}).click();
+  await page.getByRole('checkbox',{name:/Рассчитать по сроку сдачи/}).check();
+  await page.getByRole('button',{name:'Сохранить оценку · 100',exact:true}).click();
+  await page.getByRole('dialog').waitFor({state:'detached'});
+  await page.getByText('Работа проверена. Оценка сохранена.',{exact:true}).waitFor();
+  assert.equal(await page.locator('.cabinet-content [role=alert]').count(),0);
+  user = { role: 'staff_admin', id: 22, full_name: 'Администратор архива', permissions: {'homework-archive':{view:true,edit:true}} };
+  await page.goto(`${base}/cabinet/staff_admin/homework-archive`);
+  await open('Денис Лебедев');
+  await page.getByRole('button',{name:'Открыть пересдачу',exact:true}).click();
+  await page.getByRole('button',{name:'Удалить результат и открыть пересдачу',exact:true}).click();
+  await page.getByRole('dialog').waitFor({state:'detached'});
+  await page.getByText('Пересдача открыта. Ученик может прикрепить новую работу.',{exact:true}).waitFor();
+  assert.equal(await page.locator('.cabinet-content [role=alert]').count(),0);
+  assert.deepEqual(unexpected, []);
+  assert.deepEqual(errors, []);
+  fs.writeFileSync(`${output}/result.json`, JSON.stringify({ result: 'PASS', scenarios: ['queue-pagination', 'foreign-reviewer-read-only', 'claim', 'invalid-score-blocked', 'manual-grade', 'auto-grade-preview', 'mobile-375-layout', 'mobile-pdf', 'proctor-archive-edit', 'resubmit-confirmation-cancel', 'resubmit', 'search-and-state', 'revision', 'legacy-file-guard', 'legacy-grade-validation', 'staff-view-only', 'staff-queue-only-grade', 'staff-archive-only-resubmit'], requests: calls.length, externalRequests: 0, mockedFonts: mockedFonts.length, screenshots: output }, null, 2));
+  console.log(fs.readFileSync(`${output}/result.json`, 'utf8'));
+} finally { await browser.close(); }
