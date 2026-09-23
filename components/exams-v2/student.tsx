@@ -1,5 +1,6 @@
 "use client";
 
+import { FilterPopover } from "@/components/ui/filter-popover";
 import { queryString } from "@/lib/exams-v2/api";
 import Link from "next/link";
 import { examTrainingPath } from "@/lib/training/training-routes";
@@ -163,45 +164,53 @@ export function StudentExamResults() {
           Обновить
         </Action>
       </div>
-      <div className={s.row}>
-        <Field label="Тип экзамена">
-          <select
-            className={s.select}
-            value={type}
-            onChange={(e) => nav.navigate({ type: e.target.value, page: null })}
-          >
-            <option value="all">Все экзамены</option>
-            <option value="classic">Классические</option>
-            <option value="outside_lms">Вне системы LMS</option>
-          </select>
-        </Field>
-        <Field label="Оценка">
-          <select
-            className={s.select}
-            value={grade}
-            onChange={(e) =>
-              nav.navigate({ grade: e.target.value || null, page: null })
-            }
-          >
-            <option value="">Любая</option>
-            {GRADES.map((g) => (
-              <option key={g} value={g}>
-                {g}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field label="Порядок">
-          <select
-            className={s.select}
-            value={sort}
-            onChange={(e) => nav.navigate({ sort: e.target.value, page: null })}
-          >
-            <option value="date_desc">Сначала новые</option>
-            <option value="date_asc">Сначала старые</option>
-            <option value="direction_asc">По направлению</option>
-          </select>
-        </Field>
+      <div className={s.toolbar}>
+        <p className={s.toolbarSummary}>{resource.data ? `Результатов: ${resource.data.pagination.total}` : "История ваших экзаменов"}</p>
+        <FilterPopover
+          activeCount={[type !== "all", grade, sort !== "date_desc"].filter(Boolean).length}
+          onReset={() => nav.navigate({ type: null, grade: null, sort: null, page: null })}
+        >
+          <div className={s.filterGrid}>
+            <Field label="Тип экзамена">
+              <select
+                className={s.select}
+                value={type}
+                onChange={(e) => nav.navigate({ type: e.target.value, page: null })}
+              >
+                <option value="all">Все экзамены</option>
+                <option value="classic">Классические</option>
+                <option value="outside_lms">Вне системы LMS</option>
+              </select>
+            </Field>
+            <Field label="Оценка">
+              <select
+                className={s.select}
+                value={grade}
+                onChange={(e) =>
+                  nav.navigate({ grade: e.target.value || null, page: null })
+                }
+              >
+                <option value="">Любая</option>
+                {GRADES.map((g) => (
+                  <option key={g} value={g}>
+                    {g}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Порядок">
+              <select
+                className={s.select}
+                value={sort}
+                onChange={(e) => nav.navigate({ sort: e.target.value, page: null })}
+              >
+                <option value="date_desc">Сначала новые</option>
+                <option value="date_asc">Сначала старые</option>
+                <option value="direction_asc">По направлению</option>
+              </select>
+            </Field>
+          </div>
+        </FilterPopover>
       </div>
       <ErrorNotice error={resource.error} reload={resource.reload} />
       {resource.loading && <Loading />}
@@ -212,7 +221,7 @@ export function StudentExamResults() {
             ? result.currentAttempt.grade
             : result.grade;
           return (
-            <article key={result.examId} className={s.panel}>
+            <article key={result.examId} className={`${s.panel} ${s.examCard}`}>
               <div className={s.header}>
                 <h2>{result.directionName}</h2>
                 <strong className={s.score}>{gradeValue} / 5</strong>
@@ -242,7 +251,7 @@ export function StudentExamResults() {
                   </p>
                 </>
               )}
-              <Action onClick={() => nav.navigate({ examId: result.examId })}>
+              <Action className={s.cardAction} onClick={() => nav.navigate({ examId: result.examId })}>
                 Подробности
               </Action>
             </article>

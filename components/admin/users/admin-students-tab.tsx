@@ -7,6 +7,7 @@ import styles from "@/components/admin/tests/admin-tests.module.css";
 import userStyles from "@/components/admin/users/admin-users.module.css";
 import { AdminStudentPanel } from "@/components/admin/users/admin-student-panel";
 import { Button } from "@/components/ui/button";
+import { FilterPopover } from "@/components/ui/filter-popover";
 import { LoadingState } from "@/components/ui/loading-state";
 import {
   deleteAdminUser,
@@ -143,26 +144,26 @@ export function AdminStudentsTab() {
 
   return (
     <>
-      <div className={styles.filters}>
-        <div className={userStyles.statsRow}>
-          <span className={userStyles.statPill}>
-            Всего: <strong>{students.length}</strong>
-          </span>
-          <span className={userStyles.statPill}>
-            В выборке: <strong>{filtered.length}</strong>
-          </span>
-        </div>
+      <div className={styles.listToolbar}>
         <input
           type="search"
           className={styles.searchInput}
-          placeholder="Поиск по ФИО или ID…"
+          placeholder="Имя, логин или ID ученика…"
+          aria-label="Поиск учеников"
           value={search}
           onChange={(e) => {
             setSearch(e.target.value);
             setPage(1);
           }}
         />
-        <div className={styles.dateRow}>
+        <FilterPopover
+          activeCount={Number(groupFilter !== "all") + Number(classFilter !== "all")}
+          onReset={() => {
+            setGroupFilter("all");
+            setClassFilter("all");
+            setPage(1);
+          }}
+        >
           <label className={styles.dateField}>
             <span className={styles.fieldLabel}>Группа</span>
             <select
@@ -200,11 +201,15 @@ export function AdminStudentsTab() {
               ))}
             </select>
           </label>
+        </FilterPopover>
+        <div className={styles.toolbarActions}>
           <EditOnly><Button type="button" onClick={() => setPanelMode("add")}>
             + Добавить ученика
           </Button></EditOnly>
         </div>
       </div>
+
+      <p className={styles.resultsSummary}>Найдено учеников: <strong>{filtered.length}</strong>{filtered.length !== students.length ? ` из ${students.length}` : ""}</p>
 
       {error ? <div className={styles.stateBox}>{error}</div> : null}
 

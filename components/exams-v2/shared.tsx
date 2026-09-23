@@ -145,7 +145,7 @@ export function Pager({
 }) {
   if (!pagination) return null;
   return (
-    <nav className={s.row} aria-label="Страницы">
+    <nav className={s.pager} aria-label="Страницы">
       <Action
         disabled={disabled || !pagination.hasPrev}
         onClick={() => onPage(pagination.page - 1)}
@@ -211,7 +211,9 @@ export function Modal({
     };
   }, []);
   return (
-    <div className={s.overlay}>
+    <div className={s.overlay} onPointerDown={(event) => {
+      if (event.target === event.currentTarget && !busy) close();
+    }}>
       <div
         className={s.dialog}
         ref={ref}
@@ -250,9 +252,9 @@ export function Modal({
           }
         }}
       >
-        <div className={s.header}>
+        <div className={s.dialogHeader}>
           <h2 id={id}>{title}</h2>
-          <Action disabled={busy} onClick={close} aria-label="Закрыть">
+          <Action className={s.closeButton} disabled={busy} onClick={close} aria-label="Закрыть">
             ×
           </Action>
         </div>

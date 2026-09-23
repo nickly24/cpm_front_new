@@ -52,6 +52,7 @@ export function Sidebar({
       )}
       aria-label="Навигация"
       aria-hidden={isDrawer ? !isOpen : undefined}
+      inert={isDrawer && !isOpen ? true : undefined}
     >
       <div className="cabinet-sidebar-header">
         <Image src="/logo.svg" alt="CPM" width={40} height={40} />
@@ -93,6 +94,8 @@ export function Sidebar({
                         isCompact && "is-collapsed",
                       )}
                       title={isCompact ? item.label : undefined}
+                      aria-label={isCompact ? item.label : undefined}
+                      aria-current={isActive ? "page" : undefined}
                       onClick={handleNavigate}
                     >
                       <Icon size={18} />

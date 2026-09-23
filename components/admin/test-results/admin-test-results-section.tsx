@@ -244,8 +244,10 @@ export function AdminTestResultsSection() {
           </div>
         </header>
 
-        <div className={styles.filters}>
+        <div className={styles.listToolbar}>
           <input
+            type="search"
+            aria-label="Поиск результатов по названию теста"
             className={styles.searchInput}
             placeholder="Поиск по названию теста…"
             value={sessionSearch}
@@ -381,8 +383,10 @@ export function AdminTestResultsSection() {
         </div>
       </header>
 
-      <div className={styles.filters}>
+      <div className={styles.listToolbar}>
         <input
+          type="search"
+          aria-label="Поиск ученика по имени, ID или классу"
           className={styles.searchInput}
           placeholder="Поиск по имени, ID или классу…"
           value={studentSearch}
@@ -422,7 +426,17 @@ export function AdminTestResultsSection() {
                         <span className={resultStyles.studentAvatar}>
                           {student.full_name.charAt(0).toUpperCase()}
                         </span>
-                        <strong>{student.full_name}</strong>
+                        <button
+                          type="button"
+                          className={resultStyles.studentLink}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            handleSelectStudent(student);
+                          }}
+                          aria-label={`Открыть результаты: ${student.full_name}`}
+                        >
+                          {student.full_name}<span aria-hidden="true"> →</span>
+                        </button>
                       </div>
                     </td>
                     <td>{student.id}</td>

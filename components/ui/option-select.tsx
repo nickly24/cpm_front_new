@@ -56,6 +56,8 @@ export function OptionSelect<T extends string | number>({
 }: OptionSelectProps<T>) {
   const listboxId = useId();
   const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
 
@@ -64,10 +66,37 @@ export function OptionSelect<T extends string | number>({
   const SelectedIcon = selected?.icon;
   const selectedTone = selected?.tone ?? "neutral";
 
+  // The browser's top layer keeps options visible inside scrollable filter sheets.
   useEffect(() => {
-    const selectedIndex = options.findIndex((option) => option.value === value);
-    setActiveIndex(selectedIndex >= 0 ? selectedIndex : 0);
-  }, [options, value]);
+    if (!isOpen || !dropdownRef.current) return;
+    const dropdown = dropdownRef.current;
+    const position = () => {
+      const anchor = triggerRef.current?.getBoundingClientRect();
+      if (!anchor) return;
+      const width = Math.min(Math.max(anchor.width, 240), window.innerWidth - 32);
+      const below = window.innerHeight - anchor.bottom - 16;
+      const above = anchor.top - 16;
+      const openAbove = below < 240 && above > below;
+      dropdown.style.width = `${width}px`;
+      dropdown.style.left = `${Math.max(16, Math.min(anchor.left, window.innerWidth - width - 16))}px`;
+      dropdown.style.maxHeight = `${Math.max(100, Math.min(320, openAbove ? above : below))}px`;
+      dropdown.style.top = openAbove ? "auto" : `${anchor.bottom + 6}px`;
+      dropdown.style.bottom = openAbove ? `${window.innerHeight - anchor.top + 6}px` : "auto";
+    };
+    dropdown.showPopover();
+    position();
+    window.addEventListener("resize", position);
+    document.addEventListener("scroll", position, true);
+    return () => {
+      window.removeEventListener("resize", position);
+      document.removeEventListener("scroll", position, true);
+      if (dropdown.matches(":popover-open")) dropdown.hidePopover();
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (isOpen) dropdownRef.current?.querySelectorAll<HTMLElement>("[role=option]")[activeIndex]?.scrollIntoView({ block: "nearest" });
+  }, [activeIndex, isOpen]);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -83,11 +112,12 @@ export function OptionSelect<T extends string | number>({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  useEffect(() => {
-    if (disabled) {
-      setIsOpen(false);
-    }
-  }, [disabled]);
+  if (disabled && isOpen) setIsOpen(false);
+
+  const openOptions = () => {
+    setActiveIndex(Math.max(0, options.findIndex((option) => option.value === value)));
+    setIsOpen(true);
+  };
 
   const selectOption = (nextValue: T) => {
     onChange(nextValue);
@@ -97,6 +127,11 @@ export function OptionSelect<T extends string | number>({
   const handleKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
     if (disabled) return;
 
+    if (event.key === "Tab") {
+      setIsOpen(false);
+      return;
+    }
+
     if (!isOpen) {
       if (
         event.key === "ArrowDown" ||
@@ -105,7 +140,7 @@ export function OptionSelect<T extends string | number>({
         event.key === " "
       ) {
         event.preventDefault();
-        setIsOpen(true);
+        openOptions();
       }
       return;
     }
@@ -124,12 +159,13 @@ export function OptionSelect<T extends string | number>({
 
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
-      selectOption(options[activeIndex].value);
+      if (options[activeIndex]) selectOption(options[activeIndex].value);
       return;
     }
 
     if (event.key === "Escape") {
       event.preventDefault();
+      event.stopPropagation();
       setIsOpen(false);
     }
   };
@@ -145,7 +181,9 @@ export function OptionSelect<T extends string | number>({
       </span>
 
       <button
+        ref={triggerRef}
         type="button"
+        role="combobox"
         className={`${styles.trigger} ${isOpen ? styles.triggerOpen : ""} ${
           disabled ? styles.triggerDisabled : ""
         }`.trim()}
@@ -153,8 +191,9 @@ export function OptionSelect<T extends string | number>({
         aria-expanded={isOpen}
         aria-labelledby={`${listboxId}-label`}
         aria-controls={listboxId}
+        aria-activedescendant={isOpen ? `${listboxId}-option-${activeIndex}` : undefined}
         disabled={disabled}
-        onClick={() => setIsOpen((open) => !open)}
+        onClick={() => isOpen ? setIsOpen(false) : openOptions()}
         onKeyDown={handleKeyDown}
       >
         <span
@@ -171,6 +210,8 @@ export function OptionSelect<T extends string | number>({
 
       {isOpen ? (
         <div
+          ref={dropdownRef}
+          popover="manual"
           className={cn(styles.dropdown, dropdownClassName)}
           id={listboxId}
           role="listbox"
@@ -187,6 +228,8 @@ export function OptionSelect<T extends string | number>({
                 key={String(option.value)}
                 type="button"
                 role="option"
+                id={`${listboxId}-option-${index}`}
+                tabIndex={-1}
                 aria-selected={isSelected}
                 className={`${styles.option} ${
                   isActive ? styles.optionActive : ""

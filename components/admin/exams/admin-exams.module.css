@@ -137,7 +137,7 @@
 
 .examsGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
   gap: var(--ds-space-4);
 }
 
@@ -315,4 +315,45 @@
   margin: 0;
   font-size: 12px;
   color: var(--ds-text-muted);
+}
+
+.listToolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-lg);
+  background: var(--ds-surface);
+}
+.listToolbar > input {
+  flex: 1;
+  min-width: 0;
+  max-width: 560px;
+  min-height: 42px;
+}
+.examListCardWrap {
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+.examListCardActions {
+  margin-top: auto;
+}
+.filterLabel {
+  font-size: 13px;
+  color: var(--ds-text-secondary);
+  text-transform: none;
+  letter-spacing: normal;
+}
+.filterGroup {
+  min-width: 0;
+  width: 100%;
+}
+@media (max-width: 600px) {
+  .listToolbar {
+    flex-wrap: wrap;
+  }
+  .listToolbar > input {
+    flex-basis: 100%;
+    max-width: none;
+  }
 }

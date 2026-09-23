@@ -9,28 +9,24 @@
   display: flex;
   flex-direction: column;
   gap: var(--ds-space-2);
-  padding: var(--ds-space-6);
-  border: 1px solid var(--ds-border);
-  border-radius: var(--ds-radius-lg);
-  background: linear-gradient(
-    135deg,
-    var(--ds-surface) 0%,
-    var(--ds-surface-muted) 100%
-  );
-  box-shadow: var(--ds-shadow-sm);
+  padding: 8px 0 14px;
 }
+
+.eyebrow { font-size: 12px; font-weight: 500; color: var(--ds-text-secondary); }
 
 .welcomeTitle {
   margin: 0;
-  font-size: clamp(24px, 2.4vw, 32px);
-  font-weight: 700;
+  font-size: clamp(23px, 2.2vw, 30px);
+  font-weight: 500;
+  letter-spacing: -.025em;
+  line-height: 1.3;
   color: var(--ds-text);
 }
 
 .welcomeText {
   margin: 0;
   max-width: 640px;
-  font-size: 15px;
+  font-size: 14px;
   line-height: 1.5;
   color: var(--ds-text-secondary);
 }
@@ -43,30 +39,28 @@
 
 .groupTitle {
   margin: 0;
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--ds-text-muted);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ds-text-secondary);
 }
 
 .cardsGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: var(--ds-space-4);
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 290px), 1fr));
+  gap: 12px;
 }
 
 .card {
   position: relative;
   display: flex;
-  flex-direction: column;
-  gap: var(--ds-space-4);
-  min-height: 148px;
-  padding: var(--ds-space-5);
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 14px;
+  min-height: 104px;
+  padding: 20px 34px 20px 18px;
   border: 1px solid var(--ds-border);
   border-radius: var(--ds-radius-lg);
   background: var(--ds-surface);
-  box-shadow: var(--ds-shadow-sm);
   text-decoration: none;
   transition:
     border-color 0.15s ease,
@@ -97,6 +91,10 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--ds-accent-soft);
   color: var(--ds-accent);
 }
 
@@ -109,6 +107,9 @@
 }
 
 .cardArrow {
+  position: absolute;
+  top: 20px;
+  right: 14px;
   flex-shrink: 0;
   color: var(--ds-text-muted);
   transition: color 0.15s ease, transform 0.15s ease;
@@ -123,12 +124,14 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
+  min-width: 0;
+  padding-top: 1px;
 }
 
 .cardTitle {
   margin: 0;
-  font-size: 16px;
-  font-weight: 600;
+  font-size: 15px;
+  font-weight: 500;
   color: var(--ds-text);
 }
 
@@ -140,6 +143,9 @@
 }
 
 .badgeSoon {
+  position: absolute;
+  top: 8px;
+  right: 8px;
   display: inline-flex;
   align-items: center;
   align-self: flex-start;
@@ -155,7 +161,7 @@
 
 @media (max-width: 640px) {
   .welcome {
-    padding: var(--ds-space-5);
+    padding: 8px 4px;
   }
 
   .cardsGrid {

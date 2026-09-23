@@ -1,5 +1,6 @@
 "use client";
 
+import { FilterPopover } from "@/components/ui/filter-popover";
 import { useState } from "react";
 import { queryString } from "@/lib/exams-v2/api";
 import {
@@ -550,7 +551,7 @@ export function ExaminerExams({
         без устройства.
       </p>
       <form
-        className={s.row}
+        className={s.toolbar}
         onSubmit={(e) => {
           e.preventDefault();
           setFilter(search.trim());
@@ -567,7 +568,9 @@ export function ExaminerExams({
             placeholder={examId ? "Студент или ID" : "Направление"}
           />
         </Field>
+        <Action type="submit">Найти</Action>
         {examId && (
+          <FilterPopover activeCount={Number(Boolean(status))} onReset={() => { setStatus(""); setPage(1); }}>
           <Field label="Состояние">
             <select
               className={s.select}
@@ -587,8 +590,8 @@ export function ExaminerExams({
               )}
             </select>
           </Field>
+          </FilterPopover>
         )}
-        <Action type="submit">Найти</Action>
       </form>
       <ErrorNotice error={resource.error} reload={resource.reload} />
       {resource.loading && <Loading />}

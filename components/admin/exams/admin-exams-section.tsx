@@ -1,5 +1,7 @@
 "use client";
 
+import { FilterPopover } from "@/components/ui/filter-popover";
+
 import { EditOnly } from "@/components/admin/admin-section-access";
 
 import { AdminExamDeleteDialog } from "@/components/admin/exams/admin-exam-delete-dialog";
@@ -468,15 +470,16 @@ export function AdminExamsSection() {
           </div>
         </header>
 
-        <div className={styles.filters}>
+        <div className={examStyles.listToolbar}>
           <input
             className={styles.searchInput}
+            aria-label="Поиск по ученику, ID или экзаменатору"
             placeholder="Поиск по ученику, ID или экзаменатору…"
             value={sessionSearch}
             onChange={(event) => setSessionSearch(event.target.value)}
           />
 
-          <div className={examStyles.filtersRow}>
+          <FilterPopover activeCount={Number(sessionSort !== "student_name")} onReset={() => setSessionSort("student_name")}>
             <div className={examStyles.filterGroup}>
               <label className={examStyles.filterLabel} htmlFor="session-sort">
                 Сортировка
@@ -494,7 +497,7 @@ export function AdminExamsSection() {
                 <option value="points">По баллам</option>
               </select>
             </div>
-          </div>
+          </FilterPopover>
         </div>
 
         {sessionsLoading ? (
@@ -617,15 +620,16 @@ export function AdminExamsSection() {
         </div>
       ) : null}
 
-      <div className={styles.filters}>
+      <div className={examStyles.listToolbar}>
         <input
           className={styles.searchInput}
+          aria-label="Поиск экзамена по названию"
           placeholder="Поиск по названию…"
           value={examSearch}
           onChange={(event) => setExamSearch(event.target.value)}
         />
 
-        <div className={examStyles.filtersRow}>
+        <FilterPopover activeCount={Number(examSort !== "date")} onReset={() => setExamSort("date")}>
           <div className={examStyles.filterGroup}>
             <label className={examStyles.filterLabel} htmlFor="exam-sort">
               Сортировка
@@ -642,7 +646,7 @@ export function AdminExamsSection() {
               <option value="name">По названию</option>
             </select>
           </div>
-        </div>
+        </FilterPopover>
       </div>
 
       {examsLoading ? (

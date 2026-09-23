@@ -21,25 +21,6 @@ export function AdminCreateTestMenu({
 }: AdminCreateTestMenuProps) {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
-  const closeTimer = useRef<number | null>(null);
-
-  const clearCloseTimer = () => {
-    if (closeTimer.current != null) {
-      window.clearTimeout(closeTimer.current);
-      closeTimer.current = null;
-    }
-  };
-
-  const openMenu = () => {
-    clearCloseTimer();
-    setOpen(true);
-  };
-
-  const scheduleClose = () => {
-    clearCloseTimer();
-    closeTimer.current = window.setTimeout(() => setOpen(false), 140);
-  };
-
   useEffect(() => {
     if (!open) return;
 
@@ -61,24 +42,15 @@ export function AdminCreateTestMenu({
     };
   }, [open]);
 
-  useEffect(
-    () => () => {
-      clearCloseTimer();
-    },
-    [],
-  );
-
   return (
     <div
       className={styles.createMenuWrap}
       ref={wrapRef}
-      onMouseEnter={openMenu}
-      onMouseLeave={scheduleClose}
     >
       <button
         type="button"
-        className={cn(styles.createPlusBtn, open && styles.createPlusBtnOpen)}
-        aria-label="Создать"
+        className={cn(styles.createPlusBtn, styles.createLabelBtn, open && styles.createPlusBtnOpen)}
+        aria-label="Создать тест"
         aria-expanded={open}
         aria-haspopup="menu"
         title="Создать"
@@ -88,6 +60,7 @@ export function AdminCreateTestMenu({
         }}
       >
         <Plus size={20} strokeWidth={2.4} aria-hidden />
+        <span>Создать тест</span>
       </button>
 
       {open ? (
@@ -95,8 +68,6 @@ export function AdminCreateTestMenu({
           className={styles.createMicroMenu}
           role="menu"
           aria-label="Создать"
-          onMouseEnter={openMenu}
-          onMouseLeave={scheduleClose}
         >
           <button
             type="button"

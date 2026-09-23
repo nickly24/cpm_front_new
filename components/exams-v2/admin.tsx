@@ -1,5 +1,6 @@
 "use client";
 
+import { FilterPopover } from "@/components/ui/filter-popover";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { canAccessSection } from "@/lib/auth/admin-access";
@@ -567,7 +568,7 @@ export function AdminExams({
           )}
       </div>
       <form
-        className={s.row}
+        className={s.toolbar}
         onSubmit={(e) => {
           e.preventDefault();
           const search = String(
@@ -586,98 +587,88 @@ export function AdminExams({
             defaultValue={query}
           />
         </Field>
-        <Field label="Направление">
-          <select
-            className={s.select}
-            value={directionId}
-            onChange={(e) =>
-              nav.navigate({ directionId: e.target.value || null, page: null })
-            }
-          >
-            <option value="">Все направления</option>
-            {directions.data.map((direction) => (
-              <option key={direction.id} value={direction.id}>
-                {direction.name}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field label="С даты (МСК)">
-          <input
-            className={s.input}
-            type="date"
-            value={dateFrom}
-            max={dateTo || undefined}
-            onChange={(e) =>
-              nav.navigate({ dateFrom: e.target.value || null, page: null })
-            }
-          />
-        </Field>
-        <Field label="По дату (МСК)">
-          <input
-            className={s.input}
-            type="date"
-            value={dateTo}
-            min={dateFrom || undefined}
-            onChange={(e) =>
-              nav.navigate({ dateTo: e.target.value || null, page: null })
-            }
-          />
-        </Field>
-        <Field label="Тип">
-          <select
-            className={s.select}
-            value={type}
-            onChange={(e) => nav.navigate({ type: e.target.value, page: null })}
-          >
-            <option value="all">Все</option>
-            <option value="classic">Классические</option>
-            <option value="outside_lms">Вне системы LMS</option>
-          </select>
-        </Field>
-        <Field label="Порядок">
-          <select
-            className={s.select}
-            value={sort}
-            onChange={(e) => nav.navigate({ sort: e.target.value, page: null })}
-          >
-            <option value="date_desc">Сначала новые</option>
-            <option value="date_asc">Сначала старые</option>
-            <option value="direction_asc">По направлению</option>
-            <option value="created_desc">По созданию</option>
-          </select>
-        </Field>
         <Action type="submit">Найти</Action>
-        <Action
-          onClick={() =>
-            nav.navigate({
-              search: null,
-              directionId: null,
-              dateFrom: null,
-              dateTo: null,
-              type: null,
-              sort: null,
-              page: null,
-            })
-          }
+        <FilterPopover
+          activeCount={[directionId, dateFrom, dateTo, type !== "all", sort !== "date_desc"].filter(Boolean).length}
+          onReset={() => nav.navigate({ directionId: null, dateFrom: null, dateTo: null, type: null, sort: null, page: null })}
         >
-          Сбросить фильтры
-        </Action>
+          <div className={s.filterGrid}>
+            <Field label="Направление">
+              <select
+                className={s.select}
+                value={directionId}
+                onChange={(e) =>
+                  nav.navigate({ directionId: e.target.value || null, page: null })
+                }
+              >
+                <option value="">Все направления</option>
+                {directions.data.map((direction) => (
+                  <option key={direction.id} value={direction.id}>
+                    {direction.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="С даты (МСК)">
+              <input
+                className={s.input}
+                type="date"
+                value={dateFrom}
+                max={dateTo || undefined}
+                onChange={(e) =>
+                  nav.navigate({ dateFrom: e.target.value || null, page: null })
+                }
+              />
+            </Field>
+            <Field label="По дату (МСК)">
+              <input
+                className={s.input}
+                type="date"
+                value={dateTo}
+                min={dateFrom || undefined}
+                onChange={(e) =>
+                  nav.navigate({ dateTo: e.target.value || null, page: null })
+                }
+              />
+            </Field>
+            <Field label="Тип">
+              <select
+                className={s.select}
+                value={type}
+                onChange={(e) => nav.navigate({ type: e.target.value, page: null })}
+              >
+                <option value="all">Все</option>
+                <option value="classic">Классические</option>
+                <option value="outside_lms">Вне системы LMS</option>
+              </select>
+            </Field>
+            <Field label="Порядок">
+              <select
+                className={s.select}
+                value={sort}
+                onChange={(e) => nav.navigate({ sort: e.target.value, page: null })}
+              >
+                <option value="date_desc">Сначала новые</option>
+                <option value="date_asc">Сначала старые</option>
+                <option value="direction_asc">По направлению</option>
+                <option value="created_desc">По созданию</option>
+              </select>
+            </Field>
+          </div>
+          <p className={s.muted}>
+            Период учитывает московскую дату начала классического экзамена или дату экзамена вне LMS. Экзамены без даты не входят в период.
+          </p>
+        </FilterPopover>
         <Action disabled={resource.loading} onClick={resource.reload}>
           Обновить
         </Action>
       </form>
-      <p className={s.muted}>
-        Для классических экзаменов фильтр использует московскую дату начала, для
-        экзаменов вне LMS — указанную дату. Экзамены без даты не входят в
-        выбранный период.
-      </p>
       <ErrorNotice error={directions.error} />
       <ErrorNotice error={resource.error} reload={resource.reload} />
       {resource.loading && <Loading />}
       <div className={s.grid}>
         {resource.data?.items.map((exam) => (
-          <article key={exam.id} className={s.panel}>
+          <article key={exam.id} className={`${s.panel} ${s.examCard}`}>
             <h2>{exam.directionName}</h2>
             <span className={s.badge}>{typeLabel(exam.examType)}</span>
             <p className={s.muted}>
@@ -686,6 +677,7 @@ export function AdminExams({
               )}{" "}
               · ID {exam.id}
             </p>
+            <div className={s.cardTags}>
             {exam.examType === "classic" && (
               <span className={s.badge}>
                 {exam.readiness === "ready" ? "Настроен" : "Требует настройки"}
@@ -695,7 +687,9 @@ export function AdminExams({
             {exam.directionId === null && (
               <span className={s.warning}>Нужно назначить направление</span>
             )}
+            </div>
             <Action
+              className={s.cardAction}
               onClick={() => nav.navigate({ examId: exam.id, tab: "overview" })}
             >
               Открыть экзамен
