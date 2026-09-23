@@ -20,7 +20,7 @@ export const ANSWER_SPLIT_DELIMITER_OPTIONS: Array<{
   { value: ";", label: "Точка с запятой ;" },
   { value: "/", label: "Слэш /" },
   { value: "|", label: "Палка |" },
-  { value: "newline", label: "Новая строка" },
+  { value: "newline", label: "Новая строка — разделить построчно" },
   { value: "custom", label: "Свой" },
 ];
 
@@ -31,7 +31,7 @@ function countOccurrences(text: string, delimiter: string): number {
     return 0;
   }
   if (delimiter === "\n") {
-    return (text.match(/\r?\n/g) || []).length;
+    return (text.match(/\r\n|\r|\n/g) || []).length;
   }
   let count = 0;
   let index = 0;
@@ -72,7 +72,7 @@ export function splitAnswerText(
 
   const parts =
     delimiter === "\n"
-      ? source.split(/\r?\n/)
+      ? source.split(/\r\n|\r|\n/)
       : source.split(delimiter);
 
   const cleaned: string[] = [];
@@ -92,19 +92,32 @@ export function splitAnswerText(
   return cleaned;
 }
 
-export function splitAnswerWithMode(
+export function resolveAnswerSplitDelimiter(
   text: string,
   mode: AnswerSplitDelimiter,
   customDelimiter = "",
-): { delimiter: string; parts: string[] } {
-  const delimiter =
+): string {
+  return (
     mode === "auto"
       ? detectDelimiter(text)
       : mode === "custom"
         ? customDelimiter
         : mode === "newline"
           ? "\n"
-          : mode;
+          : mode
+  );
+}
+
+export function answerSplitDelimiterLabel(delimiter: string): string {
+  return delimiter === "\n" ? "новая строка" : delimiter || "не задан";
+}
+
+export function splitAnswerWithMode(
+  text: string,
+  mode: AnswerSplitDelimiter,
+  customDelimiter = "",
+): { delimiter: string; parts: string[] } {
+  const delimiter = resolveAnswerSplitDelimiter(text, mode, customDelimiter);
   return {
     delimiter,
     parts: splitAnswerText(text, delimiter),

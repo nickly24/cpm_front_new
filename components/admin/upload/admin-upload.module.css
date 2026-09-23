@@ -736,6 +736,16 @@
   max-width: 72px;
 }
 
+.previewTextarea {
+  min-width: 180px;
+  min-height: 80px;
+  resize: vertical;
+  font-family: inherit;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .previewRowError {
   background: color-mix(in srgb, #c0392b 8%, transparent);
 }

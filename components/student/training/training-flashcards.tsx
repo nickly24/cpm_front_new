@@ -11,6 +11,7 @@ import {
 } from "@/lib/training/training-api";
 import type {
   SectionKind,
+  SectionStats,
   StudyFilter,
   TrainingCard,
   TrainingSectionNode,
@@ -20,7 +21,9 @@ import {
   shuffleCards,
 } from "@/lib/training/training-utils";
 import { cn } from "@/lib/cn";
-import { ArrowLeft, ArrowRight, Check, RotateCcw } from "lucide-react";
+import { ApiError } from "@/lib/api/client";
+import { filterStudyCards, trainingError } from "@/lib/training/exam-training";
+import { ArrowLeft, Check, RotateCcw } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 
@@ -36,7 +39,7 @@ interface TrainingFlashcardsProps {
   batchIndex: number;
   studyMode: StudyFilter;
   onBack: () => void;
-  onLearnedCountChange?: (learned: number, total: number) => void;
+  previewCards?: TrainingCard[];
 }
 
 export function TrainingFlashcards({
@@ -45,7 +48,7 @@ export function TrainingFlashcards({
   batchIndex,
   studyMode,
   onBack,
-  onLearnedCountChange,
+  previewCards,
 }: TrainingFlashcardsProps) {
   const { setImmersive } = useCabinetChrome();
   const sectionKind = section.kind as SectionKind;
@@ -59,61 +62,36 @@ export function TrainingFlashcards({
   const [swipeOffset, setSwipeOffset] = useState(0);
   const [loading, setLoading] = useState(true);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [fatal, setFatal] = useState(false);
+  const [summary, setSummary] = useState<SectionStats | null>(null);
+  const submitting = useRef(false);
 
   const touchStartX = useRef(0);
   const swipeOffsetRef = useRef(0);
   const mouseDragging = useRef(false);
   const mouseStartX = useRef(0);
   const wasDragging = useRef(false);
-  const onLearnedCountChangeRef = useRef(onLearnedCountChange);
-
-  useEffect(() => {
-    onLearnedCountChangeRef.current = onLearnedCountChange;
-  }, [onLearnedCountChange]);
-
   const setSwipe = (value: number) => {
     swipeOffsetRef.current = value;
     setSwipeOffset(value);
   };
 
   useEffect(() => {
+    if (previewCards) return;
     setImmersive(true);
     return () => setImmersive(false);
-  }, [setImmersive]);
-
-  useEffect(() => {
-    try {
-      setShowOnboarding(localStorage.getItem(FLASH_ONBOARDING_KEY) !== "true");
-    } catch {
-      setShowOnboarding(true);
-    }
-  }, []);
+  }, [setImmersive, previewCards]);
 
   const loadDeck = useCallback(async () => {
-    setLoading(true);
     try {
-      const cardsByMode = (source: TrainingCard[]) => {
-        if (studyMode === "all") return source;
-        if (studyMode === "learned") {
-          return source.filter((card) => card.status === "learned");
-        }
-        if (studyMode === "stale") {
-          return source.filter((card) => card.status === "answer_changed");
-        }
-        return source.filter((card) => card.status === "unlearned");
-      };
-
-      let nextLearned = 0;
-      let nextTotal = 0;
-      if (batchIndex === -1) {
+      let deck: TrainingCard[];
+      if (previewCards) {
+        deck = filterStudyCards(await Promise.resolve(previewCards), studyMode);
+      } else if (batchIndex === -1) {
         const view = await fetchSectionStudyView(studentId, sectionKind, sectionRefId);
-        const filtered = cardsByMode(view.cards);
-        const shuffled = shuffleCards(filtered);
-        setCards(shuffled);
-        nextLearned = filtered.filter((card) => card.status === "learned").length;
-        nextTotal = filtered.length;
-        setLearnedCount(nextLearned);
-        setTotalCount(nextTotal);
+        deck = filterStudyCards(view.cards, studyMode);
       } else {
         const data = await fetchSectionBatch(
           studentId,
@@ -122,26 +100,43 @@ export function TrainingFlashcards({
           batchIndex,
           studyMode,
         );
-        const shuffled = shuffleCards(data.cards);
-        setCards(shuffled);
-        const batchStats = data.batch.stats;
-        nextLearned = batchStats.learned;
-        nextTotal = batchStats.total;
-        setLearnedCount(nextLearned);
-        setTotalCount(nextTotal);
+        deck = data.cards;
       }
+      setError(null);
+      setNotice(null);
+      setFatal(false);
+      setSummary(null);
+      try { setShowOnboarding(!previewCards && localStorage.getItem(FLASH_ONBOARDING_KEY) !== "true"); }
+      catch { setShowOnboarding(!previewCards); }
+      setCards(shuffleCards(deck));
+      setLearnedCount(0);
+      setTotalCount(deck.length);
       setIsFlipped(false);
-      onLearnedCountChangeRef.current?.(nextLearned, nextTotal);
-    } catch {
-      setCards([]);
+    } catch (err) {
+      setError(trainingError(err));
+      setFatal(err instanceof ApiError && [403, 404, 422].includes(err.status ?? 0));
     } finally {
       setLoading(false);
     }
-  }, [batchIndex, sectionKind, sectionRefId, studentId, studyMode]);
+  }, [batchIndex, sectionKind, sectionRefId, studentId, studyMode, previewCards]);
+  const reloadDeck = () => { setLoading(true); void loadDeck(); };
 
   useEffect(() => {
+    // State is updated after the awaited deck read (including preview's resolved promise).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadDeck();
   }, [loadDeck]);
+
+  useEffect(() => {
+    if (sectionKind !== "exam" || previewCards || loading || cards.length || !learnedCount) return;
+    let cancelled = false;
+    fetchSectionStudyView(studentId, sectionKind, sectionRefId).then((view) => {
+      if (!cancelled) setSummary(view.stats);
+    }, (err) => {
+      if (!cancelled) { setError(trainingError(err)); setFatal(err instanceof ApiError && [403, 404, 422].includes(err.status ?? 0)); }
+    });
+    return () => { cancelled = true; };
+  }, [cards.length, learnedCount, loading, previewCards, sectionKind, sectionRefId, studentId]);
 
   const dismissOnboarding = () => {
     try {
@@ -193,15 +188,17 @@ export function TrainingFlashcards({
   };
 
   const handleRemember = async () => {
-    if (animationState !== "idle" || cards.length === 0) return;
+    if (animationState !== "idle" || cards.length === 0 || submitting.current) return;
     const card = cards[0];
     if (!card) return;
 
     setIsFlipped(false);
+    submitting.current = true;
+    setNotice(null);
 
     try {
       await animateTransition("right");
-      await markCardLearned({
+      if (!previewCards) await markCardLearned({
         student_id: studentId,
         section_kind: sectionKind,
         section_ref_id: sectionRefId,
@@ -211,7 +208,6 @@ export function TrainingFlashcards({
 
       const nextLearned = learnedCount + 1;
       setLearnedCount(nextLearned);
-      onLearnedCountChangeRef.current?.(nextLearned, totalCount);
 
       flushSync(() => {
         setAnimationState("idle");
@@ -222,8 +218,30 @@ export function TrainingFlashcards({
         return prev.slice(1);
       });
       setIsFlipped(false);
-    } catch {
+    } catch (err) {
+      if (err instanceof ApiError && err.code === "content_changed") {
+        const updated = err.details?.card as TrainingCard | undefined;
+        if (updated) setCards((prev) => prev.map((item) => item.card_ref === card.card_ref ? updated : item));
+        else {
+          try {
+            const fresh = await fetchSectionStudyView(studentId, sectionKind, sectionRefId);
+            const updatedCard = fresh.cards.find((item) => item.card_ref === card.card_ref);
+            if (updatedCard) setCards((prev) => prev.map((item) => item.card_ref === card.card_ref ? updatedCard : item));
+          } catch (reloadError) { setError(trainingError(reloadError)); setFatal(true); }
+        }
+        setNotice(trainingError(err));
+      } else if (err instanceof ApiError && err.code === "question_not_found") {
+        setCards((prev) => prev.filter((item) => item.card_ref !== card.card_ref));
+        setTotalCount((prev) => Math.max(0, prev - 1));
+        setNotice(trainingError(err));
+      } else if (err instanceof ApiError && [403, 404, 422].includes(err.status ?? 0)) {
+        setError(trainingError(err));
+        setFatal(true);
+      } else setNotice("Не удалось сохранить прогресс. Повторите попытку.");
       setAnimationState("idle");
+      setSwipe(0);
+    } finally {
+      submitting.current = false;
     }
   };
 
@@ -280,6 +298,9 @@ export function TrainingFlashcards({
     return <LoadingState label="Подготовка карточек…" variant="panel" />;
   }
 
+  if (error) return <div className={styles.flashShell}><p className={styles.alert} role="alert">{error}</p>
+    {!fatal ? <Button onClick={reloadDeck}>Повторить загрузку</Button> : null}<Button onClick={onBack}>{sectionKind === "exam" ? "К частям экзамена" : "Назад к разделу"}</Button></div>;
+
   if (cards.length === 0) {
     return (
       <div className={styles.flashShell}>
@@ -288,13 +309,16 @@ export function TrainingFlashcards({
           Назад к разделу
         </button>
         <div className={styles.completeBox}>
-          <h3>Нет карточек в этом режиме</h3>
+          <h3>{learnedCount > 0 ? "Занятие завершено" : "Нет карточек в этом режиме"}</h3>
           <p className={styles.cardMeta}>
-            Выберите другой батч или режим заучивания.
+            {learnedCount > 0 ? `Пройдено ${learnedCount} из ${totalCount}. ${previewCards ? "Прогресс не сохранялся." : "Прогресс сохранён."}` : "Выберите другой набор или режим заучивания."}
           </p>
+          {notice ? <p role="status">{notice}</p> : null}
+          {summary ? <p>Прогресс области: {summary.learned} из {summary.total} выучено · {summary.total ? Math.round(summary.learned * 100 / summary.total) : 0}%</p> : null}
           <Button type="button" onClick={onBack}>
             К разделу
           </Button>
+          {learnedCount > 0 ? <Button onClick={reloadDeck}>Повторить выбранную область</Button> : null}
         </div>
       </div>
     );
@@ -324,7 +348,7 @@ export function TrainingFlashcards({
         <div className={styles.flashProgressRow}>
           <div className={styles.flashProgressLabel}>
             <span>
-              Выучено <strong>{learnedCount}</strong> из {total}
+              Пройдено <strong>{learnedCount}</strong> из {total}
             </span>
             <span>{progressPercent}%</span>
           </div>
@@ -336,6 +360,9 @@ export function TrainingFlashcards({
           </div>
         </div>
       </div>
+
+      {previewCards ? <p className={styles.examNotice}>Предпросмотр: прогресс не сохраняется</p> : null}
+      {notice ? <p className={styles.alert} role="status">{notice}</p> : null}
 
       {showOnboarding ? (
         <div className={styles.onboardingOverlay}>
@@ -354,6 +381,7 @@ export function TrainingFlashcards({
       ) : null}
 
       <p className={styles.flashHint}>
+        {currentCard.part_code ? `Часть ${currentCard.part_code} · ` : ""}
         {isFlipped ? "Ответ" : "Нажмите на карточку, чтобы перевернуть"}
       </p>
 

@@ -55,7 +55,7 @@ export function TrainingDirectionsView({
           </p>
           <div className={styles.progressRow}>
             <span className={styles.progressLabel}>
-              {getProgressLabel(direction.progress_percent)}
+              {getProgressLabel(direction.progress_percent, direction.total_cards > 0 && direction.learned_cards === direction.total_cards)}
             </span>
             <span className={styles.progressValue}>
               {direction.progress_percent}%

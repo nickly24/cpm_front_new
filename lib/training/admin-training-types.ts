@@ -1,9 +1,12 @@
-export type AdminTrainingSectionKind = "manual" | "test";
+export type AdminTrainingSectionKind = "manual" | "test" | "exam";
 
 export interface AdminTrainingSectionRow {
   kind: AdminTrainingSectionKind;
   id?: number;
   test_id?: string;
+  exam_id?: number;
+  training_enabled?: boolean;
+  parts_count?: number;
   name: string;
   direction_id: number;
   cards_count: number;
@@ -55,6 +58,7 @@ export interface TrainingMutationResponse {
 }
 
 export function adminSectionKey(section: AdminTrainingSectionRow): string {
+  if (section.kind === "exam") return `exam:${section.exam_id ?? section.id}`;
   if (section.kind === "test") {
     return `test:${section.test_id ?? section.name}`;
   }

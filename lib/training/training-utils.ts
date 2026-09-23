@@ -8,8 +8,8 @@ export function calcProgressPercent(
   return Math.round((learned / total) * 100);
 }
 
-export function getProgressLabel(percent: number): string {
-  if (percent >= 100) return "Изучено";
+export function getProgressLabel(percent: number, fullyLearned = percent >= 100): string {
+  if (fullyLearned) return "Изучено";
   if (percent >= 75) return "Почти готово";
   if (percent >= 40) return "В процессе";
   if (percent > 0) return "Начато";

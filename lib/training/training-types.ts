@@ -1,6 +1,6 @@
 export type CardStatus = "unlearned" | "learned" | "answer_changed";
 
-export type SectionKind = "manual" | "test";
+export type SectionKind = "manual" | "test" | "exam";
 
 export type StudyFilter = "all" | "unlearned" | "learned" | "stale";
 
@@ -16,6 +16,8 @@ export interface TrainingCard {
   card_ref: string;
   card_id?: number;
   question_id?: number;
+  part_id?: number;
+  part_code?: string;
   question: string;
   answer: string;
   sort_order?: number;
@@ -37,6 +39,7 @@ export interface StudySettings {
   batch_size: number;
   last_batch_index: number | null;
   study_mode: StudyFilter;
+  last_part_id?: number | null;
 }
 
 export interface TrainingSectionNode {
@@ -44,6 +47,12 @@ export interface TrainingSectionNode {
   refId: string;
   name: string;
   sourceTestTitle?: string;
+  exam_id?: number;
+  part_id?: number;
+  part_code?: string;
+  parts_count?: number;
+  start_at?: string | null;
+  end_at?: string | null;
   stats: SectionStats;
   total_cards: number;
   learned_cards: number;
@@ -110,6 +119,9 @@ export interface SectionStudyViewResponse {
   stats: SectionStats;
   batches: StudyBatch[];
   settings: StudySettings;
+  exam?: import("@/lib/exams-v2/types").ExamSummary;
+  parts?: TrainingSectionNode[];
+  part_id?: number | null;
 }
 
 export interface SectionBatchResponse {
@@ -143,6 +155,7 @@ export interface StudySettingsPayload {
   batch_size?: number;
   last_batch_index?: number | null;
   study_mode?: StudyFilter;
+  last_part_id?: number | null;
 }
 
 export interface StudySettingsResponse {

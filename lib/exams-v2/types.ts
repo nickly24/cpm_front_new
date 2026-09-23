@@ -56,6 +56,7 @@ export interface ExamSummary {
   endAt: string | null;
   readiness: "ready" | "incomplete" | "not_applicable";
   version: number;
+  trainingEnabled?: boolean;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -345,6 +346,7 @@ export interface StudentResultDetail {
   directionName: string;
   current: AttemptResult | OutsideStudentResult;
   history: AttemptResult[];
+  trainingEnabled?: boolean;
 }
 export type ImportKind = "questions" | "assignments" | "outside";
 export interface ImportRow {

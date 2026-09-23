@@ -89,7 +89,7 @@ export async function fetchTrainingSectionsByDirection(
     page?: number;
     limit?: number;
     search?: string;
-    kind?: "all" | "manual" | "test";
+    kind?: "all" | SectionKind;
     progress?: "all" | "in_progress" | "learned";
   },
 ): Promise<TrainingSectionsResponse> {

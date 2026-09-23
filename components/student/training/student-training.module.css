@@ -1577,7 +1577,7 @@
 .cardRowQuestion {
   font-size: 13px;
   font-weight: 600;
-  white-space: normal;
+  white-space: pre-wrap;
   overflow-wrap: anywhere;
   word-break: break-word;
 }
@@ -1592,7 +1592,7 @@
   font-size: 12px;
   line-height: 1.35;
   color: var(--ds-text-secondary);
-  white-space: normal;
+  white-space: pre-wrap;
   overflow-wrap: anywhere;
   word-break: break-word;
 }
@@ -1815,11 +1815,10 @@
 }
 
 .flashcardFaceText {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  flex: 0 0 auto;
+  margin: auto 0;
   font-size: clamp(20px, 4vw, 26px);
   font-weight: 700;
   line-height: 1.35;
@@ -2149,3 +2148,51 @@
     border-color: color-mix(in srgb, var(--ds-warning, #f97316) 32%, var(--ds-border));
   }
 }
+
+/* The same multiline content is used by manual, test and exam cards. */
+.cardRowQuestion,
+.cardRowAnswer {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.examActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-block: 12px;
+}
+.examActions label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 100%;
+  color: var(--ds-text-secondary);
+}
+.examActions select {
+  max-width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--ds-border);
+  border-radius: 10px;
+  background: var(--ds-surface);
+  color: var(--ds-text-primary);
+}
+.examParts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+  gap: 16px;
+}
+.examPanel {
+  min-width: 0;
+  padding: 20px;
+  border: 1px solid var(--ds-border);
+  border-radius: 16px;
+  background: var(--ds-surface);
+}
+.examPanel h2 { margin: 0 0 12px; font-size: 20px; }
+.examPanel .cardMeta { white-space: normal; margin-left: 0; }
+.examQuestion { padding-block: 16px; border-bottom: 1px solid var(--ds-border); }
+.examQuestion .cardRowQuestion { display: block; font-size: 16px; }
+.examQuestion .cardRowAnswer { display: block; font-size: 15px; line-height: 1.6; }
+.examQuestion summary { cursor: pointer; margin-bottom: 8px; }
+.examNotice { padding: 12px; border-radius: 10px; background: var(--ds-surface-hover); }

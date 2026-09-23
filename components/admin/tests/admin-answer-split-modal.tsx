@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button";
 import { DismissibleOverlay } from "@/components/ui/dismissible-overlay";
 import {
   ANSWER_SPLIT_DELIMITER_OPTIONS,
-  detectDelimiter,
+  answerSplitDelimiterLabel,
+  resolveAnswerSplitDelimiter,
   splitAnswerWithMode,
   type AnswerSplitDelimiter,
 } from "@/lib/admin/admin-answer-split";
@@ -43,7 +44,6 @@ export function AdminAnswerSplitModal({
   const [parts, setParts] = useState<string[]>(() =>
     splitAnswerWithMode(sourceText, "auto").parts,
   );
-  const [detected, setDetected] = useState(() => detectDelimiter(sourceText));
 
   useEffect(() => {
     document.body.style.overflow = "hidden";
@@ -52,22 +52,16 @@ export function AdminAnswerSplitModal({
     };
   }, []);
 
-  const effectiveDelimiter = useMemo(() => {
-    if (mode === "auto") {
-      return detected;
-    }
-    if (mode === "custom") {
-      return customDelimiter;
-    }
-    return mode;
-  }, [mode, customDelimiter, detected]);
+  const effectiveDelimiter = useMemo(
+    () => resolveAnswerSplitDelimiter(sourceText, mode, customDelimiter),
+    [sourceText, mode, customDelimiter],
+  );
 
   const rerunSplit = (
     nextMode: AnswerSplitDelimiter = mode,
     nextCustom = customDelimiter,
   ) => {
     const result = splitAnswerWithMode(sourceText, nextMode, nextCustom);
-    setDetected(nextMode === "auto" ? result.delimiter : detectDelimiter(sourceText));
     setParts(
       result.parts.length > 0
         ? result.parts
@@ -101,7 +95,8 @@ export function AdminAnswerSplitModal({
       >
         <h2 className={trainingStyles.modalTitle}>Разобрать ответ</h2>
         <p className={trainingStyles.modalHint}>
-          Исходная строка будет заменена кусками. Тип вопроса можно выбрать ниже.
+          После применения исходный ответ будет заменён отдельными вариантами.
+          Для пунктов на отдельных строках выберите «Новая строка — разделить построчно».
         </p>
 
         <label className={testStyles.field}>
@@ -179,9 +174,7 @@ export function AdminAnswerSplitModal({
           </Button>
           <span className={trainingStyles.modalHint} style={{ margin: 0 }}>
             Сейчас:{" "}
-            {effectiveDelimiter === "\n"
-              ? "новая строка"
-              : effectiveDelimiter || "не задан"}
+            {answerSplitDelimiterLabel(effectiveDelimiter)}
           </span>
         </div>
 

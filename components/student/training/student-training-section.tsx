@@ -2,6 +2,7 @@
 
 import styles from "@/components/student/training/student-training.module.css";
 import { TrainingFlashcards } from "@/components/student/training/training-flashcards";
+import { StudentExamTraining } from "./exam-training";
 import { TrainingSectionDetail } from "@/components/student/training/training-section-detail";
 import { TrainingSectionsListView } from "@/components/student/training/training-topics-view";
 import { SectionHeroBanner } from "@/components/student/section-hero-banner";
@@ -83,6 +84,16 @@ function sectionIdentityEqual(
 }
 
 export function StudentTrainingSection({
+  role,
+  pathSegments,
+}: StudentTrainingSectionProps) {
+  if (pathSegments[0] === "exam" && /^\d+$/.test(pathSegments[1] ?? "")) {
+    return <StudentExamTraining segments={pathSegments} />;
+  }
+  return <LegacyStudentTrainingSection role={role} pathSegments={pathSegments} />;
+}
+
+function LegacyStudentTrainingSection({
   role,
   pathSegments,
 }: StudentTrainingSectionProps) {
@@ -287,20 +298,12 @@ export function StudentTrainingSection({
   if (view === "flashcards" && selectedSection && selectedDirection && user?.id) {
     return (
       <TrainingFlashcards
-        key={sectionDetailKey}
+        key={`${sectionDetailKey}:${flashBatch}:${flashStudyMode}`}
         section={selectedSection}
         studentId={user.id}
         batchIndex={flashBatch}
         studyMode={flashStudyMode}
         onBack={() => navigateToSection(selectedDirection, selectedSection)}
-        onLearnedCountChange={(learned, total) => {
-          handleSectionProgress({
-            ...selectedSection,
-            learned_cards: learned,
-            total_cards: total,
-            progress_percent: calcProgressPercent(learned, total),
-          });
-        }}
       />
     );
   }

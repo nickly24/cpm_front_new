@@ -29,6 +29,7 @@ import {
 } from "./shared";
 import { ClassicScoring, ClassicSettings } from "./admin-settings";
 import { ClassicBank } from "./admin-bank";
+import { ExamTrainingToolbar } from "./training";
 import {
   ClassicAssignments,
   ClassicCommissions,
@@ -437,6 +438,7 @@ function Workspace({
               </Action>
             ))}
           </nav>
+          {exam.examType === "classic" ? <ExamTrainingToolbar key={exam.version} examId={examId} canEdit={editable} onChanged={overview.reload} openBank={() => navigate({ tab: "questions", attemptId: null })} /> : null}
           {attemptId && exam.examType === "classic" ? (
             <AdminAttemptDetail
               key={attemptId}
@@ -689,6 +691,7 @@ export function AdminExams({
                 {exam.readiness === "ready" ? "Настроен" : "Требует настройки"}
               </span>
             )}
+            {exam.examType === "classic" ? <span className={s.badge}>{exam.trainingEnabled ? "Подготовка открыта" : "Подготовка скрыта"}</span> : null}
             {exam.directionId === null && (
               <span className={s.warning}>Нужно назначить направление</span>
             )}

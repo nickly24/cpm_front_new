@@ -27,9 +27,49 @@ export function trainingDirectionPath(
 export function trainingSectionPath(
   role: UserRole,
   direction: Pick<TrainingDirection, "name">,
-  section: Pick<TrainingSectionNode, "name">,
+  section: Pick<TrainingSectionNode, "name"> & Partial<Pick<TrainingSectionNode, "kind" | "refId">>,
 ): string {
+  if (section.kind === "exam" && section.refId) {
+    const [examId, partId] = section.refId.split(":").map(Number);
+    return examTrainingPath(role, examId, partId ? { partId, area: true } : undefined);
+  }
   return `${trainingDirectionPath(role, direction)}/${encodeTrainingSegment(section.name)}`;
+}
+
+export interface ExamTrainingLocation {
+  examId: number;
+  partId: number | null;
+  area: boolean;
+  study: boolean;
+  batch: number;
+  mode: StudyFilter;
+}
+
+export function examTrainingPath(role: UserRole, examId: number, options: Partial<Omit<ExamTrainingLocation, "examId">> = {}): string {
+  let path = `${trainingBasePath(role)}/exam/${examId}`;
+  if (options.partId) path += `/part/${options.partId}`;
+  else if (options.area || options.study) path += "/all";
+  if (options.study) path += "/study";
+  const query = new URLSearchParams();
+  if (options.batch != null) query.set("batch", String(options.batch));
+  if (options.mode) query.set("mode", options.mode);
+  return `${path}${query.size ? `?${query}` : ""}`;
+}
+
+export function parseExamTrainingPath(segments: string[], params: Pick<URLSearchParams, "get">): ExamTrainingLocation | null {
+  if (segments[0] !== "exam" || !/^[1-9]\d*$/.test(segments[1] ?? "")) return null;
+  const examId = Number(segments[1]);
+  const part = segments[2] === "part";
+  const area = segments[2] === "all" || part;
+  const offset = part ? 4 : area ? 3 : 2;
+  if (part && !/^[1-9]\d*$/.test(segments[3] ?? "")) return null;
+  const study = segments[offset] === "study";
+  if (segments.length !== offset + (study ? 1 : 0) || (!area && study)) return null;
+  const rawBatch = Number(params.get("batch") ?? 0);
+  const rawMode = params.get("mode");
+  return { examId, partId: part ? Number(segments[3]) : null, area, study,
+    batch: Number.isInteger(rawBatch) && rawBatch >= -1 ? rawBatch : 0,
+    mode: ["all", "unlearned", "learned", "stale"].includes(rawMode ?? "") ? rawMode as StudyFilter : "unlearned" };
 }
 
 export function trainingStudyPath(

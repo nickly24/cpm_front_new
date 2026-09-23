@@ -189,8 +189,10 @@ export function AdminCardsUploadPreview({
               >
                 <td>{card.row}</td>
                 <td>
-                  <input
-                    className={styles.previewInput}
+                  <textarea
+                    className={`${styles.previewInput} ${styles.previewTextarea}`}
+                    aria-label={`Вопрос, строка ${card.row}`}
+                    rows={3}
                     value={card.question}
                     disabled={card.action === "skip"}
                     onChange={(event) =>
@@ -199,8 +201,10 @@ export function AdminCardsUploadPreview({
                   />
                 </td>
                 <td>
-                  <input
-                    className={styles.previewInput}
+                  <textarea
+                    className={`${styles.previewInput} ${styles.previewTextarea}`}
+                    aria-label={`Ответ, строка ${card.row}`}
+                    rows={3}
                     value={card.answer}
                     disabled={card.action === "skip"}
                     onChange={(event) =>

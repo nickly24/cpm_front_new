@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { DismissibleOverlay } from "@/components/ui/dismissible-overlay";
 import {
   ANSWER_SPLIT_DELIMITER_OPTIONS,
+  answerSplitDelimiterLabel,
   buildBulkSplitPreview,
   type AnswerSplitDelimiter,
   type BulkSplitCandidate,
@@ -28,13 +29,6 @@ function snippet(text: string, max = 80): string {
     return value || "Без текста";
   }
   return `${value.slice(0, max)}…`;
-}
-
-function delimiterLabel(value: string): string {
-  if (value === "\n") {
-    return "новая строка";
-  }
-  return value || "не задан";
 }
 
 export function AdminAnswerBulkSplitModal({
@@ -134,6 +128,7 @@ export function AdminAnswerBulkSplitModal({
         <p className={trainingStyles.modalHint}>
           Найдено кандидатов: {candidates.length}. Будет применено: {splitOkCount}.
           Настройки разделителя и типа — общие для всего списка.
+          Для пунктов на отдельных строках выберите «Новая строка — разделить построчно».
         </p>
 
         <div className={testStyles.fieldRow}>
@@ -200,7 +195,7 @@ export function AdminAnswerBulkSplitModal({
             Угадать разделитель
           </Button>
           <span className={trainingStyles.modalHint} style={{ margin: 0 }}>
-            Пример разделителя: {delimiterLabel(sampleDelimiter)}
+            Пример разделителя: {answerSplitDelimiterLabel(sampleDelimiter)}
           </span>
         </div>
 

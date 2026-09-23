@@ -10,6 +10,7 @@ import type {
 } from "@/lib/training/training-types";
 import { calcProgressPercent, getProgressLabel } from "@/lib/training/training-utils";
 import { cn } from "@/lib/cn";
+import { examPeriod } from "@/lib/training/exam-training";
 import { ClipboardList, FileText, Search, SlidersHorizontal } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
@@ -217,6 +218,7 @@ export function TrainingSectionsListView({
                     ["all", "Все"],
                     ["manual", "Только карточки"],
                     ["test", "Только тесты"],
+                    ["exam", "Из экзаменов"],
                   ] as const).map(([value, label]) => (
                     <button
                       key={value}
@@ -298,7 +300,7 @@ export function TrainingSectionsListView({
                   ) : (
                     <FileText size={12} aria-hidden />
                   )}
-                  {section.kind === "test" ? "Из теста" : "Свои карточки"}
+                  {section.kind === "exam" ? "Из экзамена" : section.kind === "test" ? "Из теста" : "Свои карточки"}
                 </span>
                 <span className={styles.sectionListItemPercent}>
                   {progressPercent}%
@@ -306,6 +308,7 @@ export function TrainingSectionsListView({
               </div>
 
               <h3 className={styles.sectionListItemTitle}>{section.name}</h3>
+              {section.kind === "exam" ? <p className={styles.sectionListItemSource}>Экзамен №{section.exam_id ?? section.refId} · {examPeriod(section.start_at, section.end_at)} · Частей: {section.parts_count ?? 0}</p> : null}
 
               {showSourceTest ? (
                 <p className={styles.sectionListItemSource}>
@@ -320,7 +323,7 @@ export function TrainingSectionsListView({
                 <span className={styles.sectionListItemDot} aria-hidden>
                   ·
                 </span>
-                <span>{getProgressLabel(progressPercent)}</span>
+                  <span>{getProgressLabel(progressPercent, section.total_cards > 0 && section.learned_cards === section.total_cards)}</span>
                 {staleCount > 0 ? (
                   <>
                     <span className={styles.sectionListItemDot} aria-hidden>

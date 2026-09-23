@@ -451,7 +451,7 @@ export function AdminTrainingSection() {
   }, [cards, searchTerm]);
 
   const handleDeleteSection = async (section: AdminTrainingSectionRow) => {
-    if (section.kind === "test" || !section.id) return;
+    if (section.kind !== "manual" || !section.id) return;
     const hint =
       section.cards_count > 0
         ? `Удалить раздел «${section.name}» и ${section.cards_count} карточек?`
@@ -522,6 +522,11 @@ export function AdminTrainingSection() {
     direction: AdminTrainingDirectionRow,
     section: AdminTrainingSectionRow,
   ) => {
+    if (section.kind === "exam") {
+      if (canAccessSection(user, "exams")) router.push(`${adminHref(user, "exams")}?examId=${section.exam_id ?? section.id}&tab=questions`);
+      else window.alert("Для просмотра банка требуется право просмотра раздела «Экзамены».");
+      return;
+    }
     if (section.kind === "test") {
       openTestSection(direction, section);
       return;
@@ -687,6 +692,7 @@ export function AdminTrainingSection() {
               <strong>Manual-разделы</strong> создаются здесь. Разделы{" "}
               <strong>из тестов</strong> ведут в раздел «Тесты» — там
               редактируются вопросы и видимость ответов.
+              Разделы из экзаменов ведут в исходный экзамен для управления банком и подготовкой.
             </span>
           </p>
 
@@ -712,6 +718,7 @@ export function AdminTrainingSection() {
               <div className={styles.sectionList}>
                 {filteredSections.map((section) => {
                   const isTestSection = section.kind === "test";
+                  const isExamSection = section.kind === "exam";
 
                   return (
                     <div
@@ -737,27 +744,28 @@ export function AdminTrainingSection() {
                           ) : (
                             <FileText size={12} aria-hidden />
                           )}
-                          {isTestSection ? "Из теста" : "Manual"}
+                          {isExamSection ? "Из экзамена" : isTestSection ? "Из теста" : "Manual"}
                         </span>
                         <h3 className={styles.sectionCardTitle}>
                           {section.name}
                         </h3>
                         <p className={styles.sectionCardMeta}>
                           {section.cards_count} карточек
+                          {isExamSection ? ` · ${section.training_enabled ? "подготовка открыта" : "подготовка скрыта"}` : ""}
                           {isTestSection && section.visible === false
                             ? " · ответы скрыты у студентов"
                             : ""}
                         </p>
                       </button>
                       <div className={styles.rowActions}>
-                        {isTestSection ? (
+                        {isTestSection || isExamSection ? (
                           <button
                             type="button"
                             className={styles.iconBtn}
-                            aria-label="Открыть тест"
+                            aria-label={isExamSection ? "Открыть экзамен" : "Открыть тест"}
                             onClick={() => {
                               if (!selectedDirection) return;
-                              openTestSection(selectedDirection, section);
+                              openSection(selectedDirection, section);
                             }}
                           >
                             <ExternalLink size={16} />

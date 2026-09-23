@@ -1,6 +1,8 @@
 "use client";
 
 import { queryString } from "@/lib/exams-v2/api";
+import Link from "next/link";
+import { examTrainingPath } from "@/lib/training/training-routes";
 import { useExamNavigation, useExamResource } from "@/lib/exams-v2/hooks";
 import type {
   AttemptResult,
@@ -84,6 +86,7 @@ function Detail({
           <div>
             <h1>{data.directionName}</h1>
             <p className={s.subtitle}>{typeLabel(data.examType)}</p>
+            {data.examType === "classic" && data.trainingEnabled ? <Link className={s.button} href={examTrainingPath("student", examId)}>Подготовка по карточкам</Link> : null}
           </div>
           {current && (
             <>
