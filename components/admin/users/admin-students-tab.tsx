@@ -5,11 +5,12 @@ import { EditOnly, ReadOnlyControl } from "@/components/admin/admin-section-acce
 import { AdminListPaginationBar } from "@/components/admin/tests/admin-list-pagination";
 import styles from "@/components/admin/tests/admin-tests.module.css";
 import userStyles from "@/components/admin/users/admin-users.module.css";
+import { AdminStudentDeletionManager } from "@/components/admin/users/admin-student-deletion";
+import type { DeletionStudent } from "@/lib/admin/student-deletion";
 import { AdminStudentPanel } from "@/components/admin/users/admin-student-panel";
 import { Button } from "@/components/ui/button";
 import { LoadingState } from "@/components/ui/loading-state";
 import {
-  deleteAdminUser,
   editAdminStudent,
   fetchAdminGroupsList,
   fetchAdminStudents,
@@ -41,6 +42,8 @@ export function AdminStudentsTab() {
   const [page, setPage] = useState(1);
   const [panelMode, setPanelMode] = useState<"add" | "edit" | null>(null);
   const [editing, setEditing] = useState<AdminStudent | null>(null);
+  const [deleting, setDeleting] = useState<DeletionStudent | null>(null);
+  const canDelete = canAccessSection(user, "users", "edit");
 
   const classOptions = useMemo(
     () => Array.from(new Set(students.map((student) => student.class))).sort((a, b) => a - b),
@@ -91,19 +94,20 @@ export function AdminStudentsTab() {
     });
   }, [students, debouncedSearch, groupFilter, classFilter]);
 
-  const pagination = toClientPagination(page, PAGE_SIZE, filtered.length);
-  const pageItems = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  // Preserve the chosen page and filters; clamp only when the last page disappears.
+  const visiblePage = Math.min(page, Math.max(1, Math.ceil(filtered.length / PAGE_SIZE)));
+  const pagination = toClientPagination(visiblePage, PAGE_SIZE, filtered.length);
+  const pageItems = filtered.slice((visiblePage - 1) * PAGE_SIZE, visiblePage * PAGE_SIZE);
 
-  const handleDelete = async (student: AdminStudent) => {
-    if (!window.confirm(`Удалить ученика «${student.full_name}»?`)) {
-      return;
-    }
-    try {
-      await deleteAdminUser("student", student.id);
-      setStudents((prev) => prev.filter((s) => s.id !== student.id));
-    } catch (err) {
-      window.alert(err instanceof Error ? err.message : "Ошибка удаления");
-    }
+  const handleDeletionCompleted = useCallback((studentId: number) => {
+    setStudents((previous) => previous.filter((student) => student.id !== studentId));
+    void load();
+  }, [load]);
+
+  const handleDelete = (student: AdminStudent) => {
+    if (!canDelete) return;
+    setDeleting({ id: student.id, name: student.full_name,
+      group_name: groups.find((group) => group.group_id === student.group_id)?.group_name ?? null });
   };
 
   const handleGroupChange = async (student: AdminStudent, value: string) => {
@@ -206,6 +210,14 @@ export function AdminStudentsTab() {
         </div>
       </div>
 
+      {canDelete && user ? <AdminStudentDeletionManager
+        key={`${user.role}:${user.id}`}
+        owner={`${user.role}:${user.id}`}
+        selected={deleting}
+        onSelect={setDeleting}
+        onCompleted={handleDeletionCompleted}
+      /> : null}
+
       {error ? <div className={styles.stateBox}>{error}</div> : null}
 
       {loading ? (
@@ -291,13 +303,13 @@ export function AdminStudentsTab() {
                         >
                           Изменить
                         </button></EditOnly>
-                        <EditOnly><button
+                        {canDelete ? <button
                           type="button"
                           className={`${styles.actionBtn} ${styles.actionBtnDanger}`}
                           onClick={() => handleDelete(student)}
                         >
                           Удалить
-                        </button></EditOnly>
+                        </button> : null}
                       </div>
                     </td>
                   </tr>
