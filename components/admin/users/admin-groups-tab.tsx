@@ -221,7 +221,7 @@ export function AdminGroupsTab() {
         />
       ) : null}
 
-      <div className={styles.filters}>
+      <div className={styles.listToolbar}>
         <div className={userStyles.statsRow}>
           <span className={userStyles.statPill}>
             Групп: <strong>{total}</strong>
@@ -237,12 +237,13 @@ export function AdminGroupsTab() {
           type="search"
           className={styles.searchInput}
           placeholder="Поиск группы по названию или ID…"
+          aria-label="Поиск групп"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
-        <EditOnly><Button type="button" onClick={() => setGroupForm({ mode: "create" })}>
+        <div className={styles.toolbarActions}><EditOnly><Button type="button" onClick={() => setGroupForm({ mode: "create" })}>
           + Создать группу
-        </Button></EditOnly>
+        </Button></EditOnly></div>
       </div>
 
       {error ? <div className={styles.stateBox}>{error}</div> : null}

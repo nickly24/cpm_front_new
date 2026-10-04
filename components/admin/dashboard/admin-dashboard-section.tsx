@@ -11,7 +11,7 @@ import { getSectionHref } from "@/lib/navigation";
 import { ArrowUpRight, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 
-const CARD_ICON_SIZE = 28;
+const CARD_ICON_SIZE = 22;
 
 function SectionCardIcon({
   icon: Icon,
@@ -54,12 +54,12 @@ export function AdminDashboardSection() {
   return (
     <div className={styles.page}>
       <header className={styles.welcome}>
+        <span className={styles.eyebrow}>Панель управления</span>
         <h1 className={styles.welcomeTitle}>
           {getGreeting()}, {name}
         </h1>
         <p className={styles.welcomeText}>
-          Панель управления CPM. Выберите раздел — готовые открываются сразу,
-          остальные появятся по мере разработки.
+          Занятия, учебные материалы и работа с учениками — всё под рукой.
         </p>
       </header>
 
@@ -110,7 +110,6 @@ export function AdminDashboardSection() {
                   <article
                     key={item.id}
                     className={`${styles.card} ${styles.cardSoon}`}
-                    aria-disabled
                   >
                     <div className={styles.cardTop}>
                       <span className={styles.cardIcon}>

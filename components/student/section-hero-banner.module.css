@@ -1,10 +1,10 @@
 .hero {
   position: relative;
   overflow: hidden;
-  min-height: 168px;
-  padding: 28px 32px;
+  min-height: 150px;
+  padding: 24px 28px;
   border-radius: var(--ds-radius-lg);
-  box-shadow: var(--ds-shadow-md);
+  box-shadow: var(--ds-shadow-sm);
 }
 
 .heroBg {
@@ -14,7 +14,7 @@
   background-size: cover;
   background-position: center center;
   background-repeat: no-repeat;
-  transform: scale(1.14);
+  transform: scale(1.03);
   transform-origin: center center;
 }
 
@@ -26,7 +26,7 @@
 .heroOverlay {
   position: absolute;
   inset: 0;
-  background: rgba(0, 0, 0, 0.04);
+  background: linear-gradient(90deg, rgba(32, 40, 70, 0.2), transparent 75%);
 }
 
 .heroContent {
@@ -101,17 +101,18 @@
 
 .heroTitle {
   margin: 0 0 8px;
-  font-size: clamp(26px, 2.5vw, 36px);
-  font-weight: 800;
-  line-height: 1.15;
+  font-size: clamp(25px, 2.5vw, 32px);
+  font-weight: 750;
+  letter-spacing: -0.025em;
+  line-height: 1.2;
   color: #ffffff;
 }
 
 .heroSubtitle {
   margin: 0;
   font-size: 14px;
-  font-weight: 600;
-  line-height: 1.5;
+  font-weight: 500;
+  line-height: 1.55;
   color: rgba(255, 255, 255, 0.95);
 }
 
@@ -193,22 +194,21 @@
 
 @media (max-width: 640px) {
   .hero {
-    min-height: clamp(132px, 33vw, 176px);
+    min-height: 132px;
     padding: 20px 18px;
   }
 
   .heroOverlay {
     background: linear-gradient(
       90deg,
-      rgba(14, 10, 8, 0.78) 0%,
-      rgba(14, 10, 8, 0.52) 46%,
-      rgba(14, 10, 8, 0.14) 72%,
-      rgba(14, 10, 8, 0.04) 100%
+      rgba(32, 40, 70, 0.65) 0%,
+      rgba(32, 40, 70, 0.42) 56%,
+      rgba(32, 40, 70, 0.1) 100%
     );
   }
 
   .heroContent {
-    max-width: min(100%, 240px);
+    max-width: 85%;
   }
 
   .heroTitle {
@@ -243,6 +243,6 @@
 
 @media (max-width: 400px) {
   .heroContent {
-    max-width: min(100%, 210px);
+    max-width: 92%;
   }
 }

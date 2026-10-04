@@ -15,6 +15,7 @@ import {
   getZapRequestStatusTone,
 } from "@/lib/zaps/zap-date-utils";
 import { cn } from "@/lib/cn";
+import { ArrowUpRight, Plus } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
 type ZapsView = "list" | "create" | "detail";
@@ -122,8 +123,12 @@ export function StudentZapsSection() {
       />
 
       <div className={styles.headerActions}>
+        <div className={styles.listHeading}>
+          <h2>Мои запросы</h2>
+          {!loading && !error ? <span>{zaps.length}</span> : null}
+        </div>
         <Button type="button" onClick={() => setView("create")}>
-          + Создать запрос
+          <Plus size={17} aria-hidden /> Создать запрос
         </Button>
       </div>
 
@@ -174,6 +179,7 @@ export function StudentZapsSection() {
                     <strong>Ответ:</strong> {zap.answer}
                   </p>
                 ) : null}
+                <span className={styles.zapCardLink}>Открыть запрос <ArrowUpRight size={15} aria-hidden /></span>
               </button>
             );
           })}

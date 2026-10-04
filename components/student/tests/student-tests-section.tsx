@@ -385,8 +385,8 @@ export function StudentTestsSection() {
   const isOverview = viewMode === "overview";
   const heroTitle = isOverview ? "Доступные тесты" : "Все тесты";
   const heroSubtitle = isOverview
-    ? "Тесты, которые можно начать или продолжить прямо сейчас. Полный каталог — по кнопке ниже."
-    : "Выберите направление и тест. Список загружается по 5 штук на страницу.";
+    ? "Выберите тест, чтобы начать или продолжить выполнение."
+    : "Найдите нужный тест по направлению, статусу или дате.";
 
   if (viewMode === "catalog" && loadingDirections) {
     return (

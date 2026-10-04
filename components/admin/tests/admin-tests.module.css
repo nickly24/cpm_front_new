@@ -3,13 +3,22 @@
   flex-direction: column;
   gap: var(--ds-space-5);
   width: 100%;
+  min-width: 0;
 }
 
 .pageTitle {
   margin: 0;
   font-size: clamp(22px, 2vw, 28px);
   font-weight: 700;
+  letter-spacing: -0.035em;
   color: var(--ds-text);
+}
+
+.pageDescription {
+  margin: 6px 0 0;
+  color: var(--ds-text-secondary);
+  font-size: 14px;
+  line-height: 1.55;
 }
 
 .pageHeader {
@@ -18,11 +27,7 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--ds-space-4);
-  padding: var(--ds-space-5) var(--ds-space-6);
-  border: 1px solid var(--ds-border);
-  border-radius: var(--ds-radius-lg);
-  background: var(--ds-surface);
-  box-shadow: var(--ds-shadow-sm);
+  padding: 4px 0 2px;
 }
 
 .headerActions,
@@ -41,15 +46,16 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--ds-space-2);
-  padding: var(--ds-space-4) var(--ds-space-5);
-  border: 1px solid var(--ds-border);
-  border-radius: var(--ds-radius-lg);
-  background: var(--ds-surface);
+  padding: 4px;
+  width: fit-content;
+  max-width: 100%;
+  border-radius: var(--ds-radius-md);
+  background: var(--ds-surface-muted);
 }
 
 .directionTab {
   padding: 10px 16px;
-  border: 1px solid var(--ds-border);
+  border: 1px solid transparent;
   border-radius: var(--ds-radius-md);
   background: var(--ds-surface-muted);
   color: var(--ds-text-secondary);
@@ -65,19 +71,81 @@
 }
 
 .directionTabActive {
-  border-color: var(--ds-accent);
-  background: var(--ds-accent-soft);
+  border-color: var(--ds-border);
+  background: var(--ds-surface);
   color: var(--ds-text);
+  box-shadow: var(--ds-shadow-sm);
 }
 
 .filters {
   display: flex;
-  flex-direction: column;
-  gap: var(--ds-space-4);
-  padding: var(--ds-space-5);
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ds-space-3);
+  padding: var(--ds-space-4);
   border: 1px solid var(--ds-border);
   border-radius: var(--ds-radius-lg);
   background: var(--ds-surface);
+}
+
+.listToolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ds-space-3);
+  padding: 12px;
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-lg);
+  background: var(--ds-surface);
+}
+
+.listToolbar > .searchInput {
+  flex: 1 1 240px;
+  width: auto;
+  max-width: 520px;
+}
+
+.toolbarActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ds-space-2);
+  margin-left: auto;
+}
+
+.resultsSummary {
+  margin: -6px 0 0;
+  color: var(--ds-text-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.resultsSummary strong {
+  color: var(--ds-text-secondary);
+  font-weight: 600;
+}
+
+.filterFieldsGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.filterSelect {
+  width: 100%;
+  min-height: 42px;
+  padding: 9px 12px;
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-md);
+  background: var(--ds-surface-muted);
+  color: var(--ds-text);
+  font: inherit;
+  font-size: 14px;
+}
+
+.filterSelect:focus-visible {
+  outline: 2px solid var(--ds-accent);
+  outline-offset: 2px;
 }
 
 /* —— List-only chrome (admin tests list redesign) —— */
@@ -161,7 +229,7 @@
   position: relative;
   flex: 1 1 280px;
   min-width: min(100%, 240px);
-  max-width: 420px;
+  max-width: 360px;
 }
 
 .comboTrigger {
@@ -169,7 +237,7 @@
   width: 100%;
   align-items: center;
   gap: 8px;
-  height: 36px;
+  height: 42px;
   padding: 0 10px 0 12px;
   border: 1px solid var(--ds-border);
   border-radius: var(--ds-radius-sm);
@@ -318,13 +386,13 @@
   display: flex;
   flex: 1 1 200px;
   min-width: min(100%, 180px);
-  max-width: 280px;
+  max-width: none;
   flex-direction: column;
 }
 
 .listSearchInput {
   width: 100%;
-  height: 36px;
+  height: 42px;
   padding: 0 12px;
   border: 1px solid var(--ds-border);
   border-radius: var(--ds-radius-sm);
@@ -353,7 +421,9 @@
 }
 
 .listDateInput {
-  height: 36px;
+  width: 100%;
+  min-width: 0;
+  height: 42px;
   padding: 0 10px;
   border: 1px solid var(--ds-border);
   border-radius: var(--ds-radius-sm);
@@ -458,6 +528,7 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
+  min-width: 0;
 }
 
 .fieldLabel {
@@ -467,6 +538,8 @@
 }
 
 .dateInput {
+  min-width: 0;
+  width: 100%;
   height: 40px;
   padding: 0 var(--ds-space-3);
   border: 1px solid var(--ds-border);
@@ -669,7 +742,7 @@
 
 .cardsGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
   gap: var(--ds-space-4);
 }
 
@@ -682,6 +755,7 @@
   border-radius: var(--ds-radius-lg);
   background: var(--ds-surface);
   box-shadow: var(--ds-shadow-sm);
+  min-width: 0;
 }
 
 .cardExternal {
@@ -701,21 +775,23 @@
   font-size: 17px;
   font-weight: 600;
   line-height: 1.3;
+  overflow-wrap: anywhere;
 }
 
 .listCardsGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: var(--ds-space-3);
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
+  gap: var(--ds-space-4);
 }
 
 .listCard {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 14px;
+  gap: 16px;
+  padding: 20px;
+  min-width: 0;
   border: 1px solid var(--ds-border);
-  border-radius: var(--ds-radius-md);
+  border-radius: var(--ds-radius-lg);
   background: var(--ds-surface);
   box-shadow: var(--ds-shadow-sm);
 }
@@ -739,6 +815,7 @@
   font-weight: 600;
   line-height: 1.35;
   color: var(--ds-text);
+  overflow-wrap: anywhere;
 }
 
 .listCardActions {
@@ -764,10 +841,10 @@
   display: inline-flex;
   align-items: center;
   align-self: flex-start;
-  gap: 0;
+  gap: 6px;
   max-width: 100%;
   height: 26px;
-  padding: 3px;
+  padding: 3px 9px 3px 3px;
   border-radius: var(--ds-radius-full);
   font-size: 11px;
   font-weight: 500;
@@ -799,10 +876,10 @@
 
 .statusBadgeLabel {
   display: grid;
-  grid-template-columns: 0fr;
+  grid-template-columns: 1fr;
   min-width: 0;
   overflow: hidden;
-  opacity: 0;
+  opacity: 1;
   transition:
     grid-template-columns 0.22s ease,
     opacity 0.18s ease;
@@ -1094,6 +1171,20 @@
 }
 
 .createPlusBtnOpen {
+  background: var(--ds-accent-hover);
+}
+
+.createLabelBtn {
+  width: auto;
+  height: 42px;
+  gap: 8px;
+  padding: 0 16px;
+  border-radius: var(--ds-radius-md);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.createPlusBtnOpen > svg {
   transform: rotate(45deg);
 }
 
@@ -1901,6 +1992,8 @@
 
 .tableWrap {
   overflow-x: auto;
+  min-width: 0;
+  scrollbar-width: thin;
   border: 1px solid var(--ds-border);
   border-radius: var(--ds-radius-lg);
   background: var(--ds-surface);
@@ -1914,7 +2007,7 @@
 
 .dataTable th,
 .dataTable td {
-  padding: 12px 14px;
+  padding: 14px 16px;
   text-align: left;
   border-bottom: 1px solid var(--ds-border);
 }
@@ -1924,6 +2017,7 @@
   font-weight: 600;
   color: var(--ds-text-muted);
   background: var(--ds-surface-muted);
+  white-space: nowrap;
 }
 
 .dataTable tbody tr:last-child td {
@@ -2164,4 +2258,42 @@
 .reviewItemAnswer p {
   margin: 0;
   font-size: 14px;
+}
+
+@media (max-width: 640px) {
+  .page {
+    gap: 16px;
+  }
+
+  .pageHeader,
+  .listPageHeader {
+    align-items: flex-start;
+  }
+
+  .toolbar,
+  .filters,
+  .listToolbar {
+    padding: 12px;
+  }
+
+  .comboRoot,
+  .searchField {
+    flex-basis: 100%;
+    max-width: none;
+  }
+
+  .listToolbar > .searchInput {
+    flex-basis: 100%;
+    width: 100%;
+    max-width: none;
+  }
+
+  .listCard,
+  .card {
+    padding: 16px;
+  }
+
+  .filterFieldsGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }

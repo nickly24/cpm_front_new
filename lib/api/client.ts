@@ -25,7 +25,7 @@ export function responseError(data: unknown, status: number): ApiError {
     : typeof body.error === "string" ? body.error : "Ошибка запроса";
   const retry = Number(details?.retry_after_seconds);
   return new ApiError(message, status, Number.isFinite(retry) && retry > 0 ? retry : undefined,
-    typeof body.error === "string" ? body.error : typeof body.code === "string" ? body.code : undefined,
+    typeof body.code === "string" ? body.code : typeof body.error === "string" ? body.error : undefined,
     details, typeof body.correlationId === "string" ? body.correlationId : undefined);
 }
 

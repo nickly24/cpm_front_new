@@ -38,10 +38,6 @@ export function SectionSearch({ role }: SectionSearchProps) {
   );
 
   useEffect(() => {
-    setActiveIndex(0);
-  }, [query, isOpen]);
-
-  useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (
         containerRef.current &&
@@ -64,6 +60,7 @@ export function SectionSearch({ role }: SectionSearchProps) {
   const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (!isOpen) {
       if (event.key === "ArrowDown" || event.key === "Enter") {
+        setActiveIndex(0);
         setIsOpen(true);
       }
       return;
@@ -100,10 +97,11 @@ export function SectionSearch({ role }: SectionSearchProps) {
         ref={inputRef}
         type="search"
         value={query}
-        onChange={(event) => setQuery(event.target.value)}
-        onFocus={() => setIsOpen(true)}
+        onChange={(event) => { setQuery(event.target.value); setActiveIndex(0); }}
+        onFocus={() => { setIsOpen(true); setActiveIndex(0); }}
         onKeyDown={handleKeyDown}
         placeholder="Поиск раздела..."
+        aria-label="Поиск раздела"
         className="cabinet-search-input"
         autoComplete="off"
         role="combobox"

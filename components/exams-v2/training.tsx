@@ -38,19 +38,35 @@ export function ExamTrainingToolbar({ examId, canEdit, onChanged, openBank }: {
       setSaving(false);
     }
   };
-  return <section className={s.panel} aria-label="Подготовка по карточкам">
-    <div className={s.header}><h2>Подготовка по карточкам</h2><div className={s.row}>
-      <Action onClick={() => setPreview(true)}>Предпросмотр подготовки</Action><Action onClick={openBank}>Части и вопросы</Action>
-    </div></div>
-    <ErrorNotice error={resource.error} reload={resource.reload} />
-    {state ? <>
-      <label className={s.row}><input type="checkbox" checked={Boolean(state.exam.trainingEnabled)} disabled={!canEdit || saving || resource.loading || Boolean(resource.error)} onChange={() => void toggle()} />Доступен студентам для подготовки</label>
-      <p className={s.muted}>Студенты смогут просматривать вопросы и эталонные ответы и учить их в карточках. Доступ не зависит от периода проведения экзамена.</p>
-      <p>{state.exam.trainingEnabled ? state.cards_count ? "Подготовка открыта" : "Нет вопросов для подготовки" : "Подготовка скрыта"} · Частей: {state.parts_count} · Карточек: {state.cards_count}</p>
-      {!state.cards_count && !state.exam.trainingEnabled ? <p className={s.muted}>Добавьте хотя бы один вопрос с эталонным ответом, чтобы открыть подготовку студентам.</p> : null}
-    </> : null}
-    {saving || resource.loading ? <p role="status">{saving ? "Сохранение…" : "Обновление состояния…"}</p> : null}
-    {notice ? <p role="status">{notice}</p> : null}
-    {preview ? <Modal title="Предпросмотр подготовки" onClose={() => setPreview(false)}><ExamTrainingPreview examId={examId} /></Modal> : null}
-  </section>;
+  return (
+    <section aria-label="Подготовка по карточкам">
+      <details className={s.trainingPanel}>
+        <summary className={s.trainingSummary}>
+          Подготовка по карточкам
+          {state && <span className={s.badge}>{state.exam.trainingEnabled ? "Открыта студентам" : "Скрыта"} · {state.cards_count} карточек</span>}
+        </summary>
+        <div className={s.trainingBody}>
+          <ErrorNotice error={resource.error} reload={resource.reload} />
+          {state && (
+            <>
+              <label className={s.row}>
+                <input type="checkbox" checked={Boolean(state.exam.trainingEnabled)} disabled={!canEdit || saving || resource.loading || Boolean(resource.error)} onChange={() => void toggle()} />
+                Доступна студентам для подготовки
+              </label>
+              <p className={s.muted}>Вопросы и эталонные ответы можно изучать в карточках. Доступ к подготовке не зависит от периода проведения экзамена.</p>
+              <p className={s.muted}>Частей: {state.parts_count} · Карточек: {state.cards_count}</p>
+              {!state.cards_count && <p className={s.muted}>Добавьте вопрос с эталонным ответом, чтобы студентам было по чему готовиться.</p>}
+            </>
+          )}
+          <div className={s.row}>
+            <Action onClick={() => setPreview(true)}>Предпросмотр подготовки</Action>
+            <Action onClick={openBank}>Части и вопросы</Action>
+          </div>
+          {saving || resource.loading ? <p role="status" className={s.muted}>{saving ? "Сохранение…" : "Обновление состояния…"}</p> : null}
+          {notice ? <p role="status" className={s.muted}>{notice}</p> : null}
+        </div>
+      </details>
+      {preview && <Modal title="Предпросмотр подготовки" onClose={() => setPreview(false)}><ExamTrainingPreview examId={examId} /></Modal>}
+    </section>
+  );
 }

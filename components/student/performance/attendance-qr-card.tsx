@@ -3,7 +3,7 @@
 import { useAuth } from "@/contexts/AuthContext";
 import QRCode from "qrcode";
 import { QrCode } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import styles from "./performance.module.css";
 
 export function AttendanceQrCard() {
@@ -12,6 +12,7 @@ export function AttendanceQrCard() {
   const [isOpen, setIsOpen] = useState(false);
   const [qrCodeUrl, setQrCodeUrl] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
+  const panelId = useId();
 
   useEffect(() => {
     if (!isOpen || studentId == null) {
@@ -71,13 +72,15 @@ export function AttendanceQrCard() {
       <button
         type="button"
         className={isOpen ? `${styles.btn} ${styles.btnGhost}` : styles.btn}
+        aria-expanded={isOpen}
+        aria-controls={panelId}
         onClick={() => setIsOpen((open) => !open)}
       >
         {isOpen ? "Скрыть QR-код" : "Показать QR-код"}
       </button>
 
       {isOpen ? (
-        <div className={styles.qrPanel}>
+        <div className={styles.qrPanel} id={panelId}>
           {isGenerating ? (
             <p className={styles.muted}>Генерация QR-кода...</p>
           ) : qrCodeUrl ? (

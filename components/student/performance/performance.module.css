@@ -123,15 +123,16 @@
 }
 
 .qrCard {
-  display: flex;
+  display: grid;
   width: 100%;
-  flex-direction: column;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
   gap: 20px;
   padding: 24px 28px;
   border: 1px solid var(--ds-border);
   border-radius: var(--ds-radius-lg);
   background: var(--ds-surface);
-  box-shadow: var(--ds-shadow-md);
+  box-shadow: var(--ds-shadow-sm);
 }
 
 .qrHeader {
@@ -160,12 +161,14 @@
 
 .qrSubtitle {
   margin: 0;
+  line-height: 1.55;
   font-size: 14px;
   color: var(--ds-text-secondary);
 }
 
 .qrPanel {
   display: flex;
+  grid-column: 1 / -1;
   flex-direction: column;
   align-items: center;
   gap: 16px;
@@ -176,6 +179,7 @@
 }
 
 .qrImageWrap {
+  max-width: 100%;
   padding: 16px;
   border-radius: var(--ds-radius-md);
   background: #fff;
@@ -185,7 +189,9 @@
 .qrImage {
   display: block;
   width: 220px;
-  height: 220px;
+  max-width: 100%;
+  height: auto;
+  aspect-ratio: 1;
 }
 
 .qrId {
@@ -240,7 +246,17 @@
   color: var(--ds-text);
 }
 
-@media (max-width: 640px) {
+@media (max-width: 760px) {
+  .qrCard {
+    grid-template-columns: 1fr;
+    padding: 20px;
+  }
+
+  .qrTitle { font-size: 18px; }
+  .qrSubtitle { font-size: 13px; }
+  .qrPanel { padding: 16px; }
+  .qrCard .btn { width: 100%; }
+
   .statCard {
     flex-direction: column;
     align-items: flex-start;

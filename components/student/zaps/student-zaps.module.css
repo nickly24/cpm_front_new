@@ -43,9 +43,19 @@
 .headerActions {
   display: flex;
   flex-wrap: wrap;
-  justify-content: flex-end;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.listHeading {
+  display: flex;
+  align-items: center;
   gap: 10px;
 }
+
+.listHeading h2 { margin: 0; font-size: 18px; font-weight: 700; }
+.listHeading > span { min-width: 28px; padding: 4px 8px; border-radius: 8px; background: var(--ds-surface); color: var(--ds-text-secondary); text-align: center; font-size: 12px; }
 
 .panel {
   padding: 24px 28px;
@@ -101,13 +111,15 @@
 }
 
 .zapsList {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: stretch;
+  gap: 16px;
 }
 
 .zapCard {
   display: flex;
+  min-width: 0;
   flex-direction: column;
   gap: 10px;
   padding: 20px 22px;
@@ -144,7 +156,8 @@
   margin: 0;
   font-size: 14px;
   line-height: 1.5;
-  color: var(--ds-text-primary);
+  color: var(--ds-text);
+  overflow-wrap: anywhere;
   display: -webkit-box;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
@@ -156,6 +169,20 @@
   font-size: 13px;
   color: var(--ds-text-secondary);
 }
+
+.zapCardLink {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 14px;
+  margin-top: auto;
+  color: var(--ds-accent-hover);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.zapCard:focus-visible { outline: 3px solid var(--ds-accent); outline-offset: 3px; }
 
 .zapCardAnswer {
   margin: 0;
@@ -505,4 +532,10 @@
 
 .backBar {
   margin-bottom: 4px;
+}
+
+@media (max-width: 760px) {
+  .zapsList { grid-template-columns: 1fr; gap: 12px; }
+  .zapCard { padding: 18px; }
+  .headerActions { gap: 14px; }
 }

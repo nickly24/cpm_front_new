@@ -334,7 +334,7 @@ function LegacyStudentTrainingSection({
         imageSrc={STUDENT_SECTION_BANNERS.train}
         eyebrow="Обучение"
         title="Карточки"
-        subtitle="Выберите направление и раздел, учите карточки батчами"
+        subtitle="Выберите раздел и учите карточки в удобном темпе"
       />
 
       {selectedDirection && user?.id ? (

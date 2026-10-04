@@ -6,6 +6,8 @@ import { homeworkFilesApi, type ArchiveItem } from "@/lib/homework-files/api";
 import { useDebouncedValue } from "@/lib/hooks/use-debounced-value";
 import { ReviewWorkspace } from "@/components/homework/review-workspace";
 import { homeworkDate, homeworkFileSize, staffError } from "@/components/homework/staff-homework-utils";
+import { FilterPopover } from "@/components/ui/filter-popover";
+import adminStyles from "@/components/admin/tests/admin-tests.module.css";
 import { Spinner } from "@/components/ui/spinner";
 import { Archive, ArrowUpRight, FileText, RefreshCw, Search } from "lucide-react";
 import Link from "next/link";
@@ -49,8 +51,16 @@ export function HomeworkArchiveSection() {
 
   return <div className={styles.page}>
     <header className={styles.pageHeader}><div><span className={styles.eyebrow}>Домашние работы</span><h1>Архив работ</h1><p>{user?.role === "proctor" ? "Проверенные работы учеников вашей группы. Файлы и оценки всегда под рукой." : "Итоговые файлы, оценки и управление пересдачами."}</p></div><div className={styles.headerActions}>{user?.role !== "staff_admin" || canAccessSection(user, "review-queue") ? <Link className={styles.button} href={`/cabinet/${user?.role ?? "proctor"}/review-queue`}><FileText size={17} />К проверке</Link> : null}<button disabled={loading || loadingMore || invalidDates} onClick={() => void load()} aria-label="Обновить архив"><RefreshCw size={17} /></button></div></header>
-    <div className={styles.toolbar}><label className={styles.search}><Search size={18} /><input type="search" value={search} placeholder="Ученик, задание или группа" aria-label="Поиск в архиве" onChange={(event) => setSearch(event.target.value)} /></label><span className={styles.count}>{total === null ? `${items.length} работ` : `${total} работ`}</span></div>
-    <div className={styles.dateFilters}><span>Дата отправки</span><label>С<input type="date" value={from} max={to || undefined} onChange={(event) => setFrom(event.target.value)} /></label><label>По<input type="date" value={to} min={from || undefined} onChange={(event) => setTo(event.target.value)} /></label>{from || to ? <button className={styles.quietButton} onClick={() => { setFrom(""); setTo(""); }}>Сбросить</button> : null}</div>
+    <div className={styles.toolbar}>
+      <label className={styles.search}><Search size={18} /><input type="search" value={search} placeholder="Ученик, задание или группа" aria-label="Поиск в архиве" onChange={(event) => setSearch(event.target.value)} /></label>
+      <FilterPopover title="Период отправки" activeCount={Number(Boolean(from)) + Number(Boolean(to))} onReset={() => { setFrom(""); setTo(""); }}>
+        <div className={adminStyles.filterFieldsGrid}>
+          <label className={adminStyles.dateField}><span className={adminStyles.fieldLabel}>С даты</span><input className={adminStyles.dateInput} type="date" value={from} max={to || undefined} onChange={(event) => setFrom(event.target.value)} /></label>
+          <label className={adminStyles.dateField}><span className={adminStyles.fieldLabel}>По дату</span><input className={adminStyles.dateInput} type="date" value={to} min={from || undefined} onChange={(event) => setTo(event.target.value)} /></label>
+        </div>
+      </FilterPopover>
+      <span className={styles.count}>{total === null ? `${items.length} работ` : `${total} работ`}</span>
+    </div>
     {invalidDates ? <div className={styles.error} role="alert">Начало периода должно быть не позже его окончания.</div> : null}
     {notice ? <div className={styles.success} role="status">{notice}</div> : null}
     {error ? <div className={styles.error} role="alert"><span>{error}</span><button onClick={() => void load()}>Повторить</button></div> : null}

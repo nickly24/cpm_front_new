@@ -1,5 +1,6 @@
 "use client";
 
+import { FilterPopover } from "@/components/ui/filter-popover";
 import { useState } from "react";
 import { queryString } from "@/lib/exams-v2/api";
 import { useExamMutation, useExamResource } from "@/lib/exams-v2/hooks";
@@ -190,7 +191,7 @@ export function OutsideResults(props: AdminPanelProps) {
         <ExamImport {...props} kind="outside" onChanged={changed} />
       )}
       <form
-        className={s.row}
+        className={s.toolbar}
         onSubmit={(e) => {
           e.preventDefault();
           setQuery(search.trim());
@@ -205,22 +206,26 @@ export function OutsideResults(props: AdminPanelProps) {
             onChange={(e) => setSearch(e.target.value)}
           />
         </Field>
-        <Field label="Порядок">
-          <select
-            className={s.select}
-            value={sort}
-            onChange={(e) => {
-              setSort(e.target.value);
-              setPage(1);
-            }}
-          >
-            <option value="student_asc">По студенту</option>
-            <option value="grade_desc">По оценке</option>
-            <option value="points_desc">По баллам</option>
-            <option value="updated_desc">По изменению</option>
-          </select>
-        </Field>
         <Action type="submit">Найти</Action>
+        <FilterPopover activeCount={Number(sort !== "student_asc")} onReset={() => { setSort("student_asc"); setPage(1); }}>
+          <div className={s.filterGrid}>
+            <Field label="Порядок">
+              <select
+                className={s.select}
+                value={sort}
+                onChange={(e) => {
+                  setSort(e.target.value);
+                  setPage(1);
+                }}
+              >
+                <option value="student_asc">По студенту</option>
+                <option value="grade_desc">По оценке</option>
+                <option value="points_desc">По баллам</option>
+                <option value="updated_desc">По изменению</option>
+              </select>
+            </Field>
+          </div>
+        </FilterPopover>
         <Action onClick={resource.reload}>Обновить</Action>
       </form>
       <ErrorNotice error={resource.error} reload={resource.reload} />
@@ -559,7 +564,7 @@ export function ClassicAttempts({
         </Action>
       </div>
       <form
-        className={s.row}
+        className={s.toolbar}
         onSubmit={(e) => {
           e.preventDefault();
           setPage(1);
@@ -574,38 +579,42 @@ export function ClassicAttempts({
             onChange={(e) => setSearch(e.target.value)}
           />
         </Field>
-        <Field label="Состояние">
-          <select
-            className={s.select}
-            value={status}
-            onChange={(e) => {
-              setStatus(e.target.value);
-              setPage(1);
-            }}
-          >
-            <option value="">Все</option>
-            {["pending_ready", "in_progress", "completed"].map((value) => (
-              <option key={value} value={value}>
-                {statusLabel(value)}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field label="Сдача">
-          <select
-            className={s.select}
-            value={attemptNo}
-            onChange={(e) => {
-              setAttemptNo(e.target.value);
-              setPage(1);
-            }}
-          >
-            <option value="">Все</option>
-            <option value="1">Первая</option>
-            <option value="2">Пересдача</option>
-          </select>
-        </Field>
         <Action type="submit">Найти</Action>
+        <FilterPopover activeCount={[status, attemptNo].filter(Boolean).length} onReset={() => { setStatus(""); setAttemptNo(""); setPage(1); }}>
+          <div className={s.filterGrid}>
+            <Field label="Состояние">
+              <select
+                className={s.select}
+                value={status}
+                onChange={(e) => {
+                  setStatus(e.target.value);
+                  setPage(1);
+                }}
+              >
+                <option value="">Все</option>
+                {["pending_ready", "in_progress", "completed"].map((value) => (
+                  <option key={value} value={value}>
+                    {statusLabel(value)}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Сдача">
+              <select
+                className={s.select}
+                value={attemptNo}
+                onChange={(e) => {
+                  setAttemptNo(e.target.value);
+                  setPage(1);
+                }}
+              >
+                <option value="">Все</option>
+                <option value="1">Первая</option>
+                <option value="2">Пересдача</option>
+              </select>
+            </Field>
+          </div>
+        </FilterPopover>
       </form>
       <ErrorNotice error={resource.error} reload={resource.reload} />
       {resource.loading && <Loading />}
@@ -661,7 +670,7 @@ export function ClassicResults({
         оценку.
       </p>
       <form
-        className={s.row}
+        className={s.toolbar}
         onSubmit={(e) => {
           e.preventDefault();
           setPage(1);
@@ -676,38 +685,42 @@ export function ClassicResults({
             onChange={(e) => setSearch(e.target.value)}
           />
         </Field>
-        <Field label="Оценка">
-          <select
-            className={s.select}
-            value={grade}
-            onChange={(e) => {
-              setGrade(e.target.value);
-              setPage(1);
-            }}
-          >
-            <option value="">Любая</option>
-            {GRADES.map((g) => (
-              <option key={g} value={g}>
-                {g}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field label="Апелляция">
-          <select
-            className={s.select}
-            value={hasAppeal}
-            onChange={(e) => {
-              setHasAppeal(e.target.value);
-              setPage(1);
-            }}
-          >
-            <option value="">Все</option>
-            <option value="true">Есть</option>
-            <option value="false">Нет</option>
-          </select>
-        </Field>
         <Action type="submit">Найти</Action>
+        <FilterPopover activeCount={[grade, hasAppeal].filter(Boolean).length} onReset={() => { setGrade(""); setHasAppeal(""); setPage(1); }}>
+          <div className={s.filterGrid}>
+            <Field label="Оценка">
+              <select
+                className={s.select}
+                value={grade}
+                onChange={(e) => {
+                  setGrade(e.target.value);
+                  setPage(1);
+                }}
+              >
+                <option value="">Любая</option>
+                {GRADES.map((g) => (
+                  <option key={g} value={g}>
+                    {g}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Апелляция">
+              <select
+                className={s.select}
+                value={hasAppeal}
+                onChange={(e) => {
+                  setHasAppeal(e.target.value);
+                  setPage(1);
+                }}
+              >
+                <option value="">Все</option>
+                <option value="true">Есть</option>
+                <option value="false">Нет</option>
+              </select>
+            </Field>
+          </div>
+        </FilterPopover>
       </form>
       <ErrorNotice error={resource.error} reload={resource.reload} />
       {resource.loading && <Loading />}

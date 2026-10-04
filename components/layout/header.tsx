@@ -37,7 +37,7 @@ export function Header({ role, onMenuOpen }: HeaderProps) {
 
       <div className="cabinet-header-actions">
         <ThemeToggle />
-        <Button variant="ghost" size="sm" onClick={() => void handleLogout()}>
+        <Button variant="ghost" size="sm" aria-label="Выйти из кабинета" onClick={() => void handleLogout()}>
           <LogOut size={16} />
           <span className="cabinet-header-logout-text">Выйти</span>
         </Button>

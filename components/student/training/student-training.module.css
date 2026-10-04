@@ -504,87 +504,33 @@
 
 .sectionsCatalog {
   display: flex;
+  min-width: 0;
   flex-direction: column;
-  gap: 12px;
+  gap: 18px;
 }
 
 .sectionsCatalogHeader {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-lg);
+  background: var(--ds-surface);
 }
 
-.sectionsCatalogHeader .sectionsFilterRow {
-  flex: 1;
-  min-width: 0;
-}
-
-.sectionsCatalogActions {
+.sectionsDirections {
   display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 2px 0 6px;
+  scrollbar-width: thin;
+}
+
+.sectionsDirections .sectionsFilterChip {
   flex-shrink: 0;
-  align-items: center;
-  gap: 6px;
-}
-
-.sectionsPopoverAnchor {
-  position: relative;
-  z-index: 51;
-}
-
-.sectionsPopoverBackdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 40;
-  border: none;
-  padding: 0;
-  background: transparent;
-  cursor: default;
-}
-
-.sectionsIconBtn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  border: 1px solid var(--ds-border);
-  border-radius: var(--ds-radius-sm);
-  background: var(--ds-surface);
-  color: var(--ds-text-secondary);
-  cursor: pointer;
-  transition:
-    border-color 0.15s ease,
-    color 0.15s ease,
-    background-color 0.15s ease;
-}
-
-.sectionsIconBtn:hover {
-  border-color: color-mix(in srgb, var(--ds-accent) 35%, var(--ds-border));
-  color: var(--ds-accent);
-}
-
-.sectionsIconBtnActive {
-  border-color: var(--ds-accent);
-  color: var(--ds-accent);
-  background: color-mix(in srgb, var(--ds-accent) 8%, var(--ds-surface));
-}
-
-.sectionsPopover {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
-  z-index: 50;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  min-width: 280px;
-  padding: 12px;
-  border: 1px solid var(--ds-border);
-  border-radius: var(--ds-radius-md);
-  background: var(--ds-surface);
-  box-shadow: var(--ds-shadow-lg);
-  animation: sectionsPopoverIn 0.16s ease;
 }
 
 .sectionsPopoverLabel {
@@ -596,31 +542,32 @@
   color: var(--ds-text-secondary);
 }
 
-@keyframes sectionsPopoverIn {
-  from {
-    opacity: 0;
-    transform: translateY(-4px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
 .sectionsSearch {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  width: 100%;
-  padding: 8px 10px;
+  min-width: 0;
+  flex: 1;
+  min-height: 44px;
+  padding: 8px 12px;
+  color: var(--ds-text-secondary);
   border: 1px solid var(--ds-border);
   border-radius: var(--ds-radius-sm);
   background: var(--ds-surface-elevated, var(--ds-surface));
 }
 
+.sectionsSearch:focus-within {
+  border-color: var(--ds-accent);
+  box-shadow: 0 0 0 3px var(--ds-accent-soft);
+}
+
+.sectionsSearch svg {
+  flex-shrink: 0;
+}
+
 .sectionsSearch input {
   width: 100%;
+  min-width: 0;
   border: none;
   outline: none;
   background: transparent;
@@ -635,8 +582,8 @@
 }
 
 .sectionsFilterChip {
-  min-height: 30px;
-  padding: 0 10px;
+  min-height: 38px;
+  padding: 7px 13px;
   border: 1px solid var(--ds-border);
   border-radius: 999px;
   background: var(--ds-surface-elevated, var(--ds-surface));
@@ -653,17 +600,19 @@
 
 .sectionsPagination {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: center;
   gap: 10px;
 }
 
 .sectionsPagination button {
-  min-height: 32px;
+  min-height: 40px;
   padding: 0 10px;
   border: 1px solid var(--ds-border);
   border-radius: var(--ds-radius-sm);
   background: var(--ds-surface);
+  color: var(--ds-text);
   cursor: pointer;
 }
 
@@ -678,18 +627,19 @@
 }
 
 .sectionsList {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
 }
 
 .sectionListItem {
   display: flex;
   width: 100%;
+  min-width: 0;
   flex-direction: column;
   align-items: stretch;
-  gap: 8px;
-  padding: 14px 16px;
+  gap: 12px;
+  padding: 20px;
   border: 1px solid var(--ds-border);
   border-radius: var(--ds-radius-md);
   background: var(--ds-surface-elevated, var(--ds-surface));
@@ -2196,3 +2146,11 @@
 .examQuestion .cardRowAnswer { display: block; font-size: 15px; line-height: 1.6; }
 .examQuestion summary { cursor: pointer; margin-bottom: 8px; }
 .examNotice { padding: 12px; border-radius: 10px; background: var(--ds-surface-hover); }
+
+@media (max-width: 760px) {
+  .sectionsList { grid-template-columns: 1fr; }
+  .sectionsCatalogHeader { padding: 10px; gap: 8px; }
+  .sectionsSearch { padding-inline: 10px; }
+  .sectionsSearch input { font-size: 16px; }
+  .sectionListItem { padding: 18px; }
+}

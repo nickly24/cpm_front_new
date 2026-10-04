@@ -7,6 +7,7 @@ import { AdminHomeworkWorkspace } from "@/components/admin/homework/admin-homewo
 import styles from "@/components/admin/tests/admin-tests.module.css";
 import { useCabinetChrome } from "@/contexts/cabinet-chrome-context";
 import { Button } from "@/components/ui/button";
+import { FilterPopover } from "@/components/ui/filter-popover";
 import { LoadingState } from "@/components/ui/loading-state";
 import { Toggle } from "@/components/ui/toggle";
 import {
@@ -189,45 +190,53 @@ export function AdminHomeworkSection() {
   return (
     <div className={styles.page}>
       <header className={styles.pageHeader}>
-        <h1 className={styles.pageTitle}>Домашние задания</h1>
+        <div>
+          <h1 className={styles.pageTitle}>Домашние задания</h1>
+          <p className={styles.pageDescription}>Задания, сроки сдачи и работы учеников.</p>
+        </div>
         <EditOnly><Button type="button" onClick={() => setView("create")}>
           + Создать задание
         </Button></EditOnly>
       </header>
 
-      <div className={styles.directionTabs}>
-        {TYPE_TABS.map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            className={`${styles.directionTab} ${typeFilter === tab.id ? styles.directionTabActive : ""}`}
-            onClick={() => setTypeFilter(tab.id)}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
-      <div className={styles.filters}>
+      <div className={styles.listToolbar}>
         <input
           type="search"
           className={styles.searchInput}
           placeholder="Поиск по названию…"
+          aria-label="Поиск домашних заданий"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
         />
-        <select
-          className={styles.filterSelect}
-          value={statusFilter}
-          onChange={(e) =>
-            setStatusFilter(e.target.value as AdminHomeworkStatusFilter)
-          }
+        <FilterPopover
+          activeCount={Number(typeFilter !== "all") + Number(statusFilter !== "all")}
+          onReset={() => {
+            setTypeFilter("all");
+            setStatusFilter("all");
+          }}
         >
-          <option value="all">Все статусы</option>
-          <option value="active">Активные</option>
-          <option value="ended">Дедлайн прошёл</option>
-          <option value="hidden">Скрытые</option>
-        </select>
+          <label className={styles.dateField}>
+            <span className={styles.fieldLabel}>Тип задания</span>
+            <select className={styles.filterSelect} value={typeFilter} onChange={(e) => setTypeFilter(e.target.value as AdminHomeworkTypeFilter)}>
+              {TYPE_TABS.map((tab) => <option key={tab.id} value={tab.id}>{tab.id === "all" ? "Все типы" : tab.label}</option>)}
+            </select>
+          </label>
+          <label className={styles.dateField}>
+            <span className={styles.fieldLabel}>Статус</span>
+            <select
+              className={styles.filterSelect}
+              value={statusFilter}
+              onChange={(e) =>
+                setStatusFilter(e.target.value as AdminHomeworkStatusFilter)
+              }
+            >
+              <option value="all">Все статусы</option>
+              <option value="active">Активные</option>
+              <option value="ended">Дедлайн прошёл</option>
+              <option value="hidden">Скрытые</option>
+            </select>
+          </label>
+        </FilterPopover>
       </div>
 
       {error ? <div className={styles.stateBox}>{error}</div> : null}

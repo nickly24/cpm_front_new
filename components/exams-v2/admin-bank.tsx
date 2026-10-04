@@ -1,5 +1,6 @@
 "use client";
 
+import { FilterPopover } from "@/components/ui/filter-popover";
 import { useState } from "react";
 import { queryString } from "@/lib/exams-v2/api";
 import { useExamMutation, useExamResource } from "@/lib/exams-v2/hooks";
@@ -309,7 +310,7 @@ export function ClassicBank(props: AdminPanelProps) {
           <ExamImport {...props} kind="questions" onChanged={changed} />
         )}
         <form
-          className={s.row}
+          className={s.toolbar}
           onSubmit={(e) => {
             e.preventDefault();
             setFilter(search.trim());
@@ -324,24 +325,28 @@ export function ClassicBank(props: AdminPanelProps) {
               maxLength={200}
             />
           </Field>
-          <Field label="Часть">
-            <select
-              className={s.select}
-              value={partId}
-              onChange={(e) => {
-                setPartId(e.target.value);
-                setPage(1);
-              }}
-            >
-              <option value="">Все части</option>
-              {parts.data?.items.map((part) => (
-                <option key={part.id} value={part.id}>
-                  {part.code}
-                </option>
-              ))}
-            </select>
-          </Field>
           <Action type="submit">Найти</Action>
+        <FilterPopover activeCount={Number(Boolean(partId))} onReset={() => { setPartId(""); setPage(1); }}>
+          <div className={s.filterGrid}>
+            <Field label="Часть">
+              <select
+                className={s.select}
+                value={partId}
+                onChange={(e) => {
+                  setPartId(e.target.value);
+                  setPage(1);
+                }}
+              >
+                <option value="">Все части</option>
+                {parts.data?.items.map((part) => (
+                  <option key={part.id} value={part.id}>
+                    {part.code}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          </div>
+        </FilterPopover>
           <Action onClick={questions.reload}>Обновить</Action>
         </form>
         <ErrorNotice error={questions.error} reload={questions.reload} />

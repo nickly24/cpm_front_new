@@ -1,6 +1,7 @@
 "use client";
 
 import styles from "@/components/student/training/student-training.module.css";
+import { FilterPopover } from "@/components/ui/filter-popover";
 import { LoadingState } from "@/components/ui/loading-state";
 import { fetchTrainingSectionsByDirection } from "@/lib/training/training-api";
 import type {
@@ -11,8 +12,8 @@ import type {
 import { calcProgressPercent, getProgressLabel } from "@/lib/training/training-utils";
 import { cn } from "@/lib/cn";
 import { examPeriod } from "@/lib/training/exam-training";
-import { ClipboardList, FileText, Search, SlidersHorizontal } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { ClipboardList, FileText, Search } from "lucide-react";
+import { useEffect, useState } from "react";
 
 interface TrainingSectionsListViewProps {
   directions: TrainingDirection[];
@@ -47,45 +48,6 @@ export function TrainingSectionsListView({
   const [sectionsError, setSectionsError] = useState<string | null>(null);
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [filtersOpen, setFiltersOpen] = useState(false);
-  const searchPopoverRef = useRef<HTMLDivElement>(null);
-  const filtersPopoverRef = useRef<HTMLDivElement>(null);
-  const searchInputRef = useRef<HTMLInputElement>(null);
-
-  const filtersActive = kindFilter !== "all" || progressFilter !== "all";
-
-  useEffect(() => {
-    if (!searchOpen && !filtersOpen) return;
-
-    const handlePointerDown = (event: MouseEvent) => {
-      const target = event.target as Node;
-      if (
-        searchOpen &&
-        searchPopoverRef.current &&
-        !searchPopoverRef.current.contains(target)
-      ) {
-        setSearchOpen(false);
-      }
-      if (
-        filtersOpen &&
-        filtersPopoverRef.current &&
-        !filtersPopoverRef.current.contains(target)
-      ) {
-        setFiltersOpen(false);
-      }
-    };
-
-    document.addEventListener("mousedown", handlePointerDown);
-    return () => document.removeEventListener("mousedown", handlePointerDown);
-  }, [filtersOpen, searchOpen]);
-
-  useEffect(() => {
-    if (searchOpen) {
-      searchInputRef.current?.focus();
-    }
-  }, [searchOpen]);
-
   useEffect(() => {
     setPage(1);
   }, [searchTerm, kindFilter, progressFilter, direction.id]);
@@ -133,130 +95,82 @@ export function TrainingSectionsListView({
 
   return (
     <div className={styles.sectionsCatalog}>
-      {searchOpen || filtersOpen ? (
-        <button
-          type="button"
-          className={styles.sectionsPopoverBackdrop}
-          aria-label="Закрыть"
-          onClick={() => {
-            setSearchOpen(false);
-            setFiltersOpen(false);
-          }}
-        />
-      ) : null}
+      <div className={styles.sectionsDirections} role="group" aria-label="Направление">
+        {directions.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            className={cn(
+              styles.sectionsFilterChip,
+              selectedDirectionId === item.id && styles.sectionsFilterChipActive,
+            )}
+            aria-pressed={selectedDirectionId === item.id}
+            onClick={() => onSelectDirection(item.id)}
+          >
+            {item.name}
+          </button>
+        ))}
+      </div>
 
       <div className={styles.sectionsCatalogHeader}>
-        <div className={styles.sectionsFilterRow}>
-          {directions.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              className={cn(
-                styles.sectionsFilterChip,
-                selectedDirectionId === item.id && styles.sectionsFilterChipActive,
-              )}
-              onClick={() => onSelectDirection(item.id)}
-            >
-              {item.name}
-            </button>
-          ))}
-        </div>
-
-        <div className={styles.sectionsCatalogActions}>
-          <div className={styles.sectionsPopoverAnchor} ref={searchPopoverRef}>
-            <button
-              type="button"
-              className={cn(
-                styles.sectionsIconBtn,
-                (searchOpen || searchTerm.trim()) && styles.sectionsIconBtnActive,
-              )}
-              aria-label="Поиск раздела"
-              aria-expanded={searchOpen}
-              onClick={() => {
-                setSearchOpen((prev) => !prev);
-                setFiltersOpen(false);
-              }}
-            >
-              <Search size={17} aria-hidden />
-            </button>
-            {searchOpen ? (
-              <div className={styles.sectionsPopover} role="dialog" aria-label="Поиск">
-                <label className={styles.sectionsSearch}>
-                  <Search size={15} aria-hidden />
-                  <input
-                    ref={searchInputRef}
-                    value={searchTerm}
-                    onChange={(event) => setSearchTerm(event.target.value)}
-                    placeholder="Поиск раздела..."
-                  />
-                </label>
-              </div>
-            ) : null}
+        <label className={styles.sectionsSearch}>
+          <Search size={18} aria-hidden />
+          <input
+            type="search"
+            value={searchTerm}
+            onChange={(event) => setSearchTerm(event.target.value)}
+            placeholder="Найти раздел"
+            aria-label="Найти раздел"
+          />
+        </label>
+        <FilterPopover
+          activeCount={Number(kindFilter !== "all") + Number(progressFilter !== "all")}
+          onReset={() => { setKindFilter("all"); setProgressFilter("all"); }}
+        >
+          <p className={styles.sectionsPopoverLabel}>Тип</p>
+          <div className={styles.sectionsFilterRow}>
+            {([
+              ["all", "Все"],
+              ["manual", "Только карточки"],
+              ["test", "Только тесты"],
+              ["exam", "Из экзаменов"],
+            ] as const).map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                className={cn(
+                  styles.sectionsFilterChip,
+                  kindFilter === value && styles.sectionsFilterChipActive,
+                )}
+                aria-pressed={kindFilter === value}
+                onClick={() => setKindFilter(value)}
+              >
+                {label}
+              </button>
+            ))}
           </div>
-
-          <div className={styles.sectionsPopoverAnchor} ref={filtersPopoverRef}>
-            <button
-              type="button"
-              className={cn(
-                styles.sectionsIconBtn,
-                (filtersOpen || filtersActive) && styles.sectionsIconBtnActive,
-              )}
-              aria-label="Фильтры"
-              aria-expanded={filtersOpen}
-              onClick={() => {
-                setFiltersOpen((prev) => !prev);
-                setSearchOpen(false);
-              }}
-            >
-              <SlidersHorizontal size={17} aria-hidden />
-            </button>
-            {filtersOpen ? (
-              <div className={styles.sectionsPopover} role="dialog" aria-label="Фильтры">
-                <p className={styles.sectionsPopoverLabel}>Тип</p>
-                <div className={styles.sectionsFilterRow}>
-                  {([
-                    ["all", "Все"],
-                    ["manual", "Только карточки"],
-                    ["test", "Только тесты"],
-                    ["exam", "Из экзаменов"],
-                  ] as const).map(([value, label]) => (
-                    <button
-                      key={value}
-                      type="button"
-                      className={cn(
-                        styles.sectionsFilterChip,
-                        kindFilter === value && styles.sectionsFilterChipActive,
-                      )}
-                      onClick={() => setKindFilter(value)}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-                <p className={styles.sectionsPopoverLabel}>Прогресс</p>
-                <div className={styles.sectionsFilterRow}>
-                  {([
-                    ["all", "Все"],
-                    ["in_progress", "Есть что учить"],
-                    ["learned", "Полностью выучено"],
-                  ] as const).map(([value, label]) => (
-                    <button
-                      key={value}
-                      type="button"
-                      className={cn(
-                        styles.sectionsFilterChip,
-                        progressFilter === value && styles.sectionsFilterChipActive,
-                      )}
-                      onClick={() => setProgressFilter(value)}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ) : null}
+          <p className={styles.sectionsPopoverLabel}>Прогресс</p>
+          <div className={styles.sectionsFilterRow}>
+            {([
+              ["all", "Все"],
+              ["in_progress", "Есть что учить"],
+              ["learned", "Полностью выучено"],
+            ] as const).map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                className={cn(
+                  styles.sectionsFilterChip,
+                  progressFilter === value && styles.sectionsFilterChipActive,
+                )}
+                aria-pressed={progressFilter === value}
+                onClick={() => setProgressFilter(value)}
+              >
+                {label}
+              </button>
+            ))}
           </div>
-        </div>
+        </FilterPopover>
       </div>
 
       <div className={styles.sectionsList}>
@@ -354,7 +268,7 @@ export function TrainingSectionsListView({
       {sectionsLoading ? (
         <LoadingState label="Загрузка разделов…" variant="inline" />
       ) : null}
-      <div className={styles.sectionsPagination}>
+      {totalItems > 0 ? <div className={styles.sectionsPagination}>
         <button
           type="button"
           disabled={page <= 1}
@@ -363,7 +277,7 @@ export function TrainingSectionsListView({
           Назад
         </button>
         <span>
-          Страница {page} из {totalPages} · {totalItems}
+          {page} / {totalPages} · Разделов: {totalItems}
         </span>
         <button
           type="button"
@@ -372,7 +286,7 @@ export function TrainingSectionsListView({
         >
           Далее
         </button>
-      </div>
+      </div> : null}
 
       {!sectionsLoading && totalItems === 0 ? (
         <div className={styles.emptyState}>

@@ -11,7 +11,7 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const variantClass: Record<ButtonVariant, string> = {
   primary: "ds-btn--primary",
-  secondary: "ds-btn--primary",
+  secondary: "ds-btn--secondary",
   ghost: "ds-btn--ghost",
 };
 

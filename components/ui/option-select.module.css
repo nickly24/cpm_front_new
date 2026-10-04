@@ -87,9 +87,9 @@
 }
 
 .dropdown {
-  position: absolute;
-  top: calc(100% + 8px);
-  left: 0;
+  position: fixed;
+  inset: auto;
+  margin: 0;
   z-index: 30;
   display: flex;
   width: 100%;

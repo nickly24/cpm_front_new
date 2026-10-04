@@ -19,6 +19,7 @@ import styles from "@/components/admin/tests/admin-tests.module.css";
 import { useCabinetChrome } from "@/contexts/cabinet-chrome-context";
 import { Button } from "@/components/ui/button";
 import { DismissibleOverlay } from "@/components/ui/dismissible-overlay";
+import { FilterPopover } from "@/components/ui/filter-popover";
 import { LoadingState } from "@/components/ui/loading-state";
 import { Toggle } from "@/components/ui/toggle";
 import {
@@ -633,7 +634,10 @@ export function AdminTestsSection() {
       ) : null}
 
       <header className={styles.listPageHeader}>
-        <h1 className={styles.pageTitle}>Управление тестами</h1>
+        <div>
+          <h1 className={styles.pageTitle}>Тесты</h1>
+          <p className={styles.pageDescription}>Создавайте тесты и управляйте доступом учеников.</p>
+        </div>
         <div className={styles.headerActions}>
           <button
             type="button"
@@ -688,64 +692,62 @@ export function AdminTestsSection() {
             />
           </label>
 
-          <label className={styles.listDateField}>
-            <span className={styles.listFieldLabel}>С даты</span>
-            <input
-              type="date"
-              className={styles.listDateInput}
-              value={dateFilter.startDate}
-              onChange={(e) =>
-                setDateFilter((f) => ({ ...f, startDate: e.target.value }))
-              }
-            />
-          </label>
-          <label className={styles.listDateField}>
-            <span className={styles.listFieldLabel}>По дату</span>
-            <input
-              type="date"
-              className={styles.listDateInput}
-              value={dateFilter.endDate}
-              onChange={(e) =>
-                setDateFilter((f) => ({ ...f, endDate: e.target.value }))
-              }
-            />
-          </label>
-        </div>
-
-        <div className={styles.listStatusFilters}>
-          {(
-            [
-              ["all", "Все"],
-              ["active", "Активные"],
-              ["upcoming", "Скоро"],
-              ["ended", "Завершённые"],
-              ["external", "Вне системы"],
-            ] as const
-          ).map(([key, label]) => (
-            <button
-              key={key}
-              type="button"
-              className={`${styles.listFilterChip} ${statusFilter === key ? styles.listFilterChipActive : ""}`}
-              onClick={() => setStatusFilter(key)}
-            >
-              {label} ({countByStatus(key)})
-            </button>
-          ))}
-          <button
-            type="button"
-            className={styles.listClearBtn}
-            disabled={
-              !searchTerm &&
-              !dateFilter.startDate &&
-              !dateFilter.endDate &&
-              statusFilter === "all"
-            }
-            onClick={clearFilters}
+          <FilterPopover
+            activeCount={Number(statusFilter !== "all") + Number(Boolean(dateFilter.startDate)) + Number(Boolean(dateFilter.endDate))}
+            onReset={() => {
+              setStatusFilter("all");
+              setDateFilter({ startDate: "", endDate: "" });
+            }}
           >
-            Очистить
-          </button>
+            <label className={styles.dateField}>
+              <span className={styles.fieldLabel}>Статус</span>
+              <select
+                className={styles.filterSelect}
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value as AdminTestStatusFilter)}
+              >
+                {([
+                  ["all", "Все статусы"],
+                  ["active", "Активные"],
+                  ["upcoming", "Скоро"],
+                  ["ended", "Завершённые"],
+                  ["external", "Вне системы"],
+                ] as const).map(([key, label]) => (
+                  <option key={key} value={key}>{label} · {countByStatus(key)}</option>
+                ))}
+              </select>
+            </label>
+            <div className={styles.filterFieldsGrid}>
+              <label className={styles.listDateField}>
+                <span className={styles.listFieldLabel}>С даты</span>
+                <input
+                  type="date"
+                  className={styles.listDateInput}
+                  value={dateFilter.startDate}
+                  max={dateFilter.endDate || undefined}
+                  onChange={(e) =>
+                    setDateFilter((f) => ({ ...f, startDate: e.target.value }))
+                  }
+                />
+              </label>
+              <label className={styles.listDateField}>
+                <span className={styles.listFieldLabel}>По дату</span>
+                <input
+                  type="date"
+                  className={styles.listDateInput}
+                  value={dateFilter.endDate}
+                  min={dateFilter.startDate || undefined}
+                  onChange={(e) =>
+                    setDateFilter((f) => ({ ...f, endDate: e.target.value }))
+                  }
+                />
+              </label>
+            </div>
+          </FilterPopover>
         </div>
       </div>
+
+      {!loadingTests && !error ? <p className={styles.resultsSummary}>Найдено тестов: <strong>{filteredTests.length}</strong>{filteredTests.length !== tests.length ? ` из ${tests.length}` : ""}</p> : null}
 
       {loadingTests ? (
         <LoadingState

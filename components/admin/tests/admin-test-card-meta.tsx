@@ -53,7 +53,6 @@ export function AdminTestStatusBadge({ status }: { status: AdminTestStatus }) {
       className={cn(styles.statusBadge, meta.badgeClass)}
       title={label}
       aria-label={label}
-      tabIndex={0}
     >
       <span className={cn(styles.statusBadgeIcon, meta.iconClass)}>
         <Icon size={12} aria-hidden />

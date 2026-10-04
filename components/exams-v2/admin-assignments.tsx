@@ -1,5 +1,6 @@
 "use client";
 
+import { FilterPopover } from "@/components/ui/filter-popover";
 import { useState } from "react";
 import { queryString } from "@/lib/exams-v2/api";
 import { useExamMutation, useExamResource } from "@/lib/exams-v2/hooks";
@@ -451,7 +452,7 @@ export function ClassicAssignments(props: AdminPanelProps) {
         <ExamImport {...props} kind="assignments" onChanged={changed} />
       )}
       <form
-        className={s.row}
+        className={s.toolbar}
         onSubmit={(e) => {
           e.preventDefault();
           setPage(1);
@@ -467,26 +468,30 @@ export function ClassicAssignments(props: AdminPanelProps) {
             placeholder="ФИО или ID"
           />
         </Field>
-        <Field label="Состояние">
-          <select
-            className={s.select}
-            value={status}
-            onChange={(e) => {
-              setPage(1);
-              setStatus(e.target.value);
-            }}
-          >
-            <option value="">Все</option>
-            {["not_started", "pending_ready", "in_progress", "completed"].map(
-              (value) => (
-                <option key={value} value={value}>
-                  {statusLabel(value)}
-                </option>
-              ),
-            )}
-          </select>
-        </Field>
         <Action type="submit">Найти</Action>
+        <FilterPopover activeCount={Number(Boolean(status))} onReset={() => { setStatus(""); setPage(1); }}>
+          <div className={s.filterGrid}>
+            <Field label="Состояние">
+              <select
+                className={s.select}
+                value={status}
+                onChange={(e) => {
+                  setPage(1);
+                  setStatus(e.target.value);
+                }}
+              >
+                <option value="">Все</option>
+                {["not_started", "pending_ready", "in_progress", "completed"].map(
+                  (value) => (
+                    <option key={value} value={value}>
+                      {statusLabel(value)}
+                    </option>
+                  ),
+                )}
+              </select>
+            </Field>
+          </div>
+        </FilterPopover>
         <Action onClick={resource.reload}>Обновить</Action>
       </form>
       <ErrorNotice error={resource.error} reload={resource.reload} />

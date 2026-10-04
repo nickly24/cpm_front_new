@@ -46,7 +46,7 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { adminHref, canAccessSection } from "@/lib/auth/admin-access";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 type AdminView = "directions" | "sections" | "cards";
 
@@ -63,81 +63,27 @@ function confirmDelete(message: string): boolean {
   return window.confirm(message);
 }
 
-function AdminSearchPopover({
+function AdminSearchField({
   value,
   onChange,
   placeholder,
-  open,
-  onOpenChange,
 }: {
   value: string;
   onChange: (value: string) => void;
   placeholder: string;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
 }) {
-  const anchorRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-
-    const handlePointerDown = (event: MouseEvent) => {
-      const target = event.target as Node;
-      if (anchorRef.current && !anchorRef.current.contains(target)) {
-        onOpenChange(false);
-      }
-    };
-
-    document.addEventListener("mousedown", handlePointerDown);
-    return () => document.removeEventListener("mousedown", handlePointerDown);
-  }, [onOpenChange, open]);
-
-  useEffect(() => {
-    if (open) {
-      inputRef.current?.focus();
-    }
-  }, [open]);
-
   return (
-    <>
-      {open ? (
-        <button
-          type="button"
-          className={styles.popoverBackdrop}
-          aria-label="Закрыть"
-          onClick={() => onOpenChange(false)}
-        />
-      ) : null}
-      <div className={styles.popoverAnchor} ref={anchorRef}>
-        <button
-          type="button"
-          className={cn(
-            styles.toolbarIconBtn,
-            (open || value.trim()) && styles.toolbarIconBtnActive,
-          )}
-          aria-label="Поиск"
-          aria-expanded={open}
-          onClick={() => onOpenChange(!open)}
-        >
-          <Search size={17} aria-hidden />
-        </button>
-        {open ? (
-          <div className={styles.searchPopover} role="dialog" aria-label="Поиск">
-            <label className={styles.searchField}>
-              <Search size={15} aria-hidden />
-              <input
-                ref={inputRef}
-                className={styles.searchInput}
-                value={value}
-                onChange={(event) => onChange(event.target.value)}
-                placeholder={placeholder}
-              />
-            </label>
-          </div>
-        ) : null}
-      </div>
-    </>
+    <label className={styles.searchField}>
+      <Search size={17} aria-hidden />
+      <input
+        type="search"
+        className={styles.searchInput}
+        aria-label={placeholder.replace("…", "")}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+      />
+    </label>
   );
 }
 
@@ -359,7 +305,6 @@ export function AdminTrainingSection() {
   const [transformModalOpen, setTransformModalOpen] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const [searchTerm, setSearchTerm] = useState("");
-  const [searchOpen, setSearchOpen] = useState(false);
 
   const loadCatalog = useCallback(async () => {
     setLoading(true);
@@ -426,7 +371,6 @@ export function AdminTrainingSection() {
 
   useEffect(() => {
     setSearchTerm("");
-    setSearchOpen(false);
   }, [view, selectedDirection?.id, selectedSection?.id]);
 
   const refresh = () => setReloadKey((v) => v + 1);
@@ -677,12 +621,10 @@ export function AdminTrainingSection() {
                 </button>
               ))}
             </div>
-            <AdminSearchPopover
+            <AdminSearchField
               value={searchTerm}
               onChange={setSearchTerm}
               placeholder="Поиск раздела…"
-              open={searchOpen}
-              onOpenChange={setSearchOpen}
             />
           </div>
 
@@ -814,12 +756,10 @@ export function AdminTrainingSection() {
               <Wand2 size={16} aria-hidden />
               Трансформировать в тест
             </Button></EditOnly>
-            <AdminSearchPopover
+            <AdminSearchField
               value={searchTerm}
               onChange={setSearchTerm}
               placeholder="Поиск по вопросу или ответу…"
-              open={searchOpen}
-              onOpenChange={setSearchOpen}
             />
           </div>
 
