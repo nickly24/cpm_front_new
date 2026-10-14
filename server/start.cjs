@@ -1,10 +1,13 @@
 'use strict';
 const { spawn } = require('node:child_process');
-const { readFileSync } = require('node:fs');
+const { loadTransportKey } = require('./transport-key.cjs');
 const { createTunnel } = require('./ssh-tunnel.cjs');
 const config = require('./tunnel-config.json');
 let child;
-const tunnel = createTunnel({ ...config, privateKey: readFileSync('/tmp/cpm-bff-transport.key') }, {
+const privateKey = loadTransportKey(process.env);
+// Next itself does not need the transport credential.
+delete process.env.CPM_BFF_SSH_PRIVATE_KEY_B64;
+const tunnel = createTunnel({ ...config, privateKey }, {
   log: state => console.log('[bff-transport]', state),
 });
 let stopping = false;

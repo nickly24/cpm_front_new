@@ -97,7 +97,7 @@ are accepted; local MinIO is a development default. Upload requests do not carry
 
 ### Production SSH transport
 
-`npm start` runs `server/start.cjs`, establishes the pinned SSH connection, then starts the standard Next server. The hosting start command must first create `/tmp/cpm-bff-transport.key` with mode 0600 from the separately supplied deployment key. Never put that command or key in this public repository. Existing hosting environment variables do not need changes.
+`npm start` runs `server/start.cjs`, establishes the pinned SSH connection, then starts the standard Next server. Keep the hosting start command as `npm start`. Set the server-only runtime variable `CPM_BFF_SSH_PRIVATE_KEY_B64` to the separately supplied Base64 deployment key. Do not add `NEXT_PUBLIC_` to its name. The launcher reads it in memory and removes it from the environment inherited by Next. Never put the key in this public repository. Existing address variables do not need changes.
 
 Public transport addresses and the SSH host fingerprint are fixed in `server/tunnel-config.json`. On AdminVPS the dedicated user accepts only the frontend server IP and loopback, can forward only to `127.0.0.1:80`, and cannot open shell sessions, other destination ports, reverse tunnels, agent forwarding or a PTY. BFF retains all existing authentication, context and origin checks. The HTTP hop is entirely inside the encrypted channel and server loopback.
 
