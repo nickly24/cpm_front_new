@@ -97,7 +97,7 @@ export async function apiFormRequest<T>(
   formData: FormData,
   options: Omit<RequestInit, "body"> = {},
 ): Promise<T> {
-  if (BFF_DEV) throw new ApiError("Раздел ещё не подключён в локальном режиме", 501);
+  if (BFF_DEV) throw new ApiError("Этот раздел пока недоступен", 501);
   const token = getToken();
   const headers = new Headers(options.headers);
   // The browser must attach the multipart boundary itself.

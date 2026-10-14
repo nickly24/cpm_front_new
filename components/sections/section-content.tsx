@@ -64,7 +64,7 @@ export function SectionContent(props: SectionContentProps) {
     || ["users", "schools", "dashboard", "train", "access", "upload", "organizations", "divisions", "directions"].includes(props.section) && isAdminCabinet(props.role)
     || props.section === "students" && props.role === "proctor"
     || ["dashboard", "tests", "exams", "attendance"].includes(props.section) && props.role === "supervisor";
-  if (BFF_DEV && !connected) return <div className="ds-card"><h1>{getSectionLabel(props.role, props.section)}</h1><p>Раздел ещё не подключён в локальном режиме. Домашние работы, тесты, экзамены и рейтинг доступны в выбранном кабинете с учётом прав.</p></div>;
+  if (BFF_DEV && !connected) return <div className="ds-card"><h1>{getSectionLabel(props.role, props.section)}</h1><p>Этот раздел пока недоступен в выбранном кабинете.</p></div>;
   if (isAdminCabinet(props.role)) {
     return <AdminSectionAccess section={props.section}><SectionBody {...props} role="admin" /></AdminSectionAccess>;
   }

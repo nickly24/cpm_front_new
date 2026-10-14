@@ -2,6 +2,7 @@
 import { domain, getIdentity } from "./client";
 import type { HomeworkWorkspace } from "@/lib/homework-files/types";
 import { homeworkUploadLimits } from "@/lib/homework-files/limits";
+import { assertHomeworkStorageURL } from "@/lib/homework-files/storage-url";
 type Row = Record<string, any>;
 const hw = <T = Row>(path: string, options?: RequestInit) => domain<T>(`/homework/${path}`, options);
 const write = (method: string, body?: unknown): RequestInit => ({ method, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
@@ -94,7 +95,7 @@ export async function legacyHomework(path: string, options: RequestInit = {}): P
     const data = await hw(`report?${q}`);
     return {status:true,homeworks:data.assignments.map((h:Row)=>({...h,deadline:day(h.deadline),type:h.type_name ?? ""})),students:data.students.map((s:Row)=>({id:s.account_id,full_name:s.full_name,class:s.class ?? null,group_name:s.group_name ?? null,results:s.results.map((r:Row)=>({homework_id:r.assignment_id,status:r.result?.status??0,result:r.result?.status===1?r.result.result:null,date_pass:r.result?.date_pass??null,status_text:r.result?.status===1?"Сдано":late(data.assignments.find((h:Row)=>h.id===r.assignment_id)?.deadline)>0?"Просрочено":"Не начато",days_overdue:late(data.assignments.find((h:Row)=>h.id===r.assignment_id)?.deadline,r.result?.date_pass),deadline:day(data.assignments.find((h:Row)=>h.id===r.assignment_id)?.deadline)}))}))};
   }
-  throw new Error("Раздел ещё не подключён в локальном режиме");
+  throw new Error("Этот раздел пока недоступен");
 }
 export async function filesHomework<T>(path: string, options: RequestInit = {}): Promise<T> {
   const url = new URL(path, "http://local");
@@ -113,7 +114,7 @@ export async function filesHomework<T>(path: string, options: RequestInit = {}):
       storage.state === "stale" ? "storage_stale" : storage.state === "error" ? "storage_unavailable" : storage.state !== "ok" ? "storage_unknown" : null].filter(Boolean);
     return {...data, worker, storage, processing_ready: data.processing_ready === true && broker === true && worker.state === "ok" && worker.rabbitmq === true && worker.tools === true && typeof worker.processing === "boolean" && worker.fresh_instances > 0 && storage.state === "ok", warnings, delivery:{connected:broker,pending:data.outbox_pending}} as T;
   }
-  if (p.endsWith("/file-url") && new URL(data.url).origin !== "http://127.0.0.1:19000") throw new Error("Недопустимое dev-хранилище");
+  if (p.endsWith("/file-url")) assertHomeworkStorageURL(data.url);
   if (p.endsWith("/workspace")) return workspace(data) as T;
   if (p === "review-queue" || p === "archive") return {...data,items:data.items.map((r:Row)=>({...r,student_id:r.account_id,reviewer_id:r.reviewer_account_id,reviewer_role:r.reviewer_account_id===getIdentity()?.user.account_id ? getIdentity()?.user.role : null}))} as T;
   return data as T;

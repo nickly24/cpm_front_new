@@ -34,9 +34,9 @@ describe("BFF adapter contract",()=>{
   domain.mockResolvedValue({legacy_result:{status:1,result:0},submission:{state:"graded",reviewer:{account_id:9,role:"proctor"}},limits:{max_source_bytes:12345,max_output_bytes:6789,max_pages:8,dpi:100,jpeg_quality:60}});
   expect(await filesHomework("/api/workspaces/7?student_id=21")).toMatchObject({legacy_result:{result:0},submission:{reviewer:{id:9}},limits:{max_bytes:12345,max_source_bytes:12345,max_output_bytes:6789,max_pages:8,dpi:100,jpeg_quality:60}});
  });
- it("fails closed on non-local signed URLs and unconnected legacy routes",async()=>{
-  domain.mockResolvedValue({url:"https://example.invalid/file"});await expect(filesHomework("/api/submissions/50/file-url")).rejects.toThrow("dev-хранилище");
-  await expect(legacyHomework("/api/telegram-bot")).rejects.toThrow("не подключён");
+ it("fails closed on unconfigured storage URLs and unconnected legacy routes",async()=>{
+  domain.mockResolvedValue({url:"https://example.invalid/file"});await expect(filesHomework("/api/submissions/50/file-url")).rejects.toThrow("адрес хранилища");
+  await expect(legacyHomework("/api/telegram-bot")).rejects.toThrow("пока недоступен");
  });
  it("propagates access failure without returning an empty list",async()=>{
   domain.mockRejectedValue(Object.assign(new Error("access_denied"),{status:403}));await expect(legacyHomework("/api/get-homeworks")).rejects.toThrow("access_denied");

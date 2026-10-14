@@ -46,7 +46,7 @@ async function request<T>(path: string, options: RequestInit, binary: boolean): 
       if (!res.ok) {
         if (data.error === "context_changed") { resetRequests(); window.location.replace(window.location.pathname); }
         if (res.status === 401 && path !== "/auth/login" && path !== "/auth/me") window.dispatchEvent(new Event("bff-session-expired"));
-        const labels: Record<string,string> = { invalid_credentials: "Неверный логин или пароль", session_expired: "Сессия завершена. Войдите снова", access_denied: "Недостаточно прав в выбранном кабинете", upstream_unavailable: "Сервис временно недоступен", section_not_connected: "Раздел ещё не подключён в локальном режиме" };
+        const labels: Record<string,string> = { invalid_credentials: "Неверный логин или пароль", session_expired: "Сессия завершена. Войдите снова", access_denied: "Недостаточно прав в выбранном кабинете", upstream_unavailable: "Сервис временно недоступен", section_not_connected: "Этот раздел пока недоступен" };
         throw Object.assign(new Error(labels[data.error] || data.error || "Ошибка сервера"), { status: res.status, code: data.error,
           retryAfterMs: parseRetryAfterMs(res.headers?.get("Retry-After")),
         });

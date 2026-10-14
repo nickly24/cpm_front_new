@@ -138,7 +138,7 @@ export function CoreOrganizationWorkspace({ initialTab = "organizations" }: { in
     catch (reason) { setRecoveryError(coreOrganizationError(reason).message); await refresh(); }
     finally { setBusy(false); }
   };
-  if (!BFF_DEV) return <div className={styles.page}><h1>Организация</h1><p>Управление организацией доступно в локальном режиме нового сервиса.</p></div>;
+  if (!BFF_DEV) return <div className={styles.page}><h1>Организация</h1><p>Управление организацией сейчас недоступно.</p></div>;
   const visibleAccounts = accounts?.filter(account => `${account.full_name} ${account.login} ${account.account_id}`.toLocaleLowerCase("ru").includes(query.trim().toLocaleLowerCase("ru"))) ?? [];
   const remainingDivisions = catalog?.divisions.filter(division => !memberships?.memberships.some(row => row.division_id === division.id)) ?? [];
 

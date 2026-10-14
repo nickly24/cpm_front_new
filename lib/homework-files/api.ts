@@ -12,6 +12,7 @@ import type {
   HomeworkUploadLimits,
 } from "./types";
 import { homeworkMiB, homeworkUploadLimits } from "./limits";
+import { assertHomeworkStorageURL } from "./storage-url";
 
 const ERROR_LABELS: Record<string, string> = {
   unauthorized: "Нужно войти в кабинет заново",
@@ -159,10 +160,14 @@ export function postFileToS3(
   if (!initialization.upload) return Promise.resolve();
   const accepted = homeworkUploadLimits(initialization.job.limits);
   if (accepted && file.size > accepted.max_source_bytes) return Promise.reject(Object.assign(new Error(homeworkErrorMessage("source_too_large", accepted)), { code: "source_too_large" }));
-  if (BFF_DEV && new URL(initialization.upload.url).origin !== "http://127.0.0.1:19000") return Promise.reject(new Error("Недопустимое dev-хранилище"));
+  if (BFF_DEV) {
+    try { assertHomeworkStorageURL(initialization.upload.url); }
+    catch (error) { return Promise.reject(error); }
+  }
   return new Promise<void>((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open(initialization.upload!.method, initialization.upload!.url);
+    xhr.withCredentials = false;
     xhr.timeout = 180_000;
     const abort = () => xhr.abort();
     signal?.addEventListener("abort", abort, { once: true });

@@ -73,6 +73,7 @@ Set these public variables in the Timeweb application **before** `npm run build`
 NEXT_PUBLIC_CPM_BFF_ENABLED=1
 NEXT_PUBLIC_CPM_BFF_BASE_URL=https://back1.cpm-lms.ru/bff/
 NEXT_PUBLIC_CPM_BFF_EXTERNAL_TESTS_ENABLED=1
+NEXT_PUBLIC_CPM_S3_ORIGINS=https://s3.twcstorage.ru
 ```
 
 Next.js embeds these variables in the client bundle at build time; changing only the
@@ -87,4 +88,9 @@ For the local contour, keep `NEXT_PUBLIC_CPM_BFF_DEV=1` and base URL `/bff`.
 Local rewrite/CSP are enabled only by the development Next.js server. Production uses
 `.next` and the explicit HTTPS backend; it does not rewrite requests to localhost.
 The original `BFF_DEV` export is retained as an adapter compatibility name; production
-activates it through `NEXT_PUBLIC_CPM_BFF_ENABLED`.
+uses the Go BFF unconditionally. Without an explicit URL, production defaults to
+`https://back1.cpm-lms.ru/bff/`, never to a local rewrite or the legacy backend.
+The BFF flags remain compatible only for development and tests.
+
+Homework PDF URLs use the actual external HTTPS S3 endpoint. Only configured storage origins
+are accepted; local MinIO is a development default. Upload requests do not carry BFF cookies.
