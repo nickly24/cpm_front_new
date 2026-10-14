@@ -18,7 +18,7 @@ export function CabinetContext() {
  };
  const organization = user.organizations?.find(o=>o.id===user.organization_id);
  return <div className={styles.context}>
-  <label><span>{organization?.name} · Локальный режим</span><select aria-label="Переключить кабинет и подразделение" value={value} disabled={busy} onChange={e=>void switchTo(e.target.value)}>
+  <label><span>{organization?.name}</span><select aria-label="Переключить кабинет и подразделение" value={value} disabled={busy} onChange={e=>void switchTo(e.target.value)}>
    {user.organizations?.map(o=><optgroup key={o.id} label={o.name}>{o.divisions.length?o.divisions.map(d=><option key={d.id} value={`${o.id}:${d.id}`}>Кабинет {ROLE_LABELS[user.role]} · {d.name}</option>):<option value={`${o.id}:`}>Кабинет {ROLE_LABELS[user.role]} · {o.name}</option>}</optgroup>)}
   </select></label>{error?<p role="alert">{error}</p>:null}
  </div>;
