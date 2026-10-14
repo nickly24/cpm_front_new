@@ -7,9 +7,10 @@
     "build": "next build",
     "start": "node server/start.cjs",
     "lint": "eslint",
-    "test": "vitest run",
+    "test": "vitest run && npm run test:transport",
     "predev": "node scripts/sync-pdf-worker.mjs",
-    "prebuild": "node scripts/sync-pdf-worker.mjs"
+    "prebuild": "node scripts/sync-pdf-worker.mjs",
+    "test:transport": "node --test server/*.test.cjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
