@@ -18,14 +18,14 @@ describe("production BFF cutover", () => {
     vi.stubGlobal("fetch", fetcher);
     const { bffRequest } = await import("./client");
     await bffRequest("/auth/me");
-    expect(fetcher.mock.calls[0][0]).toBe("https://back1.cpm-lms.ru/bff/auth/me");
+    expect(fetcher.mock.calls[0][0]).toBe("https://back1.cpm-lms.ru:8443/bff/auth/me");
     expect(fetcher.mock.calls[0][1].credentials).toBe("include");
   });
 
   it("uses the configured HTTPS BFF for JSON and downloads with cookie credentials", async () => {
     vi.stubEnv("NEXT_PUBLIC_CPM_BFF_ENABLED", "1");
     vi.stubEnv("NEXT_PUBLIC_CPM_BFF_DEV", "0");
-    vi.stubEnv("NEXT_PUBLIC_CPM_BFF_BASE_URL", "https://back1.cpm-lms.ru/bff/");
+    vi.stubEnv("NEXT_PUBLIC_CPM_BFF_BASE_URL", "https://back1.cpm-lms.ru:8443/bff/");
     vi.stubEnv("NEXT_PUBLIC_CPM_BFF_EXTERNAL_TESTS_ENABLED", "1");
     const config = await import("@/lib/config");
     expect(config.BFF_DEV).toBe(true);
@@ -37,8 +37,8 @@ describe("production BFF cutover", () => {
     await bffRequest("/auth/me", { headers: { Authorization: "Bearer must-not-leak" } });
     expect(await bffBlobRequest("/uploads/files/id/download")).toBe(blob);
     expect(fetcher.mock.calls.map(call => call[0])).toEqual([
-      "https://back1.cpm-lms.ru/bff/auth/me",
-      "https://back1.cpm-lms.ru/bff/uploads/files/id/download",
+      "https://back1.cpm-lms.ru:8443/bff/auth/me",
+      "https://back1.cpm-lms.ru:8443/bff/uploads/files/id/download",
     ]);
     for (const [, options] of fetcher.mock.calls) {
       expect(options.credentials).toBe("include");
