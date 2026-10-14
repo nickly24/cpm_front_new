@@ -6,11 +6,12 @@ import { AdminListPaginationBar } from "@/components/admin/tests/admin-list-pagi
 import styles from "@/components/admin/tests/admin-tests.module.css";
 import userStyles from "@/components/admin/users/admin-users.module.css";
 import { AdminStudentPanel } from "@/components/admin/users/admin-student-panel";
+import { AdminStudentDeletionManager } from "@/components/admin/users/admin-student-deletion";
+import type { DeletionStudent } from "@/lib/admin/student-deletion";
 import { Button } from "@/components/ui/button";
 import { FilterPopover } from "@/components/ui/filter-popover";
 import { LoadingState } from "@/components/ui/loading-state";
 import {
-  deleteAdminUser,
   editAdminStudent,
   fetchAdminGroupsList,
   fetchAdminStudents,
@@ -45,6 +46,8 @@ export function AdminStudentsTab() {
   const [page, setPage] = useState(1);
   const [panelMode, setPanelMode] = useState<"add" | "edit" | null>(null);
   const [editing, setEditing] = useState<AdminStudent | null>(null);
+  const [deleting, setDeleting] = useState<DeletionStudent | null>(null);
+  const canDelete = !BFF_DEV && canAccessSection(user, "users", "edit");
 
   const classOptions = useMemo(
     () => Array.from(new Set(students.map((student) => student.class))).sort((a, b) => a - b),
@@ -98,19 +101,24 @@ export function AdminStudentsTab() {
     });
   }, [students, debouncedSearch, groupFilter, classFilter]);
 
-  const pagination = toClientPagination(page, PAGE_SIZE, filtered.length);
-  const pageItems = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const visiblePage = Math.min(page, Math.max(1, Math.ceil(filtered.length / PAGE_SIZE)));
+  const pagination = toClientPagination(visiblePage, PAGE_SIZE, filtered.length);
+  const pageItems = filtered.slice((visiblePage - 1) * PAGE_SIZE, visiblePage * PAGE_SIZE);
+
+  const handleDeletionCompleted = useCallback((studentId: number) => {
+    setStudents(previous => previous.filter(student => student.id !== studentId));
+    void load();
+  }, [load]);
 
   const handleDelete = async (student: AdminStudent) => {
-    if (!window.confirm(BFF_DEV ? `${student.is_active === false ? "Активировать" : "Заблокировать"} учётную запись «${student.full_name}»? История сохраняется.` : `Удалить ученика «${student.full_name}»?`)) {
+    if (!BFF_DEV) {
+      if (canDelete) setDeleting({ id: student.id, name: student.full_name,
+        group_name: groups.find(group => group.group_id === student.group_id)?.group_name ?? null });
       return;
     }
-    try {
-      if (BFF_DEV) {await activateCoreUser(student.id, student.is_active === false);await load();}
-      else {await deleteAdminUser("student", student.id);setStudents((prev) => prev.filter((s) => s.id !== student.id));}
-    } catch (err) {
-      window.alert(err instanceof Error ? err.message : "Ошибка удаления");
-    }
+    if (!window.confirm(`${student.is_active === false ? "Активировать" : "Заблокировать"} учётную запись «${student.full_name}»? История сохраняется.`)) return;
+    try { await activateCoreUser(student.id, student.is_active === false); await load(); }
+    catch (err) { window.alert(err instanceof Error ? err.message : "Ошибка изменения статуса"); }
   };
 
   const handleGroupChange = async (student: AdminStudent, value: string) => {
@@ -215,6 +223,14 @@ export function AdminStudentsTab() {
           </Button></CoreEditOnly>
         </div>
       </div>
+
+      {canDelete && user ? <AdminStudentDeletionManager
+        key={`${user.role}:${user.id}`}
+        owner={`${user.role}:${user.id}`}
+        selected={deleting}
+        onSelect={setDeleting}
+        onCompleted={handleDeletionCompleted}
+      /> : null}
 
       <p className={styles.resultsSummary}>Найдено учеников: <strong>{filtered.length}</strong>{filtered.length !== students.length ? ` из ${students.length}` : ""}</p>
 
