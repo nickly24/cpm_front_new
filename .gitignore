@@ -45,3 +45,6 @@ next-env.d.ts
 /public/pdf.worker.min.mjs
 
 /.next-bff/
+
+# Private runtime transport material must never be published.
+/server/*key*.pem

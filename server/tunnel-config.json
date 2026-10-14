@@ -1,0 +1,9 @@
+{
+  "host": "185.239.51.138",
+  "username": "cpm-front-tunnel",
+  "hostSHA256": "51ad03c0515fdbdee5333e5105907b030e74e99c12a818b112a2872bf601f1cf",
+  "port": 22,
+  "localPort": 19445,
+  "targetHost": "127.0.0.1",
+  "targetPort": 80
+}
