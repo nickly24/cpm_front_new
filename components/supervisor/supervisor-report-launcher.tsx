@@ -48,6 +48,7 @@ export function SupervisorReportLauncher({
 
       {modalOpen ? (
         <PeriodModal
+          title={title}
           onClose={() => setModalOpen(false)}
           onCreate={(nextPeriod) => {
             setPeriod(nextPeriod);

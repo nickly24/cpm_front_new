@@ -1,4 +1,4 @@
-export type HomeworkTypeFilter = "all" | "ОВ" | "ДЗНВ";
+export type HomeworkTypeFilter = string;
 export type HomeworkStatusFilter = "all" | "done" | "undone" | "in_review" | "revision";
 
 export type HomeworkDeadlineState =

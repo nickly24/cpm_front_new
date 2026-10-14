@@ -20,6 +20,8 @@ import {
 } from "@/lib/training/training-types";
 import { calcProgressPercent } from "@/lib/training/training-utils";
 import { cn } from "@/lib/cn";
+import { BFF_DEV } from "@/lib/config";
+import { useContextGuard } from "@/lib/bff/use-context-guard";
 import {
   ArrowLeft,
   Check,
@@ -59,9 +61,11 @@ const STUDY_FILTER_ICONS: Record<StudyFilter, LucideIcon> = {
 function CardListItem({
   card,
   onToggleLearned,
+  disabled,
 }: {
   card: TrainingCard;
   onToggleLearned: () => void;
+  disabled: boolean;
 }) {
   const status = card.status;
   const isLearned = status === "learned";
@@ -89,6 +93,7 @@ function CardListItem({
           isLearned && styles.cardRowToggleLearned,
         )}
         onClick={onToggleLearned}
+        disabled={disabled}
         aria-label={
           status === "learned"
             ? "Пометить как невыученное"
@@ -124,6 +129,10 @@ export function TrainingSectionDetail({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [savingSettings, setSavingSettings] = useState(false);
+  const [mutating, setMutating] = useState(false);
+  const [mutationError, setMutationError] = useState<string | null>(null);
+  const busyRef = useRef(false);
+  useContextGuard(BFF_DEV && (savingSettings || mutating));
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsSelect, setSettingsSelect] = useState<"size" | "mode" | null>(
     null,
@@ -183,34 +192,44 @@ export function TrainingSectionDetail({
   const persistSettings = async (
     patch: Partial<{ batch_size: number; study_mode: StudyFilter; last_batch_index: number }>,
   ) => {
+    if (busyRef.current) return false;
+    busyRef.current = true;
     setSavingSettings(true);
+    setMutationError(null);
     try {
-      await updateSectionStudySettings(studentId, sectionKind, sectionRefId, {
+      const result = await updateSectionStudySettings(studentId, sectionKind, sectionRefId, {
         batch_size: patch.batch_size ?? batchSize,
         study_mode: patch.study_mode ?? studyMode,
         last_batch_index: patch.last_batch_index ?? selectedBatch,
       });
+      if (result.settings) {
+        setBatchSize(result.settings.batch_size); setStudyMode(result.settings.study_mode);
+        setSelectedBatch(patch.last_batch_index === -1 ? -1 : result.settings.last_batch_index ?? 0);
+      }
+      return true;
+    } catch (value) {
+      setMutationError(value instanceof Error ? value.message : "Не удалось сохранить настройки");
+      return false;
     } finally {
+      busyRef.current = false;
       setSavingSettings(false);
     }
   };
 
   const handleBatchSizeChange = async (size: number) => {
-    setBatchSize(size);
-    setSelectedBatch(0);
-    await persistSettings({ batch_size: size, last_batch_index: 0 });
-    void load();
+    if (await persistSettings({ batch_size: size, last_batch_index: 0 })) void load();
   };
 
   const handleStudyModeChange = async (mode: StudyFilter) => {
-    setStudyMode(mode);
     await persistSettings({ study_mode: mode });
   };
 
   const handleToggleLearned = async (card: TrainingCard) => {
+    if (busyRef.current) return;
+    busyRef.current = true; setMutating(true); setMutationError(null);
     try {
       if (card.status === "learned") {
-        await unmarkCardLearned(studentId, card.card_ref);
+        await unmarkCardLearned(studentId, card.card_ref, { kind: sectionKind, ref: sectionRefId });
       } else {
         await markCardLearned({
           student_id: studentId,
@@ -221,9 +240,10 @@ export function TrainingSectionDetail({
         });
       }
       await load();
-    } catch {
-      /* ignore */
-    }
+    } catch (value) {
+      setMutationError(value instanceof Error ? value.message : "Не удалось сохранить прогресс");
+      if (typeof value === "object" && value && "code" in value && value.code === "content_changed") await load();
+    } finally { busyRef.current = false; setMutating(false); }
   };
 
   if (loading) {
@@ -234,19 +254,21 @@ export function TrainingSectionDetail({
     return <p className={styles.alert}>{error}</p>;
   }
 
-  const currentBatch = batches[selectedBatch];
-  const progressPercent = calcProgressPercent(stats.learned, stats.total);
+  const currentBatch = batches.find((batch) => batch.index === selectedBatch);
+  const progressPercent = BFF_DEV ? stats.progress_percent ?? 0 : calcProgressPercent(stats.learned, stats.total);
   const progressFillPercent = progressPercent > 0 ? Math.max(progressPercent, 2) : 0;
   const SectionKindIcon = section.kind === "test" ? FileText : ClipboardList;
-  const cardGroups = cards.reduce<TrainingCard[][]>((groups, card, index) => {
-    const groupIndex = Math.floor(index / batchSize);
-    if (!groups[groupIndex]) groups[groupIndex] = [];
-    groups[groupIndex].push(card);
-    return groups;
-  }, []);
+  const cardGroups = batches
+    .filter((batch) => selectedBatch === -1 || batch.index === selectedBatch)
+    .map((batch) => ({
+      ...batch,
+      cards: cards.slice(batch.from - 1, batch.to),
+    }));
+  const visibleCardCount = cardGroups.reduce((total, group) => total + group.cards.length, 0);
 
   return (
     <div className={styles.page}>
+      {mutationError && <p className={styles.alert} role="alert">{mutationError}</p>}
       <div className={styles.backRow}>
         <button type="button" className={styles.backButton} onClick={onBack}>
           <ArrowLeft size={16} aria-hidden />
@@ -358,6 +380,7 @@ export function TrainingSectionDetail({
                     <button
                       key={size}
                       type="button"
+                      disabled={savingSettings || mutating}
                       className={cn(
                         styles.settingsOption,
                         batchSize === size && styles.settingsOptionActive,
@@ -401,6 +424,7 @@ export function TrainingSectionDetail({
                       <button
                         key={mode}
                         type="button"
+                        disabled={savingSettings || mutating}
                         className={cn(
                           styles.settingsOption,
                           studyMode === mode && styles.settingsOptionActive,
@@ -431,7 +455,8 @@ export function TrainingSectionDetail({
                 styles.batchRowAll,
                 selectedBatch === -1 && styles.batchRowActive,
               )}
-              onClick={() => setSelectedBatch(-1)}
+              disabled={savingSettings || mutating}
+              onClick={() => void persistSettings({ last_batch_index: -1 })}
             >
               <span className={styles.batchRowRange}>Все карточки</span>
               <span className={styles.batchRowMark} aria-hidden>
@@ -452,7 +477,7 @@ export function TrainingSectionDetail({
               </div>
             </button>
             {batches.map((batch) => {
-              const batchPercent = calcProgressPercent(
+              const batchPercent = BFF_DEV ? batch.stats.progress_percent ?? 0 : calcProgressPercent(
                 batch.stats.learned,
                 batch.stats.total,
               );
@@ -460,12 +485,12 @@ export function TrainingSectionDetail({
                 <button
                   key={batch.index}
                   type="button"
+                  disabled={savingSettings || mutating}
                   className={cn(
                     styles.batchRow,
                     selectedBatch === batch.index && styles.batchRowActive,
                   )}
                   onClick={() => {
-                    setSelectedBatch(batch.index);
                     void persistSettings({ last_batch_index: batch.index });
                   }}
                 >
@@ -498,6 +523,7 @@ export function TrainingSectionDetail({
           <Button
             type="button"
             className={styles.studyCta}
+            disabled={savingSettings || mutating}
             onClick={() => onStartFlashcards(selectedBatch, studyMode)}
           >
             <Play size={18} aria-hidden />
@@ -509,6 +535,7 @@ export function TrainingSectionDetail({
           <Button
             type="button"
             className={styles.studyCta}
+            disabled={savingSettings || mutating}
             onClick={() => onStartFlashcards(-1, studyMode)}
           >
             <Play size={18} aria-hidden />
@@ -519,34 +546,33 @@ export function TrainingSectionDetail({
 
       <section className={styles.cardsPanel}>
         <div className={styles.cardsSectionHead}>
-          <h3 className={styles.cardsSectionTitle}>Карточки выбранного набора</h3>
+          <h3 className={styles.cardsSectionTitle}>
+            {selectedBatch === -1 ? "Карточки раздела" : "Карточки выбранного набора"}
+          </h3>
           <span className={styles.cardsSectionCount}>
-            {cards.length} · {cardGroups.length} наборов
+            Карточек: {visibleCardCount} · наборов: {cardGroups.length}
           </span>
         </div>
-        {cardGroups.map((group, groupIndex) => {
-          const from = groupIndex * batchSize + 1;
-          const to = from + group.length - 1;
-          return (
-            <div key={`group-${groupIndex}`} className={styles.cardsGroup}>
-              <div className={styles.cardsGroupHead}>
-                <span className={styles.cardsGroupDivider} aria-hidden />
-                <h4 className={styles.cardsGroupTitle}>
-                  Набор {groupIndex + 1}: {from}–{to}
-                </h4>
-              </div>
-              <div className={styles.cardsList}>
-                {group.map((card) => (
-                  <CardListItem
-                    key={card.card_ref}
-                    card={card}
-                    onToggleLearned={() => void handleToggleLearned(card)}
-                  />
-                ))}
-              </div>
+        {cardGroups.map((group) => (
+          <div key={`group-${group.index}`} className={styles.cardsGroup}>
+            <div className={styles.cardsGroupHead}>
+              <span className={styles.cardsGroupDivider} aria-hidden />
+              <h4 className={styles.cardsGroupTitle}>
+                Набор {group.index + 1}: {group.from}–{group.to}
+              </h4>
             </div>
-          );
-        })}
+            <div className={styles.cardsList}>
+              {group.cards.map((card) => (
+                <CardListItem
+                  disabled={savingSettings || mutating}
+                  key={card.card_ref}
+                  card={card}
+                  onToggleLearned={() => void handleToggleLearned(card)}
+                />
+              ))}
+            </div>
+          </div>
+        ))}
       </section>
     </div>
   );

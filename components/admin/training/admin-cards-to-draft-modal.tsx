@@ -5,6 +5,9 @@ import uploadStyles from "@/components/admin/upload/admin-upload.module.css";
 import { Button } from "@/components/ui/button";
 import { DismissibleOverlay } from "@/components/ui/dismissible-overlay";
 import { LoadingState } from "@/components/ui/loading-state";
+import { BFF_DEV } from "@/lib/config";
+import { cardsTransformDraft, cardsUncertain } from "@/lib/bff/cards";
+import { useContextGuard } from "@/lib/bff/use-context-guard";
 import {
   commitCardTransformSession,
   createCardTransformSession,
@@ -34,6 +37,9 @@ export function AdminCardsToDraftModal({
   const [search, setSearch] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [uncertain, setUncertain] = useState(false);
+  useContextGuard(BFF_DEV);
+  const close = () => { if (!submitting && !uncertain) onClose(); };
 
   useEffect(() => {
     document.body.style.overflow = "hidden";
@@ -95,6 +101,18 @@ export function AdminCardsToDraftModal({
     setSubmitting(true);
     setError(null);
     try {
+      if (BFF_DEV) {
+        if (!canAccessSection(user, "tests", "edit")) throw new Error("Для создания черновика нужно право редактирования тестов");
+        if (selectedCount > 200) throw new Error("Выберите не более 200 карточек");
+        const selected = cards.filter(card => selectedIds.has(card.id));
+        if (selected.some(card => [...card.answer].length > 1000)) throw new Error("Ответ для теста должен содержать не более 1000 символов");
+        const result = await cardsTransformDraft(section.id, selected.map(card => card.id));
+        if (!result.draft_id) throw new Error("Сервер не подтвердил создание черновика");
+        onClose();
+        if (canAccessSection(user, "tests")) router.push(adminHref(user, "tests"));
+        else window.alert(`Создан черновик ${result.draft_id}. Для просмотра нужно право просмотра тестов.`);
+        return;
+      }
       const session = await createCardTransformSession(
         section.id,
         Array.from(selectedIds),
@@ -107,6 +125,7 @@ export function AdminCardsToDraftModal({
       if (canAccessSection(user, "upload")) router.push(adminHref(user, "upload"));
       else window.alert("Преобразование запущено. Готовый черновик появится в разделе «Тесты».");
     } catch (err) {
+      setUncertain(cardsUncertain(err));
       setError(err instanceof Error ? err.message : "Не удалось запустить трансформацию");
     } finally {
       setSubmitting(false);
@@ -114,7 +133,7 @@ export function AdminCardsToDraftModal({
   };
 
   return (
-    <DismissibleOverlay className={styles.overlay} onDismiss={onClose}>
+    <DismissibleOverlay className={styles.overlay} onDismiss={close}>
       <div
         className={styles.modal}
         onClick={(event) => event.stopPropagation()}
@@ -125,8 +144,7 @@ export function AdminCardsToDraftModal({
         <h2 className={styles.modalTitle}>Трансформировать в тест</h2>
         <p className={styles.modalHint}>
           Раздел «{section.name}». Драфт будет называться «{draftTitle}». Каждая
-          карточка станет text-вопросом с одним ответом целиком. Прогресс — в
-          разделе «Загрузка» → «Журнал».
+          карточка станет text-вопросом с одним ответом целиком. {BFF_DEV ? "Готовый черновик появится в разделе «Тесты» в выбранном подразделении." : "Прогресс — в разделе «Загрузка» → «Журнал»."}
         </p>
 
         <div className={uploadStyles.previewFilters}>
@@ -137,10 +155,10 @@ export function AdminCardsToDraftModal({
             value={search}
             onChange={(event) => setSearch(event.target.value)}
           />
-          <Button type="button" variant="ghost" size="sm" onClick={selectAllVisible}>
+          <Button type="button" variant="ghost" size="sm" disabled={submitting || uncertain} onClick={allVisibleSelected ? clearVisible : selectAllVisible}>
             {allVisibleSelected ? "Снять видимые" : "Выбрать видимые"}
           </Button>
-          <Button type="button" variant="ghost" size="sm" onClick={clearVisible}>
+          <Button type="button" variant="ghost" size="sm" disabled={submitting || uncertain} onClick={clearVisible}>
             Снять выбор
           </Button>
         </div>
@@ -168,6 +186,7 @@ export function AdminCardsToDraftModal({
                     <input
                       type="checkbox"
                       checked={selectedIds.has(card.id)}
+                      disabled={submitting || uncertain}
                       onChange={() => toggleCard(card.id)}
                     />
                   </td>
@@ -182,7 +201,7 @@ export function AdminCardsToDraftModal({
         {error ? <p className={styles.alert}>{error}</p> : null}
 
         <div className={uploadStyles.actions}>
-          <Button type="button" variant="ghost" onClick={onClose} disabled={submitting}>
+          <Button type="button" variant="ghost" onClick={close} disabled={submitting || uncertain}>
             Отмена
           </Button>
           <Button
@@ -190,12 +209,12 @@ export function AdminCardsToDraftModal({
             disabled={submitting || selectedCount === 0}
             onClick={() => void handleSubmit()}
           >
-            {submitting ? "Запуск…" : "Запустить трансформацию"}
+            {submitting ? "Создание…" : uncertain ? "Повторить создание" : BFF_DEV ? "Создать черновик" : "Запустить трансформацию"}
           </Button>
         </div>
 
         {submitting ? (
-          <LoadingState label="Запуск фоновой трансформации…" variant="inline" />
+          <LoadingState label={BFF_DEV ? "Создание черновика…" : "Запуск фоновой трансформации…"} variant="inline" />
         ) : null}
       </div>
     </DismissibleOverlay>

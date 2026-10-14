@@ -2,6 +2,8 @@
 
 import { useAuth } from "@/contexts/AuthContext";
 import QRCode from "qrcode";
+import Link from "next/link";
+import { BFF_DEV } from "@/lib/config";
 import { QrCode } from "lucide-react";
 import { useEffect, useId, useState } from "react";
 import styles from "./performance.module.css";
@@ -15,7 +17,7 @@ export function AttendanceQrCard() {
   const panelId = useId();
 
   useEffect(() => {
-    if (!isOpen || studentId == null) {
+    if (BFF_DEV || !isOpen || studentId == null) {
       return;
     }
 
@@ -54,6 +56,14 @@ export function AttendanceQrCard() {
       cancelled = true;
     };
   }, [isOpen, studentId]);
+
+  if (BFF_DEV) return (
+    <section className={styles.qrCard}>
+      <h2 className={styles.qrTitle}>QR для посещаемости</h2>
+      <p className={styles.qrSubtitle}>Выберите подразделение и день занятия, чтобы получить временный QR-код.</p>
+      <Link className={styles.btn} href="/cabinet/student/attendance">Выбрать день и показать QR</Link>
+    </section>
+  );
 
   return (
     <section className={styles.qrCard}>

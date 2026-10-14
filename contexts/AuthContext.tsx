@@ -1,4 +1,7 @@
 "use client";
+import { BFF_DEV } from "@/lib/config";
+import { resetRequests } from "@/lib/bff/client";
+
 
 import {
   createContext,
@@ -33,13 +36,16 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [connectionError, setConnectionError] = useState(false);
 
   const checkAuth = useCallback(async () => {
-    setLoading(true);
 
     try {
       const currentUser = await checkAuthRequest();
       setUser(currentUser);
+      setConnectionError(false);
+    } catch {
+      setConnectionError(true);
     } finally {
       setLoading(false);
     }
@@ -63,6 +69,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const timer = window.setInterval(focus, 30_000);
     return () => { active = false; window.removeEventListener("focus", focus); window.clearInterval(timer); };
   }, [user?.role]);
+
+  useEffect(() => {
+    if (!BFF_DEV) return;
+    const expired = () => { resetRequests(); setUser(null); };
+    const sync = (event: StorageEvent) => { if (event.key === "cpm-bff-session-event") { resetRequests(); window.location.replace(window.location.pathname); } };
+    const focus = () => { void checkAuthRequest(true).then(value => setUser(value)).catch(() => {}); };
+    window.addEventListener("storage", sync); window.addEventListener("focus", focus); window.addEventListener("bff-session-expired", expired);
+    const timer = window.setInterval(focus, 30000);
+    return () => { window.removeEventListener("storage", sync); window.removeEventListener("focus", focus); window.removeEventListener("bff-session-expired", expired); clearInterval(timer); };
+  }, []);
 
   const login = useCallback(async (username: string, password: string) => {
     const result = await loginRequest(username, password);
@@ -92,7 +108,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [user, loading, login, logout],
   );
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={value}>{BFF_DEV && connectionError ? <div className="login-page"><div className="ds-card" role="alert"><h2>Сервис входа временно недоступен</h2><p>Повторите подключение. Текущая сессия сохранена.</p><button type="button" onClick={() => void checkAuth()}>Повторить</button></div></div> : children}</AuthContext.Provider>;
 }
 
 export function useAuth(): AuthContextValue {

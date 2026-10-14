@@ -1,10 +1,13 @@
 "use client";
 
 import { AttendanceQrCard } from "@/components/student/performance/attendance-qr-card";
+import { StudentRatingPanel } from "@/components/student/performance/student-rating-panel";
+import { StudentExternalResults } from "@/components/student/performance/student-external-results";
 import { SectionHeroBanner } from "@/components/student/section-hero-banner";
 import styles from "@/components/student/performance/performance.module.css";
 import { useAuth } from "@/contexts/AuthContext";
 import { STUDENT_SECTION_BANNERS } from "@/lib/student/section-banners";
+import { BFF_DEV, BFF_EXTERNAL_TESTS_DEV } from "@/lib/config";
 
 function buildSubtitle(groupId?: number | null): string | undefined {
   if (groupId) {
@@ -26,6 +29,8 @@ export function StudentPerformanceSection() {
         subtitle={buildSubtitle(user?.group_id)}
       />
 
+      {BFF_DEV && <StudentRatingPanel />}
+      {BFF_EXTERNAL_TESTS_DEV && <StudentExternalResults />}
       <AttendanceQrCard />
     </div>
   );

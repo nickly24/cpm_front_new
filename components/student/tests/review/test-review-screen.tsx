@@ -1,5 +1,6 @@
 "use client";
 
+import { useContextGuard } from "@/lib/bff/use-context-guard";
 import styles from "@/components/student/tests/review/test-review.module.css";
 import { LoadingState } from "@/components/ui/loading-state";
 import { ApiError } from "@/lib/api/client";
@@ -37,13 +38,15 @@ export function TestReviewScreen({
   const [phase, setPhase] = useState<ReviewPhase>("loading");
   const [review, setReview] = useState<TestSessionReview | null>(null);
   const [error, setError] = useState<string | null>(null);
+  useContextGuard(phase === "loading" || phase === "ready");
 
-  const loadReview = useCallback(async () => {
+  const loadReview = useCallback(async (signal?: AbortSignal) => {
     setPhase("loading");
     setError(null);
 
     try {
-      const response = await fetchTestSessionReview(sessionId);
+      const response = await fetchTestSessionReview(sessionId, signal);
+      if (signal?.aborted) return;
 
       if (!response.success || !response.review) {
         throw new Error(
@@ -54,11 +57,12 @@ export function TestReviewScreen({
       setReview(response.review);
       setPhase("ready");
     } catch (err) {
+      if (signal?.aborted) return;
       const message =
         err instanceof ApiError
           ? getReviewErrorMessage(err.message)
           : err instanceof Error
-            ? err.message
+            ? getReviewErrorMessage(err.message)
             : "Не удалось загрузить разбор";
 
       setError(message);
@@ -67,7 +71,9 @@ export function TestReviewScreen({
   }, [sessionId]);
 
   useEffect(() => {
-    void loadReview();
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => void loadReview(controller.signal), 0);
+    return () => { window.clearTimeout(timer); controller.abort(); };
   }, [loadReview]);
 
   useEffect(() => {

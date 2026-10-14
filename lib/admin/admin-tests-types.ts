@@ -2,12 +2,25 @@ import type { Direction } from "@/lib/student/tests-types";
 
 export type { Direction };
 
-export type AdminTestStatus = "active" | "upcoming" | "ended" | "external";
+export type AdminTestStatus = "active" | "upcoming" | "ended" | "external" | "hidden" | "archived" | "bank";
 
 export type AdminTestStatusFilter = "all" | AdminTestStatus;
 
 export interface AdminTestListItem {
   id: string;
+  externalActions?: { can_edit: boolean; can_delete: boolean; can_view_results: boolean };
+  description?: string;
+  directionName?: string;
+  ownerDivisionId?: number;
+  ownerDivisionName?: string;
+  isOwner?: boolean;
+  isAttached?: boolean;
+  isArchived?: boolean;
+  bankAvailable?: boolean;
+  origin?: {test_id: string; source_revision: number; division_id: number} | null;
+  actions?: import("@/lib/bff/tests-admin").TestsActions;
+  revision?: number;
+  questionCount?: number;
   title?: string;
   name?: string;
   startDate?: string | null;
@@ -39,6 +52,10 @@ export interface AdminTestQuestion {
 }
 
 export interface AdminTestFormData {
+  expectedRevision?: number;
+  maxQuestionId?: number;
+  description?: string;
+  passingScore?: number | null;
   title: string;
   direction: string;
   startDate: string;
@@ -57,6 +74,8 @@ export interface AdminExternalTestFormData {
 
 export interface AdminTestDetail extends AdminTestFormData {
   _id: string;
+  actions?: import("@/lib/bff/tests-admin").TestsActions;
+  isAttached?: boolean;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -119,6 +138,7 @@ export type AdminTestsView =
   | "edit"
   | "view"
   | "workspace"
+  | "externalWorkspace"
   | "draftEditor";
 
 export interface TestsDateFilter {

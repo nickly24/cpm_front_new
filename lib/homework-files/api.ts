@@ -1,6 +1,6 @@
 import { ApiError } from "@/lib/api/client";
 import { getToken } from "@/lib/auth/storage";
-import { HOMEWORK_SERVICE_URL } from "@/lib/config";
+import { HOMEWORK_SERVICE_URL, BFF_DEV } from "@/lib/config";
 import type {
   ActiveJobsResponse,
   HomeworkWorkspace,
@@ -9,13 +9,15 @@ import type {
   UploadJob,
   HomeworkListQuery,
   HomeworkPage,
+  HomeworkUploadLimits,
 } from "./types";
+import { homeworkMiB, homeworkUploadLimits } from "./limits";
 
 const ERROR_LABELS: Record<string, string> = {
   unauthorized: "Нужно войти в кабинет заново",
   forbidden: "Недостаточно прав",
-  source_too_large: "PDF больше 10 МБ",
-  too_many_pages: "В PDF больше 35 страниц",
+  source_too_large: "Исходный PDF превышает допустимый размер загрузки. Уменьшите файл и выберите его снова.",
+  too_many_pages: "В PDF больше страниц, чем разрешено для этой загрузки. Уберите лишние страницы и выберите файл снова.",
   encrypted_pdf: "PDF защищён паролем",
   active_content: "PDF содержит небезопасное активное содержимое",
   corrupt_pdf: "PDF повреждён или не читается",
@@ -44,8 +46,12 @@ const ERROR_LABELS: Record<string, string> = {
   student_not_in_current_group: "Ученик не относится к вашей текущей группе",
 };
 
-export function homeworkErrorMessage(code?: string | null) {
+export function homeworkErrorMessage(code?: string | null, limits?: HomeworkUploadLimits | null) {
   if (!code) return "Не удалось обработать PDF. Попробуйте ещё раз или выберите другой файл.";
+  const snapshot = homeworkUploadLimits(limits);
+  if (snapshot && code === "source_too_large") return `Исходный PDF превышает лимит этой загрузки: ${homeworkMiB(snapshot.max_source_bytes)} МиБ. Уменьшите файл и выберите его снова.`;
+  if (snapshot && code === "processed_too_large") return `После обработки PDF превышает лимит этой загрузки: ${homeworkMiB(snapshot.max_output_bytes)} МиБ. Уменьшите файл и выберите его снова.`;
+  if (snapshot && code === "too_many_pages") return `В PDF больше ${snapshot.max_pages} страниц — лимита этой загрузки. Уберите лишние страницы и выберите файл снова.`;
   return ERROR_LABELS[code] ?? (/^[a-z_]+$/.test(code) ? "Не удалось обработать PDF. Повторите попытку или выберите другой файл." : code);
 }
 
@@ -56,6 +62,14 @@ function queryString(query: HomeworkListQuery = {}) {
 }
 
 async function homeworkRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
+  if (BFF_DEV) {
+    try { return await (await import("@/lib/bff/homework")).filesHomework<T>(path, options); }
+    catch (error) {
+      const code = (error as { code?: string })?.code;
+      if (code && ERROR_LABELS[code]) (error as Error).message = homeworkErrorMessage(code);
+      throw error;
+    }
+  }
   const token = getToken();
   const headers = new Headers(options.headers);
   if (options.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
@@ -114,7 +128,7 @@ export const homeworkFilesApi = {
   },
   fileUrl: (id: number, draft = false, download = false) => homeworkRequest<{ url: string; filename?: string; expires_in?: number }>(`/api/submissions/${id}/file-url?draft=${draft ? 1 : 0}&download=${download ? 1 : 0}`),
   archive: (query: HomeworkListQuery | string = {}) => homeworkRequest<HomeworkPage<ArchiveItem>>(`/api/archive${typeof query === "string" ? (query ? `?${query}` : "") : queryString(query)}`),
-  monitoring: () => homeworkRequest<MonitoringData>("/api/monitoring"),
+  monitoring: (signal?: AbortSignal) => homeworkRequest<MonitoringData>("/api/monitoring", { signal }),
 };
 
 export interface ArchiveItem {
@@ -126,11 +140,14 @@ export interface ArchiveItem {
 
 export interface MonitoringData {
   jobs: { status: string; count: number }[];
-  recent_jobs: { id: string; status: string; stage: string; error_code: string | null; attempts: number; manual_attempts: number }[];
-  runner: { started: boolean; heartbeat_age_seconds: number | null };
-  storage: { file_count: number | null; total_bytes: number | null };
+  recent_jobs: { id: string; status: string; stage: string; error_code: string | null; attempts: number; manual_attempts: number; limits?: HomeworkUploadLimits | null }[];
+  runner?: { started: boolean; heartbeat_age_seconds: number | null };
+  storage?: { file_count?: number | null; total_bytes?: number | null; state?: "ok" | "error" | "unknown" | "stale"; checked_at?: string | null };
+  worker?: { state: "ok" | "error" | "unknown" | "stale"; received_at: string | null; observed_at: string | null; rabbitmq: boolean | null; tools: boolean | null; processing: boolean | null; fresh_instances: number };
+  organization_id?: number; division_id?: number; rabbitmq?: boolean | null; processing_ready?: boolean;
+  delivery?: { connected: boolean | null; pending: number };
   warnings: string[];
-  failed_last_hour: number;
+  failed_last_hour?: number;
 }
 
 export function postFileToS3(
@@ -140,6 +157,9 @@ export function postFileToS3(
   signal?: AbortSignal,
 ) {
   if (!initialization.upload) return Promise.resolve();
+  const accepted = homeworkUploadLimits(initialization.job.limits);
+  if (accepted && file.size > accepted.max_source_bytes) return Promise.reject(Object.assign(new Error(homeworkErrorMessage("source_too_large", accepted)), { code: "source_too_large" }));
+  if (BFF_DEV && new URL(initialization.upload.url).origin !== "http://127.0.0.1:19000") return Promise.reject(new Error("Недопустимое dev-хранилище"));
   return new Promise<void>((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open(initialization.upload!.method, initialization.upload!.url);

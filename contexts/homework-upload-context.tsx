@@ -1,5 +1,6 @@
 "use client";
 
+import { useContextGuard } from "@/lib/bff/use-context-guard";
 import { Spinner } from "@/components/ui/spinner";
 import { homeworkErrorMessage, homeworkFilesApi, postFileToS3 } from "@/lib/homework-files/api";
 import type { UploadJob } from "@/lib/homework-files/types";
@@ -17,7 +18,7 @@ const active = (job: UploadJob) => ["local", "uploading", "queued", "running", "
 
 export function HomeworkUploadProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
-  return <UploadProvider key={`${user?.role}:${user?.id}`} enabled={user?.role === "student"}>{children}</UploadProvider>;
+  return <UploadProvider key={`${user?.role}:${user?.id}:${user?.context_revision}`} enabled={user?.role === "student"}>{children}</UploadProvider>;
 }
 
 function UploadProvider({ children, enabled }: { children: ReactNode; enabled: boolean }) {
@@ -69,6 +70,7 @@ function UploadProvider({ children, enabled }: { children: ReactNode; enabled: b
     window.addEventListener("focus", focus); document.addEventListener("visibilitychange", focus);
     return () => { window.removeEventListener("focus", focus); document.removeEventListener("visibilitychange", focus); };
   }, [enabled, refresh]);
+  useContextGuard(jobs.some(job => job.status === "local" || job.status === "uploading" || Boolean(job.file)));
   const needsPolling = jobs.some(job => (active(job) || job.serverStatus === "uploading") && !job.id.startsWith("local-"));
   useEffect(() => {
     if (!needsPolling) return;
@@ -96,7 +98,7 @@ function UploadProvider({ children, enabled }: { children: ReactNode; enabled: b
           if (!controller.signal.aborted) update(items => items.map(job => job.id === current.id ? { ...job, ...complete, serverStatus: complete.status, file: undefined, transferFailed: false } : job));
         } else update(items => items.map(job => job.id === current.id ? { ...job, ...initialization.job, serverStatus: initialization.job.status, file: undefined, transferFailed: false } : job));
       } catch (error) {
-        if (!controller.signal.aborted) update(items => items.map(job => job.id === current.id ? { ...job, status: "failed", stage: "failed", transferFailed: true, error_code: error instanceof Error ? error.message : "upload_failed" } : job));
+        if (!controller.signal.aborted) update(items => items.map(job => job.id === current.id ? { ...job, status: "failed", stage: "failed", transferFailed: true, error_code: (error as { code?: string })?.code ?? (error instanceof Error ? error.message : "upload_failed") } : job));
       } finally {
         if (controller.signal.aborted && !current.id.startsWith("local-")) await homeworkFilesApi.cancel(current.id).catch(() => undefined);
         transfer.current = null;
@@ -159,7 +161,7 @@ function UploadCenter({ jobs, cancel, retry, dismiss }: Omit<UploadContextValue,
       {error ? <p className={styles.error} role="alert">{error}</p> : null}
       <div className={styles.list}>{visible.map(job => <article className={styles.item} key={job.id} data-state={job.status}>
         <div className={styles.fileIcon}>{job.status === "ready" ? <CheckCircle2 /> : job.status === "failed" ? <AlertTriangle /> : <FileText />}</div>
-        <div className={styles.itemMain}><strong>{job.filename || `Домашняя работа №${job.homework_id}`}</strong><span>{labels[job.stage] || "Обрабатываем"}{active(job) ? ` · ${job.progress}%` : ""}</span>{active(job) ? <progress max={100} value={job.progress} aria-label="Прогресс загрузки" /> : null}{job.status === "failed" ? <p role="alert">{homeworkErrorMessage(job.error_code)}</p> : null}</div>
+        <div className={styles.itemMain}><strong>{job.filename || `Домашняя работа №${job.homework_id}`}</strong><span>{labels[job.stage] || "Обрабатываем"}{active(job) ? ` · ${job.progress}%` : ""}</span>{active(job) ? <progress max={100} value={job.progress} aria-label="Прогресс загрузки" /> : null}{job.status === "failed" ? <p role="alert">{homeworkErrorMessage(job.error_code, job.limits)}</p> : null}</div>
         <div className={styles.actions}>{job.status === "ready" ? <><button type="button" onClick={() => openWork(job)}>Открыть работу<ChevronRight size={16} /></button><button className={styles.iconButton} type="button" onClick={() => dismiss(job.id)} aria-label="Скрыть завершённую загрузку"><X size={16} /></button></> : job.status === "failed" ? <>{(!job.transferFailed || job.file) ? <button type="button" disabled={busy === job.id} onClick={() => void action(job.id, () => retry(job.id))}><RotateCw size={16} />Повторить</button> : null}<button type="button" disabled={busy === job.id} onClick={() => void action(job.id, async () => { if (job.transferFailed && !job.id.startsWith("local-")) await cancel(job.id); else dismiss(job.id); openWork(job); })}>Выбрать другой</button></> : <button type="button" disabled={busy === job.id} onClick={() => void action(job.id, () => cancel(job.id))}>{busy === job.id ? <Spinner size="sm" /> : null}Отменить</button>}</div>
       </article>)}</div><footer>Окно работы можно закрыть. До завершения передачи файла оставьте вкладку открытой.</footer>
     </section></div> : null}

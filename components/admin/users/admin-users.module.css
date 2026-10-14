@@ -262,3 +262,7 @@
   background: rgba(239, 68, 68, 0.12);
   color: var(--ds-danger);
 }
+
+.memberRowWithGroup { flex-wrap: wrap; }
+.memberRowWithGroup > div:first-child { flex: 1 1 160px; min-width: 0; }
+.memberRowWithGroup .fieldSelect { flex: 1 1 180px; width: auto; min-width: 0; max-width: 100%; }

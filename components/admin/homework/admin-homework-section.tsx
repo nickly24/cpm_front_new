@@ -1,4 +1,10 @@
 "use client";
+import { BFF_DEV } from "@/lib/config";
+import { HomeworkTypes } from "./homework-types";
+import { HomeworkSettingsAudit } from "./homework-settings-audit";
+import { homeworkSettingsAccess } from "@/lib/bff/homework-settings-audit";
+import { useAuth } from "@/contexts/AuthContext";
+import { useHomeworkTypes } from "@/lib/bff/use-homework-types";
 
 import { EditOnly, ReadOnlyControl } from "@/components/admin/admin-section-access";
 
@@ -40,18 +46,16 @@ const IMMERSIVE_VIEWS: AdminHomeworkView[] = [
 
 const PAGE_SIZE = 10;
 
-const TYPE_TABS: { id: AdminHomeworkTypeFilter; label: string }[] = [
-  { id: "all", label: "Все" },
-  { id: "ДЗНВ", label: "ДЗНВ" },
-  { id: "ОВ", label: "ОВ" },
-];
-
 export function AdminHomeworkSection() {
+  const { user } = useAuth();
+  const settingsAccess = homeworkSettingsAccess(user);
+  const [panel, setPanel] = useState<"settings" | "audit" | null>(null);
   const [items, setItems] = useState<AdminHomeworkItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState<AdminHomeworkView>("list");
   const [editing, setEditing] = useState<AdminHomeworkItem | null>(null);
+  const { names: typeNames, error: typeError } = useHomeworkTypes();
   const [typeFilter, setTypeFilter] = useState<AdminHomeworkTypeFilter>("all");
   const [statusFilter, setStatusFilter] =
     useState<AdminHomeworkStatusFilter>("all");
@@ -73,6 +77,7 @@ export function AdminHomeworkSection() {
       const res = await fetchAdminHomeworks({
         page,
         limit: PAGE_SIZE,
+        status: statusFilter,
         type: typeFilter === "all" ? undefined : typeFilter,
         search: debouncedSearch,
       });
@@ -91,11 +96,11 @@ export function AdminHomeworkSection() {
     } finally {
       setLoading(false);
     }
-  }, [page, typeFilter, debouncedSearch]);
+  }, [page, typeFilter, debouncedSearch, statusFilter]);
 
   useEffect(() => {
     setPage(1);
-  }, [typeFilter, debouncedSearch]);
+  }, [typeFilter, debouncedSearch, statusFilter]);
 
   useEffect(() => {
     loadList();
@@ -153,6 +158,8 @@ export function AdminHomeworkSection() {
     }
   };
 
+  if (BFF_DEV && panel) return <HomeworkSettingsAudit panel={panel} onBack={() => setPanel(null)} />;
+
   if (view === "workspace" && workspaceId != null) {
     return (
       <AdminHomeworkWorkspace
@@ -189,14 +196,19 @@ export function AdminHomeworkSection() {
 
   return (
     <div className={styles.page}>
+      {BFF_DEV ? <EditOnly><HomeworkTypes /></EditOnly> : null}
       <header className={styles.pageHeader}>
         <div>
           <h1 className={styles.pageTitle}>Домашние задания</h1>
           <p className={styles.pageDescription}>Задания, сроки сдачи и работы учеников.</p>
         </div>
+        <div className={styles.headerActions}>
+        {BFF_DEV && settingsAccess.readSettings ? <Button variant="secondary" onClick={() => setPanel("settings")}>Настройки</Button> : null}
+        {BFF_DEV && settingsAccess.readAudit ? <Button variant="secondary" onClick={() => setPanel("audit")}>Аудит</Button> : null}
         <EditOnly><Button type="button" onClick={() => setView("create")}>
           + Создать задание
         </Button></EditOnly>
+        </div>
       </header>
 
       <div className={styles.listToolbar}>
@@ -218,7 +230,7 @@ export function AdminHomeworkSection() {
           <label className={styles.dateField}>
             <span className={styles.fieldLabel}>Тип задания</span>
             <select className={styles.filterSelect} value={typeFilter} onChange={(e) => setTypeFilter(e.target.value as AdminHomeworkTypeFilter)}>
-              {TYPE_TABS.map((tab) => <option key={tab.id} value={tab.id}>{tab.id === "all" ? "Все типы" : tab.label}</option>)}
+              {[{id:"all",label:"Все типы"},...typeNames.map(name=>({id:name,label:name}))].map((tab) => <option key={tab.id} value={tab.id}>{tab.id === "all" ? "Все типы" : tab.label}</option>)}
             </select>
           </label>
           <label className={styles.dateField}>
@@ -239,7 +251,8 @@ export function AdminHomeworkSection() {
         </FilterPopover>
       </div>
 
-      {error ? <div className={styles.stateBox}>{error}</div> : null}
+      {typeError ? <p role="alert">{typeError}</p> : null}
+    {error ? <div className={styles.stateBox}>{error}</div> : null}
 
       {loading ? (
         <LoadingState

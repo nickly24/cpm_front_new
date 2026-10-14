@@ -3,7 +3,7 @@
 import { LoadingState } from "@/components/ui/loading-state";
 import { fetchProctorGroupStudents } from "@/lib/proctor/proctor-api";
 import type { ProctorGroupStudent } from "@/lib/proctor/proctor-types";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import styles from "./proctor.module.css";
 
 interface ProctorStudentListProps {
@@ -11,13 +11,15 @@ interface ProctorStudentListProps {
 }
 
 export function ProctorStudentList({ groupId }: ProctorStudentListProps) {
+  const generation=useRef(0);
   const [students, setStudents] = useState<ProctorGroupStudent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [reloadToken, setReloadToken] = useState(0);
 
-  const loadStudents = useCallback(async () => {
+  const loadStudents = useCallback(async (signal?:AbortSignal) => {
+    const serial=++generation.current;
     if (!groupId) {
       setStudents([]);
       setError("Группа не назначена");
@@ -29,7 +31,8 @@ export function ProctorStudentList({ groupId }: ProctorStudentListProps) {
     setError(null);
 
     try {
-      const response = await fetchProctorGroupStudents(groupId);
+      const response = await fetchProctorGroupStudents(groupId,signal);
+      if(signal?.aborted||serial!==generation.current)return;
       if (response.status && Array.isArray(response.res)) {
         setStudents(response.res);
       } else {
@@ -37,17 +40,20 @@ export function ProctorStudentList({ groupId }: ProctorStudentListProps) {
         setError("Не удалось загрузить список учеников");
       }
     } catch (err) {
+      if(signal?.aborted||serial!==generation.current)return;
       setStudents([]);
       setError(
         err instanceof Error ? err.message : "Ошибка при загрузке учеников",
       );
     } finally {
-      setLoading(false);
+      if(!signal?.aborted&&serial===generation.current)setLoading(false);
     }
   }, [groupId]);
 
   useEffect(() => {
-    void loadStudents();
+    const controller=new AbortController();
+    queueMicrotask(()=>{if(!controller.signal.aborted)void loadStudents(controller.signal);});
+    return ()=>controller.abort();
   }, [loadStudents, reloadToken]);
 
   const filteredStudents = useMemo(() => {

@@ -7,6 +7,9 @@ import { AdminStaffTab } from "@/components/admin/users/admin-staff-tab";
 import { AdminStudentsTab } from "@/components/admin/users/admin-students-tab";
 import type { AdminUsersTab } from "@/lib/admin/admin-users-types";
 import { useState } from "react";
+import { BFF_DEV } from "@/lib/config";
+import { coreCan } from "@/lib/bff/core-admin";
+import { useAuth } from "@/contexts/AuthContext";
 
 const TABS: { id: AdminUsersTab; label: string; hint: string }[] = [
   {
@@ -27,8 +30,11 @@ const TABS: { id: AdminUsersTab; label: string; hint: string }[] = [
 ];
 
 export function AdminUsersSection() {
-  const [tab, setTab] = useState<AdminUsersTab>("students");
-  const active = TABS.find((item) => item.id === tab);
+  const {user}=useAuth();
+  const available=TABS.filter(item=>!BFF_DEV || coreCan("users",false,user) || item.id==="groups" && coreCan("groups",false,user));
+  const [tab, setTab] = useState<AdminUsersTab>(()=>available[0]?.id??"students");
+  const activeTab=available.some(item=>item.id===tab)?tab:available[0]?.id;
+  const active = available.find((item) => item.id === activeTab);
 
   return (
     <div className={styles.page}>
@@ -40,11 +46,11 @@ export function AdminUsersSection() {
       </header>
 
       <div className={userStyles.sectionTabs}>
-        {TABS.map((item) => (
+        {available.map((item) => (
           <button
             key={item.id}
             type="button"
-            className={`${styles.directionTab} ${tab === item.id ? styles.directionTabActive : ""}`}
+            className={`${styles.directionTab} ${activeTab === item.id ? styles.directionTabActive : ""}`}
             onClick={() => setTab(item.id)}
           >
             {item.label}
@@ -52,9 +58,9 @@ export function AdminUsersSection() {
         ))}
       </div>
 
-      {tab === "students" ? <AdminStudentsTab /> : null}
-      {tab === "groups" ? <AdminGroupsTab /> : null}
-      {tab === "staff" ? <AdminStaffTab /> : null}
+      {activeTab === "students" ? <AdminStudentsTab /> : null}
+      {activeTab === "groups" ? <AdminGroupsTab /> : null}
+      {activeTab === "staff" ? <AdminStaffTab /> : null}
     </div>
   );
 }

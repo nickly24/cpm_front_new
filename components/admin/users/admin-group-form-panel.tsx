@@ -1,9 +1,12 @@
 "use client";
 
+import { CoreCreateRecovery } from "@/components/admin/users/core-access";
 import styles from "@/components/admin/tests/admin-tests.module.css";
 import userStyles from "@/components/admin/users/admin-users.module.css";
 import { Button } from "@/components/ui/button";
 import { DismissibleOverlay } from "@/components/ui/dismissible-overlay";
+import { BFF_DEV } from "@/lib/config";
+import { useContextGuard } from "@/lib/bff/use-context-guard";
 import { useEffect, useState } from "react";
 
 interface AdminGroupFormPanelProps {
@@ -19,6 +22,7 @@ export function AdminGroupFormPanel({
   onClose,
   onSubmit,
 }: AdminGroupFormPanelProps) {
+  useContextGuard(BFF_DEV);
   const [name, setName] = useState(initialName);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -72,6 +76,7 @@ export function AdminGroupFormPanel({
             />
           </label>
 
+          <CoreCreateRecovery onRecovered={onClose} />
           {error ? <p className={styles.errorText}>{error}</p> : null}
 
           <div className={userStyles.modalActions}>

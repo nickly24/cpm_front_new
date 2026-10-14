@@ -1,11 +1,18 @@
 "use client";
 
+import { BFF_DEV } from "@/lib/config";
+import { domain } from "@/lib/bff/client";
+import { testsCatalog, testsAction } from "@/lib/bff/tests-admin";
+import { useContextGuard } from "@/lib/bff/use-context-guard";
+
 import { EditOnly, ReadOnlyControl, useAdminSectionAccess } from "@/components/admin/admin-section-access";
 
+import { AdminTestCalculationSettings } from "@/components/admin/tests/admin-test-calculation-settings";
 import { AdminCreateTestMenu } from "@/components/admin/tests/admin-create-test-menu";
 import { AdminDirectionCombobox } from "@/components/admin/tests/admin-direction-combobox";
 import { AdminExternalTestDeleteDialog } from "@/components/admin/tests/admin-external-test-delete-dialog";
 import { AdminExternalTestForm } from "@/components/admin/tests/admin-external-test-form";
+import { AdminExternalTestWorkspace } from "@/components/admin/tests/admin-external-test-workspace";
 import { AdminTestCardActions } from "@/components/admin/tests/admin-test-card-actions";
 import {
   AdminTestCardSchedule,
@@ -64,6 +71,7 @@ const IMMERSIVE_VIEWS: AdminTestsView[] = [
   "edit",
   "view",
   "workspace",
+  "externalWorkspace",
   "draftEditor",
 ];
 
@@ -73,6 +81,13 @@ export function AdminTestsSection() {
   const searchParams = useSearchParams();
   const { canEdit } = useAdminSectionAccess("tests");
   const openedFromUrlRef = useRef(false);
+  const catalogGeneration = useRef(0);
+  const [catalogMode, setCatalogMode] = useState<"division"|"bank">("division");
+  const [relation, setRelation] = useState("all");
+  const [archiveFilter, setArchiveFilter] = useState("false");
+  const [ownerFilter, setOwnerFilter] = useState("");
+  const [divisions, setDivisions] = useState<{id:number;name:string}[]>([]);
+  const [actionBusy, setActionBusy] = useState<string|null>(null);
   const [directions, setDirections] = useState<Direction[]>([]);
   const [directionName, setDirectionName] = useState("");
   const [tests, setTests] = useState<AdminTestListItem[]>([]);
@@ -108,7 +123,8 @@ export function AdminTestsSection() {
   const { setImmersive } = useCabinetChrome();
 
   const loadTests = useCallback(async (direction: string) => {
-    if (!direction) {
+    const generation=++catalogGeneration.current;
+    if (!direction && !BFF_DEV) {
       setTests([]);
       return;
     }
@@ -117,25 +133,28 @@ export function AdminTestsSection() {
     setError(null);
 
     try {
-      const data = await fetchAdminTestsByDirection(direction);
+      const data = BFF_DEV ? await testsCatalog({bank:catalogMode==="bank",direction,relation,ownerDivisionId:ownerFilter,archived:archiveFilter}) : await fetchAdminTestsByDirection(direction);
+      if(generation!==catalogGeneration.current)return;
       setTests(Array.isArray(data) ? data : []);
     } catch (err) {
+      if(generation!==catalogGeneration.current)return;
       setTests([]);
       setError(
         err instanceof Error ? err.message : "Не удалось загрузить тесты",
       );
     } finally {
-      setLoadingTests(false);
+      if(generation===catalogGeneration.current)setLoadingTests(false);
     }
-  }, []);
+  }, [catalogMode, relation, ownerFilter, archiveFilter]);
 
   const loadDrafts = useCallback(async () => {
     setLoadingDrafts(true);
     try {
       const data = await fetchAdminTestDrafts("active");
       setDrafts(Array.isArray(data) ? data : []);
-    } catch {
+    } catch (err) {
       setDrafts([]);
+      setError(err instanceof Error ? err.message : "Не удалось загрузить черновики");
     } finally {
       setLoadingDrafts(false);
     }
@@ -151,7 +170,7 @@ export function AdminTestsSection() {
         if (cancelled) return;
         const list = Array.isArray(data) ? data : [];
         setDirections(list);
-        if (list.length > 0) {
+        if (list.length > 0 && !BFF_DEV) {
           setDirectionName(list[0].name);
         }
       } catch (err) {
@@ -169,6 +188,7 @@ export function AdminTestsSection() {
     }
 
     loadDirections();
+    if(BFF_DEV) void domain<{id:number;name:string}[]>("/core/divisions").then(setDivisions).catch(() => {});
     const draftTimer = window.setTimeout(() => {
       loadDrafts();
     }, 0);
@@ -179,7 +199,7 @@ export function AdminTestsSection() {
   }, [loadDrafts]);
 
   useEffect(() => {
-    if (directionName) {
+    if (directionName || BFF_DEV) {
       loadTests(directionName);
     }
   }, [directionName, loadTests]);
@@ -237,7 +257,9 @@ export function AdminTestsSection() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, statusFilter, dateFilter, directionName]);
+  }, [searchTerm, statusFilter, dateFilter, directionName, catalogMode, relation, archiveFilter, ownerFilter]);
+
+  useContextGuard(["create","createExternal","edit","draftEditor"].includes(view) || actionBusy!==null || externalDeleting);
 
   const openWorkspace = (testId: string) => {
     setWorkspaceTestId(testId);
@@ -317,7 +339,7 @@ export function AdminTestsSection() {
   const handleDelete = async (testId: string) => {
     if (
       !window.confirm(
-        "Удалить тест? Будут удалены связанные сессии. Действие необратимо.",
+        BFF_DEV ? "Архивировать общий тест? Прохождение закроется во всех подключённых подразделениях. Тест можно восстановить." : "Удалить тест? Будут удалены связанные сессии. Действие необратимо.",
       )
     ) {
       return;
@@ -381,7 +403,8 @@ export function AdminTestsSection() {
     setToggleBusy(`${testId}-published`);
     patchTestInList(testId, { published });
     try {
-      await patchAdminTestFields(testId, { published });
+      const saved=await patchAdminTestFields(testId, { published });
+      if(BFF_DEV)patchTestInList(testId,{revision:saved.revision});
     } catch (err) {
       patchTestInList(testId, { published: !published });
       window.alert(
@@ -396,7 +419,8 @@ export function AdminTestsSection() {
     setToggleBusy(`${testId}-visible`);
     patchTestInList(testId, { visible });
     try {
-      await patchAdminTestFields(testId, { visible });
+      const saved=await patchAdminTestFields(testId, { visible });
+      if(BFF_DEV)patchTestInList(testId,{revision:saved.revision});
     } catch (err) {
       patchTestInList(testId, { visible: !visible });
       window.alert(
@@ -407,8 +431,18 @@ export function AdminTestsSection() {
     }
   };
 
+  const runCatalogAction = async (test: AdminTestListItem, action: Parameters<typeof testsAction>[1]) => {
+    const label = {attach:"Подключить общий тест к текущему подразделению? Настройки будут скрытыми.",copy:"Создать независимую копию со всеми вопросами? Новая копия будет скрытой.",detach:"Снять подключение в текущем подразделении?",archive:"Архивировать тест во всех подразделениях?",restore:"Восстановить тест?", "bank-open":"Открыть тест в банке организации?", "bank-close":"Закрыть тест в банке? Существующие подключения сохранятся."}[action];
+    if(!window.confirm(label)) return;
+    setActionBusy(test.id);
+    try {await testsAction(test.id,action,test.revision);await loadTests(directionName);}
+    catch(err){window.alert(err instanceof Error?err.message:"Не удалось изменить тест");}
+    finally{setActionBusy(null);}
+  };
+
   const clearFilters = () => {
     setSearchTerm("");
+    setRelation("all");setOwnerFilter("");setArchiveFilter("false");
     setStatusFilter("all");
     setDateFilter({ startDate: "", endDate: "" });
   };
@@ -436,6 +470,10 @@ export function AdminTestsSection() {
           }}
       />
     );
+  }
+
+  if (view === "externalWorkspace" && workspaceTestId) {
+    return <AdminExternalTestWorkspace testId={workspaceTestId} onBack={() => { setView("list"); setWorkspaceTestId(null); void loadTests(directionName); }} />;
   }
 
   if (view === "draftEditor" && editingDraft) {
@@ -666,9 +704,14 @@ export function AdminTestsSection() {
         </div>
       </header>
 
+      {BFF_DEV ? <AdminTestCalculationSettings /> : null}
+      {BFF_DEV ? <nav className={styles.workspaceTabs} aria-label="Область тестов">
+        <button type="button" className={`${styles.workspaceTab} ${catalogMode==="division"?styles.workspaceTabActive:""}`} onClick={()=>setCatalogMode("division")}>Тесты подразделения</button>
+        <button type="button" className={`${styles.workspaceTab} ${catalogMode==="bank"?styles.workspaceTabActive:""}`} onClick={()=>setCatalogMode("bank")}>Банк организации</button>
+      </nav> : null}
       <div className={styles.toolbar}>
         <div className={styles.toolbarRow}>
-          {loadingDirections ? (
+          {BFF_DEV ? <label className={styles.dateField}><span className={styles.fieldLabel}>Направление</span><select className={styles.filterSelect} value={directionName} onChange={e=>setDirectionName(e.target.value)} disabled={loadingDirections}><option value="">Все направления</option>{directions.map(d=><option key={d.id} value={d.name}>{d.name}</option>)}</select></label> : loadingDirections ? (
             <p className={styles.panelHint}>Загрузка направлений…</p>
           ) : directions.length === 0 ? (
             <p className={styles.panelHint}>Направления не найдены</p>
@@ -692,6 +735,11 @@ export function AdminTestsSection() {
             />
           </label>
 
+          {BFF_DEV ? <>
+            <label className={styles.dateField}><span className={styles.fieldLabel}>Связь с подразделением</span><select className={styles.filterSelect} value={relation} onChange={e=>setRelation(e.target.value)}><option value="all">Все</option><option value="owned">Свои</option><option value="attached">Подключённые</option><option value="copy">Независимые копии</option></select></label>
+            <label className={styles.dateField}><span className={styles.fieldLabel}>Владелец</span><select className={styles.filterSelect} value={ownerFilter} onChange={e=>setOwnerFilter(e.target.value)}><option value="">Все подразделения</option>{divisions.map(d=><option key={d.id} value={d.id}>{d.name}</option>)}</select></label>
+            <label className={styles.dateField}><span className={styles.fieldLabel}>Архив</span><select className={styles.filterSelect} value={archiveFilter} onChange={e=>setArchiveFilter(e.target.value)}><option value="false">Действующие</option><option value="true">Архивные</option><option value="all">Все</option></select></label>
+          </> : null}
           <FilterPopover
             activeCount={Number(statusFilter !== "all") + Number(Boolean(dateFilter.startDate)) + Number(Boolean(dateFilter.endDate))}
             onReset={() => {
@@ -711,7 +759,7 @@ export function AdminTestsSection() {
                   ["active", "Активные"],
                   ["upcoming", "Скоро"],
                   ["ended", "Завершённые"],
-                  ["external", "Вне системы"],
+                  ...(BFF_DEV ? [["hidden", "Скрытые"], ["archived", "Архивные"], ["bank", "В банке"], ["external", "Вне системы"]] as const : [["external", "Вне системы"]] as const),
                 ] as const).map(([key, label]) => (
                   <option key={key} value={key}>{label} · {countByStatus(key)}</option>
                 ))}
@@ -770,13 +818,13 @@ export function AdminTestsSection() {
               <EditOnly><Button type="button" size="sm" onClick={() => setView("create")}>
                 Создать первый тест
               </Button></EditOnly>
-              <EditOnly><button
+              {!BFF_DEV ? <EditOnly><button
                 type="button"
                 className={styles.headerGhostBtn}
                 onClick={() => setView("createExternal")}
               >
                 Вне системы
-              </button></EditOnly>
+              </button></EditOnly> : null}
             </div>
           ) : (
             <button type="button" className={styles.listClearBtn} onClick={clearFilters}>
@@ -804,6 +852,7 @@ export function AdminTestsSection() {
                     <h3 className={styles.listCardTitle}>{getAdminTestTitle(test)}</h3>
                   </div>
 
+                  {BFF_DEV ? <p className={styles.panelHint}>{external ? `${test.directionName} · внешний тест выбранного подразделения` : <>{test.directionName} · владелец: {test.ownerDivisionName}<br />{test.isArchived?"Архивирован":test.isOwner?"Свой тест":test.isAttached?"Общее подключение":"Доступен в банке"}{test.origin?" · независимая копия":""} · {test.questionCount} вопросов</>}</p> : null}
                   <AdminTestCardSchedule
                     external={external}
                     date={test.date}
@@ -812,14 +861,14 @@ export function AdminTestsSection() {
                     timeLimitMinutes={test.timeLimitMinutes}
                   />
 
-                  {!external ? (
+                  {!external && (!BFF_DEV || (test.isAttached && !test.isArchived)) ? (
                     <div className={styles.togglesRow}>
                       <ReadOnlyControl><Toggle
                         id={`admin-test-published-${testId}`}
                         label="Видимость теста"
                         variant="success"
                         checked={published}
-                        disabled={toggleBusy === `${testId}-published`}
+                        disabled={toggleBusy === `${testId}-published` || (BFF_DEV && !test.actions?.can_edit_settings)}
                         onChange={(checked) =>
                           handleTogglePublished(testId, checked)
                         }
@@ -829,21 +878,25 @@ export function AdminTestsSection() {
                         label="Показ ответов студентам"
                         variant="success"
                         checked={visible}
-                        disabled={toggleBusy === `${testId}-visible`}
+                        disabled={toggleBusy === `${testId}-visible` || (BFF_DEV && !test.actions?.can_edit_settings)}
                         onChange={(checked) =>
                           handleToggleVisible(testId, checked)
                         }
                       /></ReadOnlyControl>
                     </div>
-                  ) : (
+                  ) : external ? (
                     <p className={styles.externalNotice}>
-                      Внешний тест CPM-LMS — редактирование недоступно.
+                      {BFF_DEV ? "Результаты внешнего теста хранятся в выбранном подразделении." : "Внешний тест CPM-LMS — редактирование недоступно."}
                     </p>
-                  )}
+                  ) : null}
 
                   <AdminTestCardActions
                     external={external}
-                    onOpen={() => openWorkspace(testId)}
+                    canEditClassic={!BFF_DEV || Boolean(test.actions?.can_edit_metadata||test.actions?.can_edit_settings)}
+                    canEditNew={!BFF_DEV || Boolean(test.actions?.can_edit_metadata)}
+                    canDelete={external && BFF_DEV ? Boolean(test.externalActions?.can_delete) : !BFF_DEV}
+                    canOpenExternal={external && BFF_DEV}
+                    onOpen={() => { if (external && BFF_DEV) { setWorkspaceTestId(testId); setView("externalWorkspace"); } else openWorkspace(testId); }}
                     onEditClassic={() => {
                       void openTest(testId, "edit");
                     }}
@@ -858,6 +911,13 @@ export function AdminTestsSection() {
                       }
                     }}
                   />
+                  {BFF_DEV ? <div className={styles.listCardActions}>
+                    {test.actions?.can_attach ? <Button size="sm" variant="ghost" disabled={actionBusy===test.id} onClick={()=>void runCatalogAction(test,"attach")}>Подключить</Button> : null}
+                    {test.actions?.can_copy ? <Button size="sm" variant="ghost" disabled={actionBusy===test.id} onClick={()=>void runCatalogAction(test,"copy")}>Независимая копия</Button> : null}
+                    {test.actions?.can_detach ? <Button size="sm" variant="ghost" disabled={actionBusy===test.id} onClick={()=>void runCatalogAction(test,"detach")}>Снять подключение</Button> : null}
+                    {test.actions?.can_manage_bank ? <Button size="sm" variant="ghost" disabled={actionBusy===test.id} onClick={()=>void runCatalogAction(test,test.bankAvailable?"bank-close":"bank-open")}>{test.bankAvailable?"Закрыть банк":"Открыть в банк"}</Button> : null}
+                    {test.actions?.can_archive ? <Button size="sm" variant="ghost" disabled={actionBusy===test.id} onClick={()=>void runCatalogAction(test,test.isArchived?"restore":"archive")}>{test.isArchived?"Восстановить":"Архивировать"}</Button> : null}
+                  </div> : null}
                 </article>
               );
             })}

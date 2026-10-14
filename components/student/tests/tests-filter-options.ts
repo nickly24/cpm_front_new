@@ -32,6 +32,11 @@ export const TESTS_STATUS_FILTER_OPTIONS: HomeworkFilterOption<TestStatusFilter>
       icon: Clock,
       tone: "info",
     },
+    { value: "running", label: "В процессе", hint: "Есть начатая попытка", icon: PlayCircle, tone: "info" },
+    { value: "pending_upload", label: "Ожидают отправки", hint: "Время ответов истекло, отправка разрешена", icon: Clock, tone: "warning" },
+    { value: "upload_window_closed", label: "Срок отправки истёк", hint: "Нужна помощь администратора", icon: AlertCircle, tone: "warning" },
+    { value: "checking", label: "Проверка ответов", hint: "Ответы приняты, результат ожидается", icon: Clock, tone: "warning" },
+    { value: "calculation_failed", label: "Ошибка проверки", hint: "Ответы сохранены", icon: AlertCircle, tone: "warning" },
     {
       value: "completed",
       label: "Сданные",

@@ -10,6 +10,9 @@ import {
 import { getSectionHref } from "@/lib/navigation";
 import { ArrowUpRight, type LucideIcon } from "lucide-react";
 import Link from "next/link";
+import { BFF_DEV } from "@/lib/config";
+import { CoreDashboardSummary } from "./core-dashboard-summary";
+const BFF_CONNECTED = new Set(["users","schools","train","assignments","tests","test-results","exams","ratings","review-queue","homework-archive","monitoring","schedule","attendance","scan","zaps","access","upload","organizations","divisions","directions"]);
 
 const CARD_ICON_SIZE = 22;
 
@@ -63,8 +66,9 @@ export function AdminDashboardSection() {
         </p>
       </header>
 
+      {BFF_DEV ? <CoreDashboardSummary /> : null}
       {getNavigation(user?.role ?? "admin", user).groups.map((group) => {
-        const items = group.items.filter((item) => item.id !== "dashboard");
+        const items = group.items.filter((item) => item.id !== "dashboard" && (!BFF_DEV || BFF_CONNECTED.has(item.id)));
 
         if (items.length === 0) {
           return null;

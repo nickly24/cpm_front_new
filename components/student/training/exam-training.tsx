@@ -3,13 +3,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
-import { ApiError } from "@/lib/api/client";
+import { useContextGuard } from "@/lib/bff/use-context-guard";
 import { Button } from "@/components/ui/button";
 import { LoadingState } from "@/components/ui/loading-state";
 import { examGet } from "@/lib/exams-v2/api";
 import { fetchSectionStudyView, markCardLearned, unmarkCardLearned, updateSectionStudySettings } from "@/lib/training/training-api";
 import { examTrainingPath, parseExamTrainingPath, trainingBasePath, type ExamTrainingLocation } from "@/lib/training/training-routes";
-import { examPeriod, examSection, filterStudyCards, studyBatches, trainingError, trainingStats } from "@/lib/training/exam-training";
+import { examPeriod, examSection, filterStudyCards, studyBatches, trainingError, trainingStats, trainingUnavailable } from "@/lib/training/exam-training";
 import { BATCH_SIZE_PRESETS, CARD_STATUS_LABELS, STUDY_FILTER_LABELS, type SectionStudyViewResponse, type StudySettings, type TrainingCard } from "@/lib/training/training-types";
 import { TrainingFlashcards } from "./training-flashcards";
 import styles from "./student-training.module.css";
@@ -47,6 +47,7 @@ export function ExamTraining({ studentId, location, navigate, onBack, preview = 
   const [error, setError] = useState<unknown>(null);
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
+  useContextGuard(busy);
   const [listPage, setListPage] = useState(1);
   const request = useRef(0);
   const saving = useRef(false);
@@ -101,7 +102,7 @@ export function ExamTraining({ studentId, location, navigate, onBack, preview = 
       return settings;
     } catch (err) {
       setNotice(trainingError(err));
-      if (err instanceof ApiError && [403, 404, 422].includes(err.status ?? 0)) { setView(null); setError(err); }
+      if (trainingUnavailable(err)) { setView(null); setError(err); }
       return null;
     }
     finally { saving.current = false; setBusy(false); }

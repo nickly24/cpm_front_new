@@ -18,6 +18,7 @@
 .table th, .table td { padding: 14px 18px; border-bottom: 1px solid var(--ds-border, #e8ecf1); }
 .matrix th:not(:first-child), .matrix td:not(:first-child) { text-align: center; width: 130px; }
 .matrix input, .check input { width: 18px; height: 18px; accent-color: var(--ds-sidebar); cursor: pointer; }
+.matrixWrap { min-width: 0; overflow-x: auto; }
 .empty { padding: 40px; text-align: center; }
 .empty h2 { font-size: 21px; }
 .empty p { color: var(--ds-text-secondary, #697686); margin-bottom: 20px; }

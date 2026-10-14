@@ -1,0 +1,35 @@
+.page { display: flex; flex-direction: column; gap: 20px; min-width: 0; width: 100%; }
+.panel { border: 1px solid var(--ds-border); border-radius: var(--ds-radius-lg); background: var(--ds-surface); padding: 24px; min-width: 0; }
+.header, .controls { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.header { justify-content: space-between; }
+.title { font-size: 24px; font-weight: 700; margin: 0; }
+.subtitle { color: var(--ds-text-secondary); margin: 6px 0 0; line-height: 1.5; }
+.summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin: 20px 0; }
+.metric { background: var(--ds-surface-muted); padding: 18px; border-radius: var(--ds-radius-md); }
+.metric dt { color: var(--ds-text-secondary); margin-bottom: 8px; }
+.metric dd { margin: 0; font-size: 26px; font-weight: 700; overflow-wrap: anywhere; }
+.metadata { display: flex; flex-wrap: wrap; gap: 8px 24px; margin: 12px 0; color: var(--ds-text-secondary); font-size: 14px; }
+.tableWrap { width: 100%; overflow-x: auto; border: 1px solid var(--ds-border); border-radius: var(--ds-radius-md); margin-top: 16px; }
+.table { border-collapse: collapse; width: 100%; min-width: 600px; text-align: left; font-size: 14px; }
+.table th { background: var(--ds-surface-muted); font-weight: 600; }
+.table th, .table td { padding: 12px 16px; border-bottom: 1px solid var(--ds-border); }
+.table tbody tr:last-child td { border-bottom: 0; }
+.table td:first-child { font-variant-numeric: tabular-nums; }
+.input, .select { border: 1px solid var(--ds-border); border-radius: var(--ds-radius-md); background: var(--ds-surface); color: var(--ds-text); padding: 10px 12px; min-width: 0; max-width: 100%; }
+.input { flex: 1; }
+.label { display: flex; flex-direction: column; gap: 6px; min-width: 0; font-size: 14px; color: var(--ds-text-secondary); }
+.notice { background: var(--ds-surface-muted); border: 1px solid var(--ds-border); border-radius: var(--ds-radius-md); padding: 14px; }
+.detailGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 12px; }
+.detailCard { border: 1px solid var(--ds-border); padding: 16px; border-radius: var(--ds-radius-md); overflow-wrap: anywhere; }
+.detailTitle { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.detailTitle h3 { margin: 0; font-size: 16px; }
+.detailCard p { margin: 8px 0 0; font-size: 14px; color: var(--ds-text-secondary); }
+.score { font-weight: 700; white-space: nowrap; }
+.tabs { display: flex; flex-wrap: wrap; gap: 8px; }
+@media (max-width: 760px) {
+  .panel { padding: 18px; }
+  .summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .metric { padding: 12px; }
+  .title { font-size: 20px; }
+  .controls .input { flex-basis: 100%; }
+}

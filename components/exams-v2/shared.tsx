@@ -8,6 +8,8 @@ import {
   type ButtonHTMLAttributes,
   type ReactNode,
 } from "react";
+import { BFF_DEV } from "@/lib/config";
+import { useContextGuard } from "@/lib/bff/use-context-guard";
 import { ApiError } from "@/lib/api/client";
 import { queryString } from "@/lib/exams-v2/api";
 import { useExamResource } from "@/lib/exams-v2/hooks";
@@ -190,6 +192,7 @@ export function Modal({
   busy?: boolean;
 }) {
   const id = useId();
+  useContextGuard(true);
   const ref = useRef<HTMLDivElement>(null);
   const close = () => {
     if (
@@ -265,6 +268,8 @@ export function Modal({
 }
 
 export function UnsavedExamChanges() {
+  const [hasDirty, setHasDirty] = useState(false);
+  useContextGuard(hasDirty);
   useEffect(() => {
     const dirty = (event: Event) => {
       const target = event.target;
@@ -272,6 +277,8 @@ export function UnsavedExamChanges() {
       const form = target.closest<HTMLElement>("form[data-exam-editor]");
       if (form) form.dataset.examDirty = "true";
     };
+    const observer = new MutationObserver(() => setHasDirty(Boolean(document.querySelector("[data-exam-dirty='true']"))));
+    observer.observe(document.body, { subtree: true, attributes: true, attributeFilter: ["data-exam-dirty"], childList: true });
     const leave = (event: BeforeUnloadEvent) => {
       if (document.querySelector("[data-exam-dirty='true']")) {
         event.preventDefault();
@@ -282,6 +289,7 @@ export function UnsavedExamChanges() {
     document.addEventListener("input", dirty);
     window.addEventListener("beforeunload", leave);
     return () => {
+      observer.disconnect();
       document.removeEventListener("change", dirty);
       document.removeEventListener("input", dirty);
       window.removeEventListener("beforeunload", leave);
@@ -308,6 +316,7 @@ export function PersonPicker({
   const [submitted, setSubmitted] = useState("");
   const [page, setPage] = useState(1);
   const [open, setOpen] = useState(false);
+  const [accountId, setAccountId] = useState("");
   const resource = useExamResource<Page<Person>>(
     open
       ? `/api/exams/lookups/${kind}${queryString({ search: submitted, page, limit: 20 })}`
@@ -359,7 +368,11 @@ export function PersonPicker({
               Найти
             </Action>
           </div>
-          <ErrorNotice error={resource.error} reload={resource.reload} />
+          {BFF_DEV && resource.error instanceof ApiError && resource.error.status === 403 ? <div className={s.stack}>
+            <p>Просмотр списка пользователей недоступен. Укажите ID аккаунта {kind === "students" ? "ученика" : "экзаменатора"} в выбранном подразделении.</p>
+            <input aria-label={`ID аккаунта: ${label}`} className={s.input} inputMode="numeric" value={accountId} onChange={e => setAccountId(e.target.value)} />
+            <Action disabled={disabled || !/^[1-9]\d*$/.test(accountId) || !Number.isSafeInteger(Number(accountId)) || exclude.includes(Number(accountId))} onClick={() => { onChange({ id: Number(accountId), fullName: `Аккаунт ${accountId}` }); setOpen(false); }}>Выбрать аккаунт</Action>
+          </div> : <ErrorNotice error={resource.error} reload={resource.reload} />}
           {resource.loading && <Loading />}
           <div className={s.lookupList}>
             {resource.data?.items

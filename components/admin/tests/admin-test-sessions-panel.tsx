@@ -1,6 +1,9 @@
 "use client";
+import { BFF_DEV } from "@/lib/config";
+import { calculationLabel, testsCalculationHistory, testsRetryCalculation } from "@/lib/bff/tests-admin";
+import { useContextGuard } from "@/lib/bff/use-context-guard";
 
-import { EditOnly } from "@/components/admin/admin-section-access";
+import { useAdminSectionAccess } from "@/components/admin/admin-section-access";
 
 import {
   AdminAnswerItemsList,
@@ -24,7 +27,7 @@ import { formatAdminTestDate } from "@/lib/admin/admin-tests-utils";
 import { fetchTestSessionReview } from "@/lib/student/test-review-api";
 import type { TestSessionReview } from "@/lib/student/test-review-types";
 import { useDebouncedValue } from "@/lib/hooks/use-debounced-value";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 interface AdminTestSessionsPanelProps {
   testId: string;
@@ -40,6 +43,13 @@ const emptyPagination: AdminListPagination = {
 };
 
 export function AdminTestSessionsPanel({ testId }: AdminTestSessionsPanelProps) {
+  const detailGeneration=useRef(0);
+  const selectedSession=useRef<string|null>(null);
+  const { canEdit: canEditResults } = useAdminSectionAccess("test-results");
+  const [calculationStatus,setCalculationStatus] = useState("");
+  const [calculationHistory,setCalculationHistory] = useState<Awaited<ReturnType<typeof testsCalculationHistory>>>([]);
+  const [mutating,setMutating] = useState(false);
+  useContextGuard(mutating);
   const [searchInput, setSearchInput] = useState("");
   const debouncedSearch = useDebouncedValue(searchInput, 350);
   const [page, setPage] = useState(1);
@@ -59,6 +69,7 @@ export function AdminTestSessionsPanel({ testId }: AdminTestSessionsPanelProps) 
       const res = await fetchAdminTestSessions(testId, {
         page,
         search: debouncedSearch,
+        calculationStatus,
       });
       setSessions(res.sessions);
       setPagination(res.pagination);
@@ -69,50 +80,62 @@ export function AdminTestSessionsPanel({ testId }: AdminTestSessionsPanelProps) 
     } finally {
       setLoading(false);
     }
-  }, [testId, page, debouncedSearch]);
+  }, [testId, page, debouncedSearch, calculationStatus]);
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch]);
+  }, [debouncedSearch,calculationStatus]);
 
   useEffect(() => {
     load();
   }, [load]);
 
-  const openDetail = async (sessionId: string) => {
+  const openDetail = useCallback(async (sessionId: string) => {
+    selectedSession.current=sessionId;
+    const generation=++detailGeneration.current;
     setDetailLoading(true);
     setActiveSessionId(sessionId);
     setDetail(null);
     setReview(null);
     try {
-      const [adminDetail, reviewRes] = await Promise.all([
-        fetchAdminSessionDetail(sessionId),
-        fetchTestSessionReview(sessionId),
-      ]);
+      const adminDetail = await fetchAdminSessionDetail(sessionId);
+      if(generation!==detailGeneration.current)return;
       setDetail(adminDetail);
-      if (reviewRes.success && reviewRes.review) {
-        setReview(reviewRes.review);
+      if(!BFF_DEV || adminDetail.session.calculationStatus==="ready") {
+        const reviewRes=await fetchTestSessionReview(sessionId);
+        if(generation!==detailGeneration.current)return;
+        if(reviewRes.success && reviewRes.review)setReview(reviewRes.review);
       }
+      if(BFF_DEV){const history=await testsCalculationHistory(sessionId);if(generation===detailGeneration.current)setCalculationHistory(history);}
     } catch (err) {
+      if(generation!==detailGeneration.current)return;
       window.alert(
         err instanceof Error ? err.message : "Не удалось загрузить сдачу",
       );
       setActiveSessionId(null);
     } finally {
-      setDetailLoading(false);
+      if(generation===detailGeneration.current)setDetailLoading(false);
     }
-  };
+  },[]);
+
+  useEffect(() => {
+    if(!BFF_DEV || !sessions.some(s=>s.calculationStatus!=="ready")) return;
+    const timer=window.setInterval(()=>{void load().then(()=>{if(activeSessionId && selectedSession.current===activeSessionId)void openDetail(activeSessionId);});},5000);return ()=>window.clearInterval(timer);
+  },[sessions,load,activeSessionId,openDetail]);
 
   const closeDetail = () => {
+    detailGeneration.current++;selectedSession.current=null;
+    setCalculationHistory([]);
     setDetail(null);
     setReview(null);
     setActiveSessionId(null);
   };
 
   const handleDelete = async (sessionId: string) => {
-    if (!window.confirm("Удалить сдачу? Студент сможет пройти тест заново.")) {
+    if (!window.confirm(BFF_DEV ? "Сбросить сдачу? Студент сможет пройти тест заново." : "Удалить сдачу? Студент сможет пройти тест заново.")) {
       return;
     }
+    setMutating(true);
     try {
       await deleteAdminSession(sessionId);
       if (activeSessionId === sessionId) {
@@ -121,7 +144,13 @@ export function AdminTestSessionsPanel({ testId }: AdminTestSessionsPanelProps) 
       await load();
     } catch (err) {
       window.alert(err instanceof Error ? err.message : "Ошибка удаления");
-    }
+    } finally {setMutating(false);}
+  };
+
+  const retryCalculation = async () => {
+    if(!activeSessionId || !detail || !window.confirm("Поставить сдачу на повторную проверку?")) return;
+    setMutating(true);
+    try {await testsRetryCalculation(activeSessionId,Number(detail.session.revision));await load();await openDetail(activeSessionId);}catch(err){window.alert(err instanceof Error?err.message:"Не удалось повторить проверку");}finally{setMutating(false);}
   };
 
   const reviewRows = review ? reviewItemsToRows(review.items) : [];
@@ -129,6 +158,8 @@ export function AdminTestSessionsPanel({ testId }: AdminTestSessionsPanelProps) 
   return (
     <div className={styles.panel}>
       <div className={styles.panelToolbar}>
+        {BFF_DEV ? <select aria-label="Статус проверки" className={styles.filterSelect} value={calculationStatus} onChange={e=>setCalculationStatus(e.target.value)}><option value="">Все статусы</option>{["queued","processing","retrying","ready","failed"].map(status=><option key={status} value={status}>{calculationLabel(status)}</option>)}</select> : null}
+        <Button size="sm" variant="ghost" onClick={()=>void load()}>Обновить</Button>
         <input
           type="search"
           className={styles.searchInput}
@@ -151,6 +182,7 @@ export function AdminTestSessionsPanel({ testId }: AdminTestSessionsPanelProps) 
               <tr>
                 <th>Студент</th>
                 <th>Балл</th>
+                {BFF_DEV?<th>Проверка</th>:null}
                 <th>Ответов</th>
                 <th>Завершение</th>
                 <th />
@@ -168,6 +200,7 @@ export function AdminTestSessionsPanel({ testId }: AdminTestSessionsPanelProps) 
                 >
                   <td>{row.studentFullName}</td>
                   <td>{row.score ?? "—"}</td>
+                  {BFF_DEV?<td>{calculationLabel(row.calculationStatus)}</td>:null}
                   <td>{row.answersCount ?? "—"}</td>
                   <td>{formatAdminTestDate(row.completedAt)}</td>
                   <td className={styles.tableActions}>
@@ -178,13 +211,13 @@ export function AdminTestSessionsPanel({ testId }: AdminTestSessionsPanelProps) 
                     >
                       Детали
                     </button>
-                    <EditOnly><button
+                    {canEditResults ? <><button
                       type="button"
                       className={styles.linkBtnDanger}
                       onClick={() => handleDelete(row.sessionId)}
                     >
-                      Удалить
-                    </button></EditOnly>
+                      {BFF_DEV?"Сбросить":"Удалить"}
+                    </button></> : null}
                   </td>
                 </tr>
               ))}
@@ -208,7 +241,7 @@ export function AdminTestSessionsPanel({ testId }: AdminTestSessionsPanelProps) 
             <div>
               <h3>{detail.studentFullName}</h3>
               <p className={styles.panelHint}>
-                Итог:{" "}
+                {BFF_DEV && detail.session.calculationStatus!=="ready" ? calculationLabel(String(detail.session.calculationStatus)) : <>Итог:{" "}
                 {review?.score ??
                   (detail.session as { score?: number }).score ??
                   "—"}
@@ -216,7 +249,7 @@ export function AdminTestSessionsPanel({ testId }: AdminTestSessionsPanelProps) 
                 {formatAdminTestDate(
                   review?.completedAt ??
                     (detail.session as { completedAt?: string }).completedAt,
-                )}
+                )}</>}
               </p>
             </div>
             <button
@@ -257,18 +290,21 @@ export function AdminTestSessionsPanel({ testId }: AdminTestSessionsPanelProps) 
             </div>
           </dl>
 
+          {BFF_DEV && detail.session.calculationStatus!=="ready" ? <p className={styles.panelHint}>Сдача принята. Итог и разбор появятся после завершения проверки.</p> : null}
+          {BFF_DEV && calculationHistory.length>0 ? <details><summary>История расчётов</summary><table className={styles.dataTable}><thead><tr><th>Ревизия</th><th>Балл</th><th>Время</th></tr></thead><tbody>{calculationHistory.map(c=><tr key={c.calculation_revision}><td>{c.calculation_revision}</td><td>{c.score}% · {c.earned_points}/{c.max_points}</td><td>{formatAdminTestDate(c.calculated_at)}</td></tr>)}</tbody></table></details> : null}
           <h4 className={styles.detailSectionTitle}>Ответы по вопросам</h4>
           <AdminAnswerItemsList items={reviewRows} />
 
           <div className={styles.detailCardActions}>
-            <EditOnly><Button
+            {BFF_DEV && canEditResults && detail.session.calculationStatus!=="ready" ? <Button size="sm" disabled={mutating} onClick={()=>void retryCalculation()}>Повторить проверку</Button> : null}
+            {canEditResults ? <><Button
               type="button"
               variant="ghost"
               size="sm"
               onClick={() => activeSessionId && handleDelete(activeSessionId)}
             >
-              Удалить сдачу
-            </Button></EditOnly>
+              {BFF_DEV?"Сбросить сдачу":"Удалить сдачу"}
+            </Button></> : null}
           </div>
         </div>
       ) : null}

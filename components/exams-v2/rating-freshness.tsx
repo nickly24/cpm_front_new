@@ -10,10 +10,12 @@ export function RatingFreshnessNotice({
   value?: RatingFreshness | null;
 }) {
   const message = ratingFreshnessMessage(value);
-  return message ? (
+  const excludedSources = value?.scope === "ratings" ? [value.examsMode === "dev_empty" ? "Экзамены исключены из расчёта в настройках Dev" : "", value.externalTestsMode === "dev_internal_only" ? "Внешние тесты исключены из расчёта в настройках Dev" : ""].filter(Boolean).join(". ") : "";
+  return message || excludedSources ? (
     <div className={s.warning} role="status">
       {message}
-      <p className={s.muted}>Проверка актуальности относится к экзаменам.</p>
+      {excludedSources ? <p>{excludedSources}.</p> : null}
+      <p className={s.muted}>{value?.scope === "ratings" ? "Проверка охватывает домашние задания, тесты и экзамены." : "Проверка актуальности относится к экзаменам."}</p>
     </div>
   ) : null;
 }

@@ -1,4 +1,5 @@
 "use client";
+import { BFF_DEV } from "@/lib/config";
 import { useExamMutation, useExamResource } from "@/lib/exams-v2/hooks";
 import { queryString } from "@/lib/exams-v2/api";
 import type { DeletePreview } from "@/lib/exams-v2/types";
@@ -7,10 +8,15 @@ import { Action, ErrorNotice, Loading, Modal, MutationNotice } from "./shared";
 import s from "./exams.module.css";
 
 const countNames: Record<string, string> = {
+  parts: "Части",
+  divisions: "Подключённые подразделения",
+  outside_results: "Результаты вне LMS",
+  classic_results: "Текущие результаты классических экзаменов",
   attempts: "Сдачи",
   attemptsCount: "Сдачи",
   questions: "Вопросы",
   presentedQuestions: "Выданные вопросы",
+  presented_questions: "Выданные вопросы",
   votes: "Голоса",
   rounds: "Раунды",
   appeals: "Апелляции",
@@ -62,7 +68,7 @@ export function DeleteEntity({
             ))}
           </ul>
           <p className={s.muted}>
-            Подтверждение действительно до {formatDate(preview.data.expiresAt)}.
+            {preview.data.expiresAt ? `Подтверждение действительно до ${formatDate(preview.data.expiresAt)}. ` : ""}
             Если данные изменятся, потребуется обновить предпросмотр.
           </p>
         </>
@@ -85,6 +91,7 @@ export function DeleteEntity({
           void mutation.execute({
             path: `${path}${queryString({ expectedVersion: version })}`,
             method: "DELETE",
+            ...(BFF_DEV ? { body: { expectedVersion: version ?? preview.data?.version, expectedHistoryGeneration: preview.data?.historyGeneration } } : {}),
             confirmationToken: preview.data?.confirmationToken,
           })
         }

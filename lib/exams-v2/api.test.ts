@@ -5,7 +5,7 @@ import {
   ApiError,
   responseError,
 } from "@/lib/api/client";
-import { examGet, examMutate, parseExamImport, attemptCommand } from "./api";
+import { downloadExamImportTemplate, examGet, examMutate, parseExamImport, attemptCommand } from "./api";
 import { isUncertain } from "./hooks";
 
 vi.mock("@/lib/auth/storage", () => ({ getToken: () => "offline-test-token" }));
@@ -22,6 +22,10 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("exam transport contracts — no network", () => {
+  it("keeps the new native template feature out of the legacy production transport", async () => {
+    await expect(downloadExamImportTemplate(3, "questions")).rejects.toMatchObject({ status: 501 });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
   it("unwraps only v2 data, fetches no-store and sends auth", async () => {
     fetchMock.mockResolvedValue(ok({ items: [] }));
     expect(await examGet("/api/exams", { grade: 0 })).toEqual({ items: [] });

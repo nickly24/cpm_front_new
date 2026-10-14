@@ -1,4 +1,7 @@
 "use client";
+import { BFF_DEV, BFF_EXTERNAL_TESTS_DEV } from "@/lib/config";
+import { testsResultsStudents, calculationLabel } from "@/lib/bff/tests-admin";
+import { AdminExternalResults } from "./admin-external-results";
 
 import {
   AdminAnswerItemsList,
@@ -24,7 +27,7 @@ import { formatAdminTestDate } from "@/lib/admin/admin-tests-utils";
 import { fetchTestSessionReview } from "@/lib/student/test-review-api";
 import type { TestSessionReview } from "@/lib/student/test-review-types";
 import { useDebouncedValue } from "@/lib/hooks/use-debounced-value";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 const STUDENTS_PAGE_SIZE = 12;
 const SESSIONS_PAGE_SIZE = 9;
@@ -59,15 +62,19 @@ function questionTypeLabel(type: string): string {
   return type;
 }
 
+type ResultsStudent = Omit<AdminStudent,"class"> & {class:number|null};
 export function AdminTestResultsSection() {
-  const [students, setStudents] = useState<AdminStudent[]>([]);
+  const detailGeneration = useRef(0);
+  const selectedSession = useRef<string|null>(null);
+  const selectedStudentId = useRef<number|null>(null);
+  const [students, setStudents] = useState<ResultsStudent[]>([]);
   const [studentsLoading, setStudentsLoading] = useState(true);
   const [studentsError, setStudentsError] = useState<string | null>(null);
   const [studentSearch, setStudentSearch] = useState("");
   const debouncedStudentSearch = useDebouncedValue(studentSearch, 300);
   const [studentPage, setStudentPage] = useState(1);
 
-  const [selectedStudent, setSelectedStudent] = useState<AdminStudent | null>(null);
+  const [selectedStudent, setSelectedStudent] = useState<ResultsStudent | null>(null);
   const [sessions, setSessions] = useState<StudentTestSession[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(false);
   const [sessionsError, setSessionsError] = useState<string | null>(null);
@@ -87,7 +94,7 @@ export function AdminTestResultsSection() {
     setStudentsLoading(true);
     setStudentsError(null);
     try {
-      setStudents(await fetchAdminStudents());
+      setStudents(BFF_DEV ? await testsResultsStudents() : await fetchAdminStudents());
     } catch (err) {
       setStudents([]);
       setStudentsError(
@@ -103,6 +110,8 @@ export function AdminTestResultsSection() {
   }, [loadStudents]);
 
   const loadSessions = useCallback(async (studentId: number) => {
+    detailGeneration.current++;
+    selectedStudentId.current=studentId;selectedSession.current=null;
     setSessionsLoading(true);
     setSessionsError(null);
     setActiveSessionId(null);
@@ -184,13 +193,14 @@ export function AdminTestResultsSection() {
     setSessionPage(1);
   }, [debouncedSessionSearch, selectedStudent?.id]);
 
-  const handleSelectStudent = (student: AdminStudent) => {
+  const handleSelectStudent = (student: ResultsStudent) => {
     setSelectedStudent(student);
     setSessionSearch("");
     void loadSessions(student.id);
   };
 
   const handleBackToStudents = () => {
+    detailGeneration.current++;selectedStudentId.current=null;selectedSession.current=null;
     setSelectedStudent(null);
     setSessions([]);
     setActiveSessionId(null);
@@ -200,34 +210,49 @@ export function AdminTestResultsSection() {
     setSessionSearch("");
   };
 
-  const openSessionDetail = async (session: StudentTestSession) => {
+  const openSessionDetail = useCallback(async (session: StudentTestSession) => {
+    selectedSession.current=session.id;
+    const generation=++detailGeneration.current;
     setDetailLoading(true);
     setActiveSessionId(session.id);
     setDetail(null);
     setReview(null);
     setStats(null);
     try {
-      const [adminDetail, reviewRes, statsRes] = await Promise.all([
-        fetchAdminSessionDetail(session.id),
-        fetchTestSessionReview(session.id),
-        fetchTestSessionStats(session.id),
-      ]);
+      const adminDetail = await fetchAdminSessionDetail(session.id);
+      if(generation!==detailGeneration.current)return;
       setDetail(adminDetail);
-      setStats(statsRes);
-      if (reviewRes.success && reviewRes.review) {
-        setReview(reviewRes.review);
+      if(!BFF_DEV || adminDetail.session.calculationStatus==="ready") {
+        const [reviewRes,statsRes]=await Promise.all([fetchTestSessionReview(session.id),fetchTestSessionStats(session.id)]);
+        if(generation!==detailGeneration.current)return;
+        setStats(statsRes);
+        if(reviewRes.success && reviewRes.review)setReview(reviewRes.review);
       }
     } catch (err) {
+      if(generation!==detailGeneration.current)return;
       window.alert(
         err instanceof Error ? err.message : "Не удалось загрузить сдачу",
       );
       setActiveSessionId(null);
     } finally {
-      setDetailLoading(false);
+      if(generation===detailGeneration.current)setDetailLoading(false);
     }
-  };
+  },[]);
 
   const reviewRows = review ? reviewItemsToRows(review.items) : [];
+
+  useEffect(()=>{
+    if(!BFF_DEV || !selectedStudent || !sessions.some(s=>s.calculationStatus!=="ready"))return;
+    const timer=window.setInterval(()=>{
+      void fetchStudentTestSessions(selectedStudent.id).then(rows=>{
+        if(selectedStudentId.current!==selectedStudent.id)return;
+        setSessions(rows);
+        const selected=rows.find(s=>s.id===activeSessionId);
+        if(selected && selectedSession.current===activeSessionId && detail?.session.calculationStatus!==selected.calculationStatus)void openSessionDetail(selected);
+      }).catch(err=>setSessionsError(err.message));
+    },5000);
+    return ()=>window.clearInterval(timer);
+  },[selectedStudent,sessions,activeSessionId,detail,openSessionDetail]);
 
   if (selectedStudent) {
     return (
@@ -243,6 +268,8 @@ export function AdminTestResultsSection() {
             </p>
           </div>
         </header>
+
+        {BFF_EXTERNAL_TESTS_DEV ? <AdminExternalResults key={selectedStudent.id} accountId={selectedStudent.id} /> : null}
 
         <div className={styles.listToolbar}>
           <input
@@ -288,7 +315,7 @@ export function AdminTestResultsSection() {
                     <span
                       className={`${resultStyles.sessionScore} ${scoreClass(session.score)}`}
                     >
-                      {session.score ?? "—"}%
+                      {BFF_DEV && session.calculationStatus!=="ready" ? calculationLabel(session.calculationStatus) : `${session.score ?? "—"}%`}
                     </span>
                   </div>
                   <div className={resultStyles.sessionMeta}>
@@ -316,7 +343,7 @@ export function AdminTestResultsSection() {
               <div>
                 <h3>{review?.testTitle ?? stats?.testTitle ?? "Сдача теста"}</h3>
                 <p className={styles.panelHint}>
-                  Итог: {review?.score ?? stats?.totalPoints ?? "—"}% ·{" "}
+                  {BFF_DEV && detail.session.calculationStatus!=="ready" ? calculationLabel(String(detail.session.calculationStatus)) : `Итог: ${review?.score ?? (detail.session as {score?:number}).score ?? "—"}%`} ·{" "}
                   {formatAdminTestDate(review?.completedAt)}
                 </p>
               </div>

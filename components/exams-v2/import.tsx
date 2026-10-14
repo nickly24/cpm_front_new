@@ -1,9 +1,11 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { BFF_DEV } from "@/lib/config";
+import { examContextKey } from "@/lib/bff/exams-shared";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { canAccessSection } from "@/lib/auth/admin-access";
-import { importPrefix, parseExamImport, queryString } from "@/lib/exams-v2/api";
+import { downloadExamImportTemplate, importPrefix, parseExamImport, queryString } from "@/lib/exams-v2/api";
 import { useExamMutation, useExamResource } from "@/lib/exams-v2/hooks";
 import type {
   ImportCommit,
@@ -46,6 +48,34 @@ const labels: Record<string, string> = {
   replacementLimit: "Лимит замен",
 };
 
+function ImportTemplate({ examId, kind }: { examId: number; kind: ImportKind }) {
+  const controller = useRef<AbortController | null>(null);
+  const [busy, setBusy] = useState(false), [error, setError] = useState<Error | null>(null);
+  useEffect(() => () => controller.current?.abort(), []);
+  const download = async () => {
+    if (controller.current) return;
+    const request = new AbortController(); controller.current = request;
+    setBusy(true); setError(null);
+    try {
+      const blob = await downloadExamImportTemplate(examId, kind, request.signal);
+      if (request.signal.aborted) return;
+      const url = URL.createObjectURL(blob), anchor = document.createElement("a");
+      anchor.href = url; anchor.download = `exam-${examId}-${kind}-template.xlsx`;
+      document.body.appendChild(anchor); anchor.click(); anchor.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 0);
+    } catch (error) {
+      if (!request.signal.aborted) setError(error instanceof Error ? error : new Error("Не удалось скачать шаблон"));
+    } finally {
+      controller.current = null;
+      if (!request.signal.aborted) setBusy(false);
+    }
+  };
+  return <div className={s.item}>
+    <Action disabled={busy} onClick={() => void download()}>{busy ? "Скачиваем шаблон…" : "Скачать шаблон Excel"}</Action>
+    <ErrorNotice error={error} />
+  </div>;
+}
+
 function inputValue(value: unknown): string {
   return Array.isArray(value)
     ? value.join(", ")
@@ -81,14 +111,14 @@ export function importCellValue(
         : value;
   return value;
 }
-function PreviewEditor({
+export function PreviewEditor({
   sessionId,
   prefix,
   storageKey,
   reset,
   ...props
 }: AdminPanelProps & {
-  sessionId: number;
+  sessionId: number | string;
   prefix: string;
   storageKey: string;
   reset: () => void;
@@ -118,13 +148,16 @@ function PreviewEditor({
   const dirty = Object.keys(changes).length > 0;
   const disabled =
     !props.canEdit ||
+    resource.loading ||
+    Boolean(resource.error) ||
     mutation.busy ||
     mutation.uncertain ||
     session?.status === "committed";
   const change = (
     row: ImportRow,
     patch: Partial<{ input: Record<string, unknown>; excluded: boolean }>,
-  ) =>
+  ) => {
+    if (disabled) return;
     setChanges((old) => ({
       ...old,
       [row.rowId]: {
@@ -133,6 +166,7 @@ function PreviewEditor({
         ...patch,
       },
     }));
+  };
   return (
     <div className={s.stack} data-exam-dirty={dirty ? "true" : undefined}>
       <div className={s.header}>
@@ -345,11 +379,11 @@ function ExamImportWorkspace({
   kind,
   ...props
 }: AdminPanelProps & { kind: ImportKind }) {
-  const storageKey = `exam-import:${props.actor}:${props.examId}:${kind}`;
-  const [sessionId, setSessionId] = useState<number | null>(() => {
+  const storageKey = `exam-import:${BFF_DEV ? examContextKey() : props.actor}:${props.examId}:${kind}`;
+  const [sessionId, setSessionId] = useState<number | string | null>(() => {
     try {
       const value = sessionStorage.getItem(storageKey);
-      return value && /^[1-9]\d*$/.test(value) ? Number(value) : null;
+      return value && (/^[1-9]\d*$/.test(value) || /^[a-f\d]{8}(?:-[a-f\d]{4}){3}-[a-f\d]{12}$/i.test(value)) ? value : null;
     } catch {
       return null;
     }
@@ -399,6 +433,7 @@ function ExamImportWorkspace({
     <div className={s.panel}>
       <h3>Импорт из Excel</h3>
       <p className={s.muted}>{hints[kind]}</p>
+      {BFF_DEV && <ImportTemplate examId={props.examId} kind={kind} />}
       <p className={s.muted}>
         Один непустой лист, до 5000 строк и 10 МиБ. Формулы не поддерживаются.
         ID и логин — разные колонки; ФИО не используется как идентификатор.

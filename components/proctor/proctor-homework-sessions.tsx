@@ -1,4 +1,5 @@
 "use client";
+import { useContextGuard } from "@/lib/bff/use-context-guard";
 
 import Link from "next/link";
 import { ReviewWorkspace } from "@/components/homework/review-workspace";
@@ -44,6 +45,7 @@ export function ProctorHomeworkSessions({
   homeworkName,
   proctorId,
 }: ProctorHomeworkSessionsProps) {
+  useContextGuard(true);
   const [fileWork, setFileWork] = useState<StaffHomeworkIdentity | null>(null);
   const [sessions, setSessions] = useState<ProctorHomeworkSession[]>([]);
   const [loading, setLoading] = useState(true);

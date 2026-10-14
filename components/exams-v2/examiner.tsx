@@ -1,5 +1,7 @@
 "use client";
 
+import { BFF_DEV } from "@/lib/config";
+import { useContextGuard } from "@/lib/bff/use-context-guard";
 import { FilterPopover } from "@/components/ui/filter-popover";
 import { useState } from "react";
 import { queryString } from "@/lib/exams-v2/api";
@@ -53,7 +55,7 @@ function AssignmentCard({
   open: (id: number) => void;
 }) {
   const mutation = useExamMutation<CommandResult>(
-    `${actor}:ensure:${row.assignmentId}:${row.historyGeneration}`,
+    `${actor}:ensure:${examId}:${row.assignmentId}:${row.historyGeneration}`,
     (data) => open(data.attempt.id),
   );
   return (
@@ -99,19 +101,20 @@ function AssignmentCard({
 }
 
 function AttemptWorkspace({
+  examId,
   attemptId,
   actor,
   enabled,
   back,
 }: {
+  examId: number | null;
   attemptId: number;
   actor: string;
   enabled: boolean;
   back: () => void;
 }) {
-  const resource = useExamResource<{ attempt: AttemptState }>(
-    `/api/examiner/attempts/${attemptId}`,
-  );
+  const attemptPath = BFF_DEV ? `/api/examiner/exams/${examId}/attempts/${attemptId}` : `/api/examiner/attempts/${attemptId}`;
+  const resource = useExamResource<{ attempt: AttemptState }>(attemptPath);
   const [commandState, setCommandState] = useState<AttemptState | null>(null);
   const [receipt, setReceipt] = useState<Receipt | null>(null);
   const [confirm, setConfirm] = useState<
@@ -133,12 +136,12 @@ function AttemptWorkspace({
       ? fetched
       : commandState;
   const mutation = useExamMutation<CommandResult>(
-    `${actor}:attempt:${attemptId}`,
+    `${actor}:attempt:${examId}:${attemptId}`,
     (data) => {
       if (data.attempt.id !== attemptId) return;
       setCommandState((previous) =>
         !previous || data.attempt.stateVersion >= previous.stateVersion
-          ? data.attempt
+          ? { ...data.attempt, directionName: fetched?.directionName ?? data.attempt.directionName }
           : previous,
       );
       setReceipt(data.receipt);
@@ -148,10 +151,11 @@ function AttemptWorkspace({
   const disabled = !enabled || mutation.busy || mutation.uncertain;
   const command = (name: string, body: unknown) =>
     void mutation.execute({
-      path: `/api/examiner/attempts/${attemptId}/${name}`,
+      path: `${attemptPath}/${name}`,
       method: "POST",
       body,
     });
+  useContextGuard(attempt?.status === "pending_ready" || attempt?.status === "in_progress");
   const question = attempt?.currentQuestion;
   return (
     <div className={s.page}>
@@ -420,7 +424,7 @@ function AttemptWorkspace({
           </Action>
           {showProtocol && (
             <ExamProtocol
-              path={`/api/examiner/attempts/${attempt.id}/questions`}
+              path={`${attemptPath}/questions`}
               showRounds
             />
           )}
@@ -512,10 +516,12 @@ export function ExaminerExams({
       : null,
   );
   if (!nav.initialized) return <Loading />;
+  if (BFF_DEV && attemptId && !examId) return <Empty>Выберите экзамен перед открытием сдачи. <Action onClick={() => nav.navigate({ attemptId: null, assignmentId: null })}>К экзаменам</Action></Empty>;
   if (attemptId)
     return (
       <AttemptWorkspace
-        key={`${actor}:${attemptId}`}
+        key={`${actor}:${examId}:${attemptId}`}
+        examId={examId}
         attemptId={attemptId}
         actor={actor}
         enabled={enabled}

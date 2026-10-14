@@ -1,3 +1,5 @@
+import { announceAttemptChange } from "./test-attempt-v2-events";
+import { BFF_DEV } from "@/lib/config";
 import type {
   AnswerDraft,
   StoredAttemptAnswer,
@@ -67,6 +69,9 @@ export interface AttemptV2Bundle {
     lastError?: string;
   };
   finalSnapshot: FinalAttemptSnapshot | null;
+  finalUpload?: { failures: number; paused: boolean; lastError?: string; nextAttemptEpochMs?: number };
+  sealingReason?: "manual" | "timeout";
+  sealingCompletedAt?: string;
   localStatus: LocalAttemptStatus;
   updatedAtMoscow: string;
 }
@@ -117,15 +122,26 @@ export async function preflightAttemptStorage(): Promise<void> {
   }
 }
 
-export async function saveV2Bundle(bundle: AttemptV2Bundle): Promise<void> {
+export async function saveV2Bundle(bundle: AttemptV2Bundle): Promise<AttemptV2Bundle> {
   const db = await openAttemptDb();
-  await new Promise<void>((resolve, reject) => {
-    const tx = db.transaction(STORE, "readwrite");
-    tx.objectStore(STORE).put(bundle);
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
-  db.close();
+  let saved = bundle;
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(STORE, "readwrite");
+      const store = tx.objectStore(STORE);
+      const request = store.get(bundle.attemptId);
+      request.onsuccess = () => {
+        // Two simultaneous starts must not erase an existing draft, commit or snapshot.
+        if (request.result) saved = request.result;
+        else store.put(bundle);
+      };
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error);
+    });
+  } finally { db.close(); }
+  announceAttemptChange(bundle.attemptId);
+  return saved;
 }
 
 export async function loadV2Bundle(attemptId: string): Promise<AttemptV2Bundle | null> {
@@ -177,13 +193,16 @@ async function mutateBundle(
     const store = tx.objectStore(STORE);
     const request = store.get(attemptId);
     let next: AttemptV2Bundle;
+    let changed = false;
     request.onsuccess = () => {
       if (!request.result) {
         tx.abort();
         return;
       }
       try {
-        next = mutate(request.result as AttemptV2Bundle);
+        const previous = request.result as AttemptV2Bundle;
+        next = mutate(previous);
+        changed = previous.localStatus !== next.localStatus || JSON.stringify(previous.committedByQuestion) !== JSON.stringify(next.committedByQuestion) || JSON.stringify(previous.draftsByQuestion) !== JSON.stringify(next.draftsByQuestion);
         store.put(next);
       } catch (error) {
         tx.abort();
@@ -191,7 +210,10 @@ async function mutateBundle(
       }
     };
     request.onerror = () => reject(request.error);
-    tx.oncomplete = () => resolve(next!);
+    tx.oncomplete = () => {
+      if (changed) announceAttemptChange(attemptId);
+      resolve(next!);
+    };
     tx.onerror = () => reject(tx.error);
     tx.onabort = () => reject(tx.error ?? new Error("storage_transaction_aborted"));
   });
@@ -206,7 +228,11 @@ export function createV2Bundle(attempt: TestAttempt, testTitle: string): Attempt
   const nowEpoch = attempt.serverNowEpochMs ?? Date.now();
   const committed = Object.fromEntries((attempt.answers ?? []).map((answer, index) => [
     String(answer.questionId),
-    { ...answer, commitId: `server-${answer.questionId}`, sequence: index + 1, committedAtMoscow: attempt.startedAtMoscow ?? moscowNowIso(nowEpoch) },
+    { ...answer,
+      commitId: attempt.serverCommits?.find(c => c.question_id === answer.questionId)?.commit_id ?? `server-${answer.questionId}`,
+      sequence: attempt.serverCommits?.find(c => c.question_id === answer.questionId)?.sequence ?? index + 1,
+      committedAtMoscow: attempt.serverCommits?.find(c => c.question_id === answer.questionId)?.answered_at ?? attempt.startedAtMoscow ?? moscowNowIso(nowEpoch),
+    },
   ]));
   return {
     schemaVersion: 2,
@@ -258,7 +284,8 @@ export function commitDraft(attemptId: string, questionId: number, nextQuestionI
     const sequence = Math.max(0, ...Object.values(bundle.committedByQuestion).map((item) => item.sequence)) + 1;
     const commit: AttemptCommit = {
       ...draftToStoredAnswer(questionId, draft),
-      commitId: crypto.randomUUID(), sequence, committedAtMoscow: moscowNowIso(),
+      commitId: crypto.randomUUID(), sequence,
+      committedAtMoscow: BFF_DEV ? new Date(Math.min(effectiveNowAfterReload(bundle.time), bundle.time.answerDeadlineEpochMs)).toISOString() : moscowNowIso(),
     };
     const drafts = { ...bundle.draftsByQuestion };
     delete drafts[String(questionId)];
@@ -314,23 +341,41 @@ async function hashSnapshot(value: unknown): Promise<string> {
 }
 
 export async function sealV2Bundle(attemptId: string, reason: "manual" | "timeout", draftQuestionId?: number) {
-  let bundle = await loadV2Bundle(attemptId);
-  if (!bundle) throw new Error("attempt_bundle_not_found");
-  if (draftQuestionId != null) {
-    const draft = bundle.draftsByQuestion[String(draftQuestionId)];
-    if (draft && isDraftValid(draft)) bundle = await commitDraft(attemptId, draftQuestionId);
-  }
+  // Freeze the answers in one transaction before asynchronous hashing. Other tabs cannot
+  // commit between reading answers and sealing, and a reload can resume an interrupted seal.
+  const bundle = await mutateBundle(attemptId, (current) => {
+    if (current.finalSnapshot || current.localStatus === "sealing") return current;
+    if (current.localStatus !== "active") throw new Error("attempt_not_active");
+    const draft = draftQuestionId == null ? undefined : current.draftsByQuestion[String(draftQuestionId)];
+    if (draftQuestionId != null && draft && isDraftValid(draft) && !current.committedByQuestion[String(draftQuestionId)]) {
+      const commit: AttemptCommit = {
+        ...draftToStoredAnswer(draftQuestionId, draft), commitId: crypto.randomUUID(),
+        sequence: Math.max(0, ...Object.values(current.committedByQuestion).map(c => c.sequence)) + 1,
+        committedAtMoscow: BFF_DEV ? new Date(Math.min(effectiveNowAfterReload(current.time), current.time.answerDeadlineEpochMs)).toISOString() : moscowNowIso(),
+      };
+      const drafts = { ...current.draftsByQuestion };
+      delete drafts[String(draftQuestionId)];
+      current = { ...current, draftsByQuestion: drafts,
+        committedByQuestion: { ...current.committedByQuestion, [draftQuestionId]: commit },
+        pendingCommitIds: [...current.pendingCommitIds, commit.commitId] };
+    }
+    return { ...current, localStatus: "sealing", updatedAtMoscow: moscowNowIso(),
+      // Freeze completion metadata too, so both tabs hash the same final snapshot.
+      sealingReason: reason, sealingCompletedAt: BFF_DEV
+        ? new Date(reason === "timeout" ? current.time.answerDeadlineEpochMs : Math.min(effectiveNowAfterReload(current.time), current.time.answerDeadlineEpochMs)).toISOString()
+        : moscowNowIso() };
+  });
+  if (bundle.finalSnapshot) return bundle;
   const answers = Object.values(bundle.committedByQuestion).sort((a, b) => a.sequence - b.sequence);
   const core = {
     attemptId, testVersionId: bundle.testVersionId, answers,
-    completedAtMoscow: moscowNowIso(), reason,
+    completedAtMoscow: bundle.sealingCompletedAt!, reason: bundle.sealingReason!,
     answeredCount: answers.length,
     unansweredCount: Math.max(0, bundle.questions.length - answers.length),
   };
   const finalSnapshot: FinalAttemptSnapshot = { ...core, snapshotHash: await hashSnapshot(core) };
-  return mutateBundle(attemptId, (current) => ({
-    ...current, finalSnapshot, localStatus: "sealed_pending_upload",
-    updatedAtMoscow: moscowNowIso(),
+  return mutateBundle(attemptId, (current) => current.finalSnapshot ? current : ({
+    ...current, finalSnapshot, localStatus: "sealed_pending_upload", updatedAtMoscow: moscowNowIso(),
   }));
 }
 
@@ -353,5 +398,9 @@ export function updateSyncState(attemptId: string, patch: Partial<AttemptV2Bundl
 }
 
 export function updateLocalStatus(attemptId: string, localStatus: LocalAttemptStatus) {
-  return mutateBundle(attemptId, (bundle) => ({ ...bundle, localStatus, updatedAtMoscow: moscowNowIso() }));
+  return mutateBundle(attemptId, (bundle) => bundle.localStatus === "uploaded" ? bundle : ({ ...bundle, localStatus, updatedAtMoscow: moscowNowIso() }));
+}
+
+export function updateFinalUploadState(attemptId: string, finalUpload: NonNullable<AttemptV2Bundle["finalUpload"]>) {
+  return mutateBundle(attemptId, (bundle) => ({ ...bundle, finalUpload, updatedAtMoscow: moscowNowIso() }));
 }

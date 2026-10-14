@@ -61,11 +61,14 @@ export function testDetailToCanvasState(test: AdminTestDetail): AdminTestDraft {
 
   return {
     id: test._id,
+    description: test.description,
+    expectedRevision: test.expectedRevision,
+    maxQuestionId: test.maxQuestionId,
     title: test.title || "",
     direction: test.direction || "",
     startDate: toDatetimeLocalValue(test.startDate),
     endDate: toDatetimeLocalValue(test.endDate),
-    timeLimitMinutes: test.timeLimitMinutes || 30,
+    timeLimitMinutes: test.timeLimitMinutes ?? 30,
     published: test.published ?? true,
     visible: test.visible ?? false,
     canvas: {
@@ -92,6 +95,7 @@ export function parseQuestionIdFromCanvasId(
  */
 export function allocateStableQuestionIds(
   canvasIds: string[],
+  historicalMax = 0,
 ): number[] {
   const used = new Set<number>();
   const assigned: Array<number | null> = canvasIds.map((canvasId) => {
@@ -103,7 +107,7 @@ export function allocateStableQuestionIds(
     return id;
   });
 
-  let next = 0;
+  let next = historicalMax;
   for (const id of used) {
     if (id > next) next = id;
   }
@@ -134,7 +138,7 @@ export function canvasStateToTestFormData(state: AdminTestDraft): AdminTestFormD
   const sorted = sortQuestions(state.canvas).filter(
     (question) => !question.markedForDeletion,
   );
-  const questionIds = allocateStableQuestionIds(sorted.map((q) => q.id));
+  const questionIds = allocateStableQuestionIds(sorted.map((q) => q.id), state.maxQuestionId);
 
   const questions = sorted.map((question, index) => {
     const questionId = questionIds[index];
@@ -169,11 +173,14 @@ export function canvasStateToTestFormData(state: AdminTestDraft): AdminTestFormD
   });
 
   return {
+    expectedRevision: state.expectedRevision,
+    maxQuestionId: state.maxQuestionId,
+    description: state.description,
     title: state.title || "",
     direction: state.direction || "",
     startDate: state.startDate || "",
     endDate: state.endDate || "",
-    timeLimitMinutes: state.timeLimitMinutes || 30,
+    timeLimitMinutes: state.timeLimitMinutes ?? 30,
     questions,
     visible: state.visible ?? false,
     published: state.published ?? true,

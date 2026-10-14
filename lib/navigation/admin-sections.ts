@@ -1,5 +1,8 @@
 /** Разделы админки с готовым UI (остальные — заглушки). */
 export const ADMIN_READY_SECTIONS = new Set([
+  "organizations",
+  "divisions",
+  "directions",
   "users",
   "access",
   "review-queue",
@@ -21,6 +24,9 @@ export const ADMIN_READY_SECTIONS = new Set([
 ]);
 
 export const ADMIN_SECTION_DESCRIPTIONS: Record<string, string> = {
+  organizations: "Организация и участия существующих аккаунтов",
+  divisions: "Подразделения и кабинеты организации",
+  directions: "Общий справочник учебных направлений",
   users: "Ученики, группы и персонал",
   access: "Роли и пользователи административного кабинета",
   "review-queue": "Проверка отправленных домашних работ",

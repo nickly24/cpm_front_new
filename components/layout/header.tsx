@@ -1,5 +1,7 @@
 "use client";
 
+import { BFF_DEV } from "@/lib/config";
+import { CabinetContext } from "./cabinet-context";
 import { Button } from "@/components/ui/button";
 import { SectionSearch } from "@/components/layout/section-search";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
@@ -18,8 +20,7 @@ export function Header({ role, onMenuOpen }: HeaderProps) {
   const router = useRouter();
 
   const handleLogout = async () => {
-    await logout();
-    router.replace("/login");
+    try { await logout(); router.replace("/login"); } catch(e) { window.alert(e instanceof Error ? e.message : "Не удалось выйти"); }
   };
 
   return (
@@ -33,7 +34,7 @@ export function Header({ role, onMenuOpen }: HeaderProps) {
         <Menu size={22} />
       </button>
 
-      <SectionSearch role={role} />
+      {BFF_DEV ? <CabinetContext /> : <SectionSearch role={role} />}
 
       <div className="cabinet-header-actions">
         <ThemeToggle />

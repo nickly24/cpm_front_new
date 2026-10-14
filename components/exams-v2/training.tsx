@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { ExamSummary } from "@/lib/exams-v2/types";
 import { examMutate } from "@/lib/exams-v2/api";
 import { useExamResource } from "@/lib/exams-v2/hooks";
+import { useContextGuard } from "@/lib/bff/use-context-guard";
 import { ApiError } from "@/lib/api/client";
 import { ExamTrainingPreview } from "@/components/student/training/exam-training";
 import { Action, ErrorNotice, Modal } from "./shared";
@@ -18,9 +19,12 @@ export function ExamTrainingToolbar({ examId, canEdit, onChanged, openBank }: {
   const [preview, setPreview] = useState(false);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState("");
+  const savingRef = useRef(false);
+  useContextGuard(saving);
   const state = resource.data;
   const toggle = async () => {
-    if (!state || saving || !canEdit) return;
+    if (!state || savingRef.current || !canEdit) return;
+    savingRef.current = true;
     setSaving(true);
     setNotice("");
     try {
@@ -35,6 +39,7 @@ export function ExamTrainingToolbar({ examId, canEdit, onChanged, openBank }: {
     } finally {
       // Also resolves an uncertain transport outcome before another toggle is allowed.
       resource.reload();
+      savingRef.current = false;
       setSaving(false);
     }
   };
@@ -50,7 +55,7 @@ export function ExamTrainingToolbar({ examId, canEdit, onChanged, openBank }: {
           {state && (
             <>
               <label className={s.row}>
-                <input type="checkbox" checked={Boolean(state.exam.trainingEnabled)} disabled={!canEdit || saving || resource.loading || Boolean(resource.error)} onChange={() => void toggle()} />
+                <input type="checkbox" checked={Boolean(state.exam.trainingEnabled)} disabled={!canEdit || saving || resource.loading || Boolean(resource.error) || (!state.exam.trainingEnabled && state.cards_count === 0)} onChange={() => void toggle()} />
                 Доступна студентам для подготовки
               </label>
               <p className={s.muted}>Вопросы и эталонные ответы можно изучать в карточках. Доступ к подготовке не зависит от периода проведения экзамена.</p>

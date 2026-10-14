@@ -3,6 +3,9 @@
 import styles from "@/components/student/training/student-training.module.css";
 import { TrainingFlashcards } from "@/components/student/training/training-flashcards";
 import { StudentExamTraining } from "./exam-training";
+import { CardsCommandRecovery } from "@/components/training/cards-command-recovery";
+import { BFF_DEV } from "@/lib/config";
+import { cardsPercent } from "@/lib/bff/cards";
 import { TrainingSectionDetail } from "@/components/student/training/training-section-detail";
 import { TrainingSectionsListView } from "@/components/student/training/training-topics-view";
 import { SectionHeroBanner } from "@/components/student/section-hero-banner";
@@ -56,7 +59,7 @@ function updateSectionInDirection(
       total_cards,
       learned_cards,
       answer_changed_cards,
-      progress_percent: calcProgressPercent(learned_cards, total_cards),
+      progress_percent: BFF_DEV ? cardsPercent(learned_cards, total_cards) : calcProgressPercent(learned_cards, total_cards),
     };
   });
 }
@@ -90,7 +93,7 @@ export function StudentTrainingSection({
   if (pathSegments[0] === "exam" && /^\d+$/.test(pathSegments[1] ?? "")) {
     return <StudentExamTraining segments={pathSegments} />;
   }
-  return <LegacyStudentTrainingSection role={role} pathSegments={pathSegments} />;
+  return <><CardsCommandRecovery /><LegacyStudentTrainingSection role={role} pathSegments={pathSegments} /></>;
 }
 
 function LegacyStudentTrainingSection({
@@ -130,7 +133,7 @@ function LegacyStudentTrainingSection({
     setTreeReady(tree.length > 0);
     setSelectedDirection((prev) => {
       if (!prev) return prev;
-      return tree.find((d) => d.id === prev.id) ?? prev;
+      return tree.find((d) => d.id === prev.id) ?? null;
     });
     setSelectedSection((prev) => {
       if (!prev) return prev;
@@ -140,7 +143,7 @@ function LegacyStudentTrainingSection({
         );
         if (section) return section;
       }
-      return prev;
+      return null;
     });
   }, []);
 
@@ -355,6 +358,8 @@ function LegacyStudentTrainingSection({
           }}
         />
       ) : null}
+      {!selectedDirection && error ? <p className={styles.alert} role="alert">{error}</p> : null}
+      {!loading && !error && directions.length === 0 ? <p>Пока нет доступных карточек</p> : null}
     </div>
   );
 }

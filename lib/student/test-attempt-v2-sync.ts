@@ -21,6 +21,7 @@ export function cancelScheduledOfficialSync(attemptId: string) {
   const timer = timers.get(attemptId);
   if (timer != null) window.clearTimeout(timer);
   timers.delete(attemptId);
+  listeners.delete(attemptId);
 }
 
 export function scheduleOfficialSync(
@@ -28,8 +29,9 @@ export function scheduleOfficialSync(
   onUpdate?: (bundle: AttemptV2Bundle) => void,
   delayMs = 3000,
 ) {
-  if (onUpdate) listeners.set(attemptId, onUpdate);
+  const listener = onUpdate ?? listeners.get(attemptId);
   cancelScheduledOfficialSync(attemptId);
+  if (listener) listeners.set(attemptId, listener);
   timers.set(attemptId, window.setTimeout(() => {
     timers.delete(attemptId);
     void syncOfficialNow(attemptId).then((bundle) => bundle && listeners.get(attemptId)?.(bundle));

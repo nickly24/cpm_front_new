@@ -33,6 +33,7 @@ export function AdminExternalTestDeleteDialog({
   const [loadingPreview, setLoadingPreview] = useState(true);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [resultsCount, setResultsCount] = useState<number | null>(null);
+  const [refresh, setRefresh] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -68,7 +69,7 @@ export function AdminExternalTestDeleteDialog({
     return () => {
       cancelled = true;
     };
-  }, [test.id]);
+  }, [test.id, refresh]);
 
   const title = getAdminTestTitle(test);
   const busy = loadingPreview || deleting;
@@ -129,7 +130,7 @@ export function AdminExternalTestDeleteDialog({
         )}
 
         {deleteError ? (
-          <p className={styles.deleteDialogError}>{deleteError}</p>
+          <div><p className={styles.deleteDialogError}>{deleteError}</p><button type="button" className={styles.actionBtn} disabled={busy} onClick={() => setRefresh(v => v + 1)}>Обновить подтверждение</button></div>
         ) : null}
 
         <div className={styles.deleteDialogActions}>

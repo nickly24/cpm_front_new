@@ -1,6 +1,6 @@
 "use client";
 
-import { EditOnly, ReadOnlyControl } from "@/components/admin/admin-section-access";
+import { CoreCreateRecovery, CoreEditOnly, CoreReadOnlyControl } from "@/components/admin/users/core-access";
 
 import { AdminListPaginationBar } from "@/components/admin/tests/admin-list-pagination";
 import styles from "@/components/admin/tests/admin-tests.module.css";
@@ -25,12 +25,15 @@ import { useDebouncedValue } from "@/lib/hooks/use-debounced-value";
 import { useAuth } from "@/contexts/AuthContext";
 import { adminHref, canAccessSection } from "@/lib/auth/admin-access";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { BFF_DEV } from "@/lib/config";
+import { activateCoreUser } from "@/lib/bff/core-admin";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 const PAGE_SIZE = 15;
 
 export function AdminStudentsTab() {
   const { user } = useAuth();
+  const loadSerial=useRef(0);
   const [students, setStudents] = useState<AdminStudent[]>([]);
   const [groups, setGroups] = useState<AdminGroupItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -49,6 +52,7 @@ export function AdminStudentsTab() {
   );
 
   const load = useCallback(async () => {
+    const serial=++loadSerial.current;
     setLoading(true);
     setError(null);
     try {
@@ -56,13 +60,15 @@ export function AdminStudentsTab() {
         fetchAdminStudents(),
         fetchAdminGroupsList(),
       ]);
+      if(serial!==loadSerial.current)return;
       setStudents(studentsData);
       setGroups(groupsData);
     } catch (err) {
+      if(serial!==loadSerial.current)return;
       setStudents([]);
       setError(err instanceof Error ? err.message : "Не удалось загрузить учеников");
     } finally {
-      setLoading(false);
+      if(serial===loadSerial.current)setLoading(false);
     }
   }, []);
 
@@ -96,12 +102,12 @@ export function AdminStudentsTab() {
   const pageItems = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const handleDelete = async (student: AdminStudent) => {
-    if (!window.confirm(`Удалить ученика «${student.full_name}»?`)) {
+    if (!window.confirm(BFF_DEV ? `${student.is_active === false ? "Активировать" : "Заблокировать"} учётную запись «${student.full_name}»? История сохраняется.` : `Удалить ученика «${student.full_name}»?`)) {
       return;
     }
     try {
-      await deleteAdminUser("student", student.id);
-      setStudents((prev) => prev.filter((s) => s.id !== student.id));
+      if (BFF_DEV) {await activateCoreUser(student.id, student.is_active === false);await load();}
+      else {await deleteAdminUser("student", student.id);setStudents((prev) => prev.filter((s) => s.id !== student.id));}
     } catch (err) {
       window.alert(err instanceof Error ? err.message : "Ошибка удаления");
     }
@@ -144,6 +150,7 @@ export function AdminStudentsTab() {
 
   return (
     <>
+      <CoreCreateRecovery onRecovered={load} />
       <div className={styles.listToolbar}>
         <input
           type="search"
@@ -203,9 +210,9 @@ export function AdminStudentsTab() {
           </label>
         </FilterPopover>
         <div className={styles.toolbarActions}>
-          <EditOnly><Button type="button" onClick={() => setPanelMode("add")}>
+          <CoreEditOnly><Button type="button" onClick={() => setPanelMode("add")}>
             + Добавить ученика
-          </Button></EditOnly>
+          </Button></CoreEditOnly>
         </div>
       </div>
 
@@ -226,7 +233,7 @@ export function AdminStudentsTab() {
                   <th>ФИО</th>
                   <th>Класс</th>
                   <th>Логин</th>
-                  <th>Пароль</th>
+                  <th>{BFF_DEV ? "Статус" : "Пароль"}</th>
                   <th>Группа</th>
                   <th>Школа</th>
                   <th>Действия</th>
@@ -248,7 +255,7 @@ export function AdminStudentsTab() {
                       )}
                     </td>
                     <td>
-                      {student.password ? (
+                      {BFF_DEV ? <span>{student.is_active === false ? "Заблокирован" : "Активен"}</span> : student.password ? (
                         <span className={userStyles.credentialCode}>{student.password}</span>
                       ) : student.password_hidden ? (
                         <span className={userStyles.memberMeta}>Задайте новый</span>
@@ -257,7 +264,7 @@ export function AdminStudentsTab() {
                       )}
                     </td>
                     <td>
-                      <ReadOnlyControl><select
+                      <CoreReadOnlyControl section="groups"><select
                         className={userStyles.fieldSelect}
                         value={student.group_id ?? "none"}
                         onChange={(e) => handleGroupChange(student, e.target.value)}
@@ -268,7 +275,7 @@ export function AdminStudentsTab() {
                             {group.group_name}
                           </option>
                         ))}
-                      </select></ReadOnlyControl>
+                      </select></CoreReadOnlyControl>
                     </td>
                     <td>
                       {student.school_id ? (
@@ -286,7 +293,7 @@ export function AdminStudentsTab() {
                     </td>
                     <td>
                       <div className={userStyles.tableActions}>
-                        <EditOnly><button
+                        <CoreEditOnly><button
                           type="button"
                           className={styles.actionBtn}
                           onClick={() => {
@@ -295,14 +302,14 @@ export function AdminStudentsTab() {
                           }}
                         >
                           Изменить
-                        </button></EditOnly>
-                        <EditOnly><button
+                        </button></CoreEditOnly>
+                        <CoreEditOnly fullAdmin><button
                           type="button"
                           className={`${styles.actionBtn} ${styles.actionBtnDanger}`}
                           onClick={() => handleDelete(student)}
                         >
-                          Удалить
-                        </button></EditOnly>
+                          {BFF_DEV ? (student.is_active === false ? "Активировать" : "Заблокировать") : "Удалить"}
+                        </button></CoreEditOnly>
                       </div>
                     </td>
                   </tr>

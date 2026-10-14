@@ -1,6 +1,10 @@
 "use client";
 
 import { EditOnly } from "@/components/admin/admin-section-access";
+import { BFF_DEV } from "@/lib/config";
+import { useContextGuard } from "@/lib/bff/use-context-guard";
+import { cardsUncertain } from "@/lib/bff/cards";
+import { CardsCommandRecovery } from "@/components/training/cards-command-recovery";
 
 import { AdminCardsToDraftModal } from "@/components/admin/training/admin-cards-to-draft-modal";
 import styles from "@/components/admin/training/admin-training.module.css";
@@ -46,7 +50,7 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { adminHref, canAccessSection } from "@/lib/auth/admin-access";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type AdminView = "directions" | "sections" | "cards";
 
@@ -104,6 +108,10 @@ function FormModal({
   const [answer, setAnswer] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [uncertain, setUncertain] = useState(false);
+  const [conflict, setConflict] = useState(false);
+  useContextGuard(BFF_DEV);
+  const close = () => { if (!submitting && !uncertain) onClose(); };
 
   useEffect(() => {
     setError(null);
@@ -148,6 +156,7 @@ function FormModal({
     event.preventDefault();
     setSubmitting(true);
     setError(null);
+    setConflict(false);
     try {
       let res;
       switch (state.kind) {
@@ -168,6 +177,7 @@ function FormModal({
           res = await updateTrainingTheme(state.section.id, {
             name: name.trim(),
             direction_id: Number(directionId),
+            ...(BFF_DEV ? { expected_revision: state.section.revision } : {}),
           });
           break;
         case "card-create":
@@ -191,6 +201,7 @@ function FormModal({
           res = await updateTrainingCard(state.card.id, {
             question: question.trim(),
             answer: answer.trim(),
+            ...(BFF_DEV ? { theme_id: state.card.theme_id, expected_revision: state.card.revision, sort_order: state.card.sort_order } : {}),
           });
           break;
       }
@@ -199,6 +210,8 @@ function FormModal({
       }
       onSaved();
     } catch (err) {
+      setUncertain(cardsUncertain(err));
+      setConflict(BFF_DEV && typeof err === "object" && err !== null && "status" in err && err.status === 409);
       setError(err instanceof Error ? err.message : "Ошибка");
     } finally {
       setSubmitting(false);
@@ -206,7 +219,7 @@ function FormModal({
   };
 
   return (
-    <DismissibleOverlay className={styles.overlay} onDismiss={onClose}>
+    <DismissibleOverlay className={styles.overlay} onDismiss={close}>
       <div
         className={styles.modal}
         onClick={(event) => event.stopPropagation()}
@@ -229,6 +242,8 @@ function FormModal({
                 <input
                   className={styles.input}
                   value={name}
+                  disabled={submitting || uncertain}
+                  maxLength={200}
                   onChange={(e) => setName(e.target.value)}
                   autoFocus
                 />
@@ -238,6 +253,7 @@ function FormModal({
                 <select
                   className={styles.input}
                   value={directionId}
+                  disabled={submitting || uncertain}
                   onChange={(e) => setDirectionId(e.target.value)}
                 >
                   {directions.map((direction) => (
@@ -257,6 +273,8 @@ function FormModal({
                 <textarea
                   className={styles.textarea}
                   value={question}
+                  disabled={submitting || uncertain}
+                  maxLength={4000}
                   onChange={(e) => setQuestion(e.target.value)}
                   autoFocus
                 />
@@ -266,6 +284,8 @@ function FormModal({
                 <textarea
                   className={styles.textarea}
                   value={answer}
+                  disabled={submitting || uncertain}
+                  maxLength={16000}
                   onChange={(e) => setAnswer(e.target.value)}
                 />
               </label>
@@ -273,13 +293,14 @@ function FormModal({
           )}
 
           {error ? <p className={styles.formError}>{error}</p> : null}
+          {conflict && <Button type="button" variant="ghost" onClick={onSaved}>Обновить данные</Button>}
 
           <div className={styles.formActions}>
-            <Button type="button" variant="ghost" onClick={onClose}>
+            <Button type="button" variant="ghost" onClick={close} disabled={submitting || uncertain}>
               Отмена
             </Button>
             <Button type="submit" disabled={submitting}>
-              {submitting ? "Сохранение…" : "Сохранить"}
+              {submitting ? "Сохранение…" : uncertain ? "Повторить сохранение" : "Сохранить"}
             </Button>
           </div>
         </form>
@@ -305,6 +326,9 @@ export function AdminTrainingSection() {
   const [transformModalOpen, setTransformModalOpen] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const [searchTerm, setSearchTerm] = useState("");
+  const [actionBusy, setActionBusy] = useState(false);
+  const cardsRequestGeneration = useRef(0);
+  useContextGuard(BFF_DEV && actionBusy);
 
   const loadCatalog = useCallback(async () => {
     setLoading(true);
@@ -321,7 +345,7 @@ export function AdminTrainingSection() {
       setDirections(normalized);
       setSelectedDirection((prev) => {
         if (!prev) return prev;
-        return normalized.find((d) => d.id === prev.id) ?? prev;
+        return normalized.find((d) => d.id === prev.id) ?? null;
       });
       setSelectedSection((prev) => {
         if (!prev) return prev;
@@ -332,7 +356,7 @@ export function AdminTrainingSection() {
           );
           if (section) return section;
         }
-        return prev;
+        return null;
       });
     } catch (err) {
       setDirections([]);
@@ -343,15 +367,19 @@ export function AdminTrainingSection() {
   }, [reloadKey]);
 
   const loadCards = useCallback(async (sectionId: number) => {
+    const generation = ++cardsRequestGeneration.current;
     setCardsLoading(true);
     setError(null);
     try {
-      setCards(await fetchAdminCardsByTheme(sectionId));
+      const result = await fetchAdminCardsByTheme(sectionId);
+      if (generation !== cardsRequestGeneration.current) return;
+      setCards(result);
     } catch (err) {
+      if (generation !== cardsRequestGeneration.current) return;
       setCards([]);
       setError(err instanceof Error ? err.message : "Ошибка загрузки карточек");
     } finally {
-      setCardsLoading(false);
+      if (generation === cardsRequestGeneration.current) setCardsLoading(false);
     }
   }, []);
 
@@ -401,8 +429,10 @@ export function AdminTrainingSection() {
         ? `Удалить раздел «${section.name}» и ${section.cards_count} карточек?`
         : `Удалить раздел «${section.name}»?`;
     if (!confirmDelete(hint)) return;
+    if (actionBusy) return;
+    setActionBusy(true);
     try {
-      const res = await deleteTrainingTheme(section.id);
+      const res = await deleteTrainingTheme(section.id, section.revision);
       if (!res.success) throw new Error(res.error);
       if (
         selectedSection &&
@@ -414,7 +444,7 @@ export function AdminTrainingSection() {
       refresh();
     } catch (err) {
       window.alert(err instanceof Error ? err.message : "Ошибка удаления");
-    }
+    } finally { setActionBusy(false); }
   };
 
   const handleDeleteCard = async (card: AdminTrainingCardRow) => {
@@ -429,14 +459,16 @@ export function AdminTrainingSection() {
     ) {
       return;
     }
+    if (actionBusy) return;
+    setActionBusy(true);
     try {
-      const res = await deleteTrainingCard(card.id);
+      const res = await deleteTrainingCard(card.id, card.theme_id, card.revision);
       if (!res.success) throw new Error(res.error);
       refresh();
       if (selectedSection?.id) void loadCards(selectedSection.id);
     } catch (err) {
       window.alert(err instanceof Error ? err.message : "Ошибка удаления");
-    }
+    } finally { setActionBusy(false); }
   };
 
   const openCreate = () => {
@@ -536,6 +568,7 @@ export function AdminTrainingSection() {
 
   return (
     <div className={styles.page}>
+      <CardsCommandRecovery onRecovered={(result) => { setModal(null); setTransformModalOpen(false); refresh(); if (typeof result === "object" && result && "draft_id" in result && canAccessSection(user, "tests")) router.push(adminHref(user, "tests")); }} />
       <SectionHeroBanner
         imageSrc={STUDENT_SECTION_BANNERS.trainFlashcards}
         textTone="dark"
@@ -750,7 +783,7 @@ export function AdminTrainingSection() {
             <EditOnly><Button
               type="button"
               variant="secondary"
-              disabled={cards.length === 0}
+              disabled={cards.length === 0 || (BFF_DEV && !canAccessSection(user, "tests", "edit"))}
               onClick={() => setTransformModalOpen(true)}
             >
               <Wand2 size={16} aria-hidden />

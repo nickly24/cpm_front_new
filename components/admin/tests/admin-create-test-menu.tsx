@@ -1,6 +1,7 @@
 "use client";
 
 import styles from "@/components/admin/tests/admin-tests.module.css";
+import { BFF_DEV, BFF_EXTERNAL_TESTS_DEV } from "@/lib/config";
 import { cn } from "@/lib/cn";
 import { FilePlus2, Link2, Plus } from "lucide-react";
 import {
@@ -87,6 +88,8 @@ export function AdminCreateTestMenu({
             type="button"
             role="menuitem"
             className={styles.editMicroItem}
+            disabled={BFF_DEV && !BFF_EXTERNAL_TESTS_DEV}
+            title={BFF_DEV && !BFF_EXTERNAL_TESTS_DEV ? "Тесты вне системы пока недоступны" : undefined}
             onClick={() => {
               setOpen(false);
               onCreateExternal();

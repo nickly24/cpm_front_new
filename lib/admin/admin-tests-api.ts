@@ -1,3 +1,6 @@
+import { BFF_DEV } from "@/lib/config";
+import * as bffTests from "@/lib/bff/tests-admin";
+import { createExternalTest, deleteExternalTest, externalAdminItem, externalDeletePreview } from "@/lib/bff/external-tests";
 import { apiRequest } from "@/lib/api/client";
 import type {
   AdminExternalTestDeletePreview,
@@ -14,12 +17,14 @@ import type {
 } from "@/lib/admin/admin-tests-types";
 
 export async function fetchAdminDirections(): Promise<Direction[]> {
+  if (BFF_DEV) return bffTests.testsDirections();
   return apiRequest<Direction[]>("/directions");
 }
 
 export async function fetchAdminTestsByDirection(
   directionName: string,
 ): Promise<AdminTestListItem[]> {
+  if (BFF_DEV) return bffTests.testsCatalog({direction:directionName});
   return apiRequest<AdminTestListItem[]>(
     `/tests/${encodeURIComponent(directionName)}`,
   );
@@ -28,12 +33,14 @@ export async function fetchAdminTestsByDirection(
 export async function fetchAdminTestById(
   testId: string,
 ): Promise<AdminTestDetail> {
+  if (BFF_DEV) return bffTests.testsDetail(testId);
   return apiRequest<AdminTestDetail>(`/test/${testId}`);
 }
 
 export async function createAdminTest(
   payload: AdminTestFormData,
 ): Promise<{ id: string }> {
+  if (BFF_DEV) return bffTests.testsCreate(payload);
   return apiRequest<{ id: string }>("/create-test", {
     method: "POST",
     body: JSON.stringify(payload),
@@ -43,6 +50,7 @@ export async function createAdminTest(
 export async function createExternalAdminTest(
   payload: AdminExternalTestFormData,
 ): Promise<{ success: boolean; test: AdminTestListItem }> {
+  if (BFF_DEV) return { success: true, test: externalAdminItem(await createExternalTest(payload)) };
   return apiRequest<{ success: boolean; test: AdminTestListItem }>(
     "/external-tests",
     {
@@ -59,6 +67,7 @@ export interface AdminTestUpdateRecalcDecision {
 }
 
 export interface AdminTestUpdateRecalc {
+  queued?: boolean;
   updated: number;
   sessions: number;
   skipped?: boolean;
@@ -67,6 +76,8 @@ export interface AdminTestUpdateRecalc {
 }
 
 export interface AdminTestUpdateResponse {
+  revision?: number;
+  maxQuestionId?: number;
   message: string;
   testId: string;
   recalc?: AdminTestUpdateRecalc;
@@ -108,6 +119,9 @@ export function describeAdminTestRecalc(
       updated: 0,
       sessions: 0,
     };
+  }
+  if (recalc.queued) {
+    return {kind:"saved",title:"Тест сохранён",summary:"Пересчёт выполняется в очереди согласно настройке организации. Статус и новые баллы появятся в сдачах.",reasons:[],updated:0,sessions:0};
   }
   if (recalc.error) {
     return {
@@ -161,6 +175,7 @@ export async function updateAdminTest(
   testId: string,
   payload: AdminTestFormData,
 ): Promise<AdminTestUpdateResponse> {
+  if (BFF_DEV) return bffTests.testsUpdate(testId,payload);
   return apiRequest<AdminTestUpdateResponse>(`/test/${testId}`, {
     method: "PUT",
     body: JSON.stringify(payload),
@@ -171,6 +186,7 @@ export async function deleteAdminTest(testId: string): Promise<{
   message: string;
   deletedSessions: number;
 }> {
+  if (BFF_DEV) {await bffTests.testsAction(testId,"archive");return {message:"Тест архивирован",deletedSessions:0};}
   return apiRequest<{ message: string; deletedSessions: number }>(
     `/test/${testId}`,
     { method: "DELETE" },
@@ -182,6 +198,7 @@ export async function patchAdminTestFields(
   testId: string,
   fields: { published?: boolean; visible?: boolean },
 ): Promise<AdminTestUpdateResponse> {
+  if (BFF_DEV) return bffTests.testsPatch(testId,fields);
   return apiRequest<AdminTestUpdateResponse>(`/test/${testId}`, {
     method: "PUT",
     body: JSON.stringify(fields),
@@ -203,6 +220,7 @@ export function isAdminExternalTest(test: AdminTestListItem): boolean {
 export async function fetchExternalTestDeletePreview(
   testId: string,
 ): Promise<AdminExternalTestDeletePreview> {
+  if (BFF_DEV) { const preview = await externalDeletePreview(testId); return { test: externalAdminItem(preview.test), resultsCount: preview.results_count }; }
   return apiRequest<AdminExternalTestDeletePreview>(
     `/external-tests/${encodeURIComponent(testId)}/delete-preview`,
   );
@@ -211,6 +229,7 @@ export async function fetchExternalTestDeletePreview(
 export async function deleteExternalAdminTest(
   testId: string,
 ): Promise<AdminExternalTestDeleteResponse> {
+  if (BFF_DEV) { const result = await deleteExternalTest(testId); return { message: "Внешний тест удалён", testId: result.test_id, resultsDeleted: result.results_deleted }; }
   return apiRequest<AdminExternalTestDeleteResponse>(
     `/external-tests/${encodeURIComponent(testId)}`,
     { method: "DELETE" },
@@ -226,6 +245,7 @@ export async function fetchAdminTestChanges(
     eventType?: AdminTestChangeEventType;
   } = {},
 ): Promise<AdminTestChangesResponse> {
+  if (BFF_DEV) return bffTests.testsHistory(testId,params);
   const search = new URLSearchParams();
   if (params.page) search.set("page", String(params.page));
   if (params.limit) search.set("limit", String(params.limit));

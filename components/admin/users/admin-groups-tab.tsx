@@ -1,9 +1,13 @@
 "use client";
 
-import { EditOnly, ReadOnlyControl } from "@/components/admin/admin-section-access";
+import { CoreEditOnly, CoreReadOnlyControl } from "@/components/admin/users/core-access";
 
 import { AdminGroupFormPanel } from "@/components/admin/users/admin-group-form-panel";
 import { AdminListPaginationBar } from "@/components/admin/tests/admin-list-pagination";
+import { coreCan } from "@/lib/bff/core-admin";
+import { useAuth } from "@/contexts/AuthContext";
+import { BFF_DEV } from "@/lib/config";
+import { CoreCreateRecovery } from "@/components/admin/users/core-access";
 import styles from "@/components/admin/tests/admin-tests.module.css";
 import userStyles from "@/components/admin/users/admin-users.module.css";
 import { Button } from "@/components/ui/button";
@@ -24,7 +28,7 @@ import {
 import type { AdminGroupOverviewRow } from "@/lib/admin/admin-users-types";
 import { toClientPagination } from "@/lib/admin/admin-users-utils";
 import { useDebouncedValue } from "@/lib/hooks/use-debounced-value";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 const PAGE_SIZE = 12;
 
@@ -36,6 +40,9 @@ function proctorName(row: AdminGroupOverviewRow): string {
 }
 
 export function AdminGroupsTab() {
+  const {user}=useAuth();
+  const canSeeDirectory=!BFF_DEV||coreCan("users",false,user);
+  const loadSerial=useRef(0);
   const [rows, setRows] = useState<AdminGroupOverviewRow[]>([]);
   const [groupsList, setGroupsList] = useState<{ group_id: number; group_name: string }[]>([]);
   const [unsigned, setUnsigned] = useState({
@@ -48,6 +55,7 @@ export function AdminGroupsTab() {
   const debouncedSearch = useDebouncedValue(search, 350);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
+  const [movingAccountId,setMovingAccountId]=useState<number|null>(null);
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [expandedLoading, setExpandedLoading] = useState(false);
   const [expandedMembers, setExpandedMembers] = useState<
@@ -58,6 +66,7 @@ export function AdminGroupsTab() {
   >(null);
 
   const load = useCallback(async () => {
+    const serial=++loadSerial.current;
     setLoading(true);
     setError(null);
     try {
@@ -70,6 +79,7 @@ export function AdminGroupsTab() {
         fetchAdminGroupsList(),
         fetchAdminUnsignedUsers(),
       ]);
+      if(serial!==loadSerial.current)return;
       if (!overview.status) {
         throw new Error(overview.error || "Не удалось загрузить группы");
       }
@@ -81,19 +91,16 @@ export function AdminGroupsTab() {
         proctors: unsignedData.unassigned_proctors?.length ?? 0,
       });
     } catch (err) {
+      if(serial!==loadSerial.current)return;
       setRows([]);
       setError(err instanceof Error ? err.message : "Ошибка загрузки");
     } finally {
-      setLoading(false);
+      if(serial===loadSerial.current)setLoading(false);
     }
   }, [page, debouncedSearch]);
 
   useEffect(() => {
-    setPage(1);
-  }, [debouncedSearch]);
-
-  useEffect(() => {
-    load();
+    queueMicrotask(()=>{void load();});
   }, [load]);
 
   const pagination = toClientPagination(page, PAGE_SIZE, total);
@@ -144,7 +151,7 @@ export function AdminGroupsTab() {
 
   const handleRemoveStudent = async (groupId: number, studentId: number) => {
     try {
-      await removeAdminStudentFromGroup(studentId);
+      await removeAdminStudentFromGroup(studentId,groupId);
       await refreshExpanded(groupId);
     } catch (err) {
       window.alert(err instanceof Error ? err.message : "Ошибка");
@@ -153,16 +160,28 @@ export function AdminGroupsTab() {
 
   const handleRemoveProctor = async (groupId: number, proctorId: number) => {
     try {
-      await removeAdminProctorFromGroup(proctorId);
+      await removeAdminProctorFromGroup(proctorId,groupId);
       await refreshExpanded(groupId);
     } catch (err) {
       window.alert(err instanceof Error ? err.message : "Ошибка");
     }
   };
 
+  const handleMoveMember = async (groupId:number,accountId:number,targetGroupId:number,role:"student"|"proctor") => {
+    if(targetGroupId===groupId)return;
+    setMovingAccountId(accountId);
+    try {
+      if(role==="student")await assignAdminStudentToGroup(accountId,targetGroupId);
+      else await assignAdminProctorToGroup(accountId,targetGroupId);
+      setExpandedMembers(previous=>{const next={...previous};delete next[targetGroupId];return next;});
+      await refreshExpanded(groupId);
+    } catch(error){window.alert(error instanceof Error?error.message:"Ошибка смены группы");}
+    finally{setMovingAccountId(null);}
+  };
+
   const handleDeleteGroup = async (row: AdminGroupOverviewRow) => {
     const message = [
-      `Удалить группу «${row.item.group_name}»?`,
+      `${BFF_DEV ? "Архивировать" : "Удалить"} группу «${row.item.group_name}»?`,
       "",
       `Учеников в группе: ${row.student_count}.`,
       proctorName(row) !== "Не назначен"
@@ -181,7 +200,7 @@ export function AdminGroupsTab() {
     try {
       const res = await deleteAdminGroup(row.item.group_id);
       if (!res.status) {
-        throw new Error(res.error || "Не удалось удалить группу");
+        throw new Error(res.error || "Не удалось архивировать группу");
       }
       if (expandedId === row.item.group_id) {
         setExpandedId(null);
@@ -199,11 +218,12 @@ export function AdminGroupsTab() {
 
   return (
     <>
+      <CoreCreateRecovery onRecovered={load} />
       {groupForm ? (
         <AdminGroupFormPanel
           mode={groupForm.mode}
           initialName={groupForm.mode === "edit" ? groupForm.name : ""}
-          onClose={() => setGroupForm(null)}
+          onClose={() => {setGroupForm(null);void load();}}
           onSubmit={async (name) => {
             if (groupForm.mode === "create") {
               const res = await createAdminGroup(name);
@@ -226,12 +246,12 @@ export function AdminGroupsTab() {
           <span className={userStyles.statPill}>
             Групп: <strong>{total}</strong>
           </span>
-          <span className={userStyles.statPill}>
+          {canSeeDirectory ? <><span className={userStyles.statPill}>
             Без группы — учеников: <strong>{unsigned.students}</strong>
           </span>
           <span className={userStyles.statPill}>
             прокторов: <strong>{unsigned.proctors}</strong>
-          </span>
+          </span></> : <span className={userStyles.hint}>Просмотр пользователей без группы недоступен для этой роли.</span>}
         </div>
         <input
           type="search"
@@ -239,11 +259,11 @@ export function AdminGroupsTab() {
           placeholder="Поиск группы по названию или ID…"
           aria-label="Поиск групп"
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => {setSearch(e.target.value);setPage(1);}}
         />
-        <div className={styles.toolbarActions}><EditOnly><Button type="button" onClick={() => setGroupForm({ mode: "create" })}>
+        <div className={styles.toolbarActions}><CoreEditOnly section="groups"><Button type="button" onClick={() => setGroupForm({ mode: "create" })}>
           + Создать группу
-        </Button></EditOnly></div>
+        </Button></CoreEditOnly></div>
       </div>
 
       {error ? <div className={styles.stateBox}>{error}</div> : null}
@@ -253,9 +273,9 @@ export function AdminGroupsTab() {
       ) : rows.length === 0 ? (
         <div className={styles.stateBox}>
           <p>Группы не найдены</p>
-          <EditOnly><Button type="button" onClick={() => setGroupForm({ mode: "create" })}>
+          <CoreEditOnly section="groups"><Button type="button" onClick={() => setGroupForm({ mode: "create" })}>
             + Создать группу
-          </Button></EditOnly>
+          </Button></CoreEditOnly>
         </div>
       ) : (
         <>
@@ -291,7 +311,7 @@ export function AdminGroupsTab() {
                     >
                       {expanded ? "Свернуть" : "Состав"}
                     </button>
-                    <EditOnly><button
+                    <CoreEditOnly section="groups"><button
                       type="button"
                       className={styles.actionBtn}
                       onClick={() =>
@@ -303,14 +323,14 @@ export function AdminGroupsTab() {
                       }
                     >
                       Переименовать
-                    </button></EditOnly>
-                    <EditOnly><button
+                    </button></CoreEditOnly>
+                    <CoreEditOnly section="groups"><button
                       type="button"
                       className={`${styles.actionBtn} ${styles.actionBtnDanger}`}
                       onClick={() => handleDeleteGroup(row)}
                     >
-                      Удалить
-                    </button></EditOnly>
+                      {BFF_DEV ? "Архивировать" : "Удалить"}
+                    </button></CoreEditOnly>
                   </div>
 
                   {expanded ? (
@@ -324,13 +344,14 @@ export function AdminGroupsTab() {
                             {members.proctor.status &&
                             members.proctor.res &&
                             typeof members.proctor.res === "object" ? (
-                              <div className={userStyles.memberRow}>
+                              <div className={`${userStyles.memberRow} ${BFF_DEV ? userStyles.memberRowWithGroup : ""}`}>
                                 <div>
                                   <div className={userStyles.memberName}>
                                     {members.proctor.res.full_name}
                                   </div>
                                 </div>
-                                <EditOnly><button
+                                {BFF_DEV ? <CoreEditOnly section="groups"><select className={userStyles.fieldSelect} aria-label={`Группа для ${members.proctor.res.full_name}`} value={groupId} disabled={movingAccountId!==null} onChange={event=>void handleMoveMember(groupId, members.proctor.res&&typeof members.proctor.res==="object"?members.proctor.res.proctor_id:0,Number(event.target.value),"proctor")}>{groupsList.map(group=><option key={group.group_id} value={group.group_id}>{group.group_name}</option>)}</select></CoreEditOnly> : null}
+                                <CoreEditOnly section="groups"><button
                                   type="button"
                                   className={`${styles.actionBtn} ${styles.actionBtnDanger}`}
                                   onClick={() =>
@@ -344,7 +365,7 @@ export function AdminGroupsTab() {
                                   }
                                 >
                                   Снять
-                                </button></EditOnly>
+                                </button></CoreEditOnly>
                               </div>
                             ) : (
                               <p className={userStyles.hint}>Проктор не назначен</p>
@@ -357,7 +378,7 @@ export function AdminGroupsTab() {
                               <p className={userStyles.hint}>В группе нет учеников</p>
                             ) : (
                               members.students.map((student) => (
-                                <div key={student.id} className={userStyles.memberRow}>
+                                <div key={student.id} className={`${userStyles.memberRow} ${BFF_DEV ? userStyles.memberRowWithGroup : ""}`}>
                                   <div>
                                     <div className={userStyles.memberName}>
                                       {student.full_name}
@@ -368,7 +389,8 @@ export function AdminGroupsTab() {
                                         : "Школа не указана"}
                                     </div>
                                   </div>
-                                  <EditOnly><button
+                                  {BFF_DEV ? <CoreEditOnly section="groups"><select className={userStyles.fieldSelect} aria-label={`Группа для ${student.full_name}`} value={groupId} disabled={movingAccountId!==null} onChange={event=>void handleMoveMember(groupId,student.id,Number(event.target.value),"student")}>{groupsList.map(group=><option key={group.group_id} value={group.group_id}>{group.group_name}</option>)}</select></CoreEditOnly> : null}
+                                  <CoreEditOnly section="groups"><button
                                     type="button"
                                     className={`${styles.actionBtn} ${styles.actionBtnDanger}`}
                                     onClick={() =>
@@ -376,7 +398,7 @@ export function AdminGroupsTab() {
                                     }
                                   >
                                     Убрать
-                                  </button></EditOnly>
+                                  </button></CoreEditOnly>
                                 </div>
                               ))
                             )}
@@ -392,7 +414,7 @@ export function AdminGroupsTab() {
 
           <AdminListPaginationBar pagination={pagination} onPageChange={setPage} />
 
-          {unsigned.students + unsigned.proctors > 0 ? (
+          {canSeeDirectory && unsigned.students + unsigned.proctors > 0 ? (
             <AdminUnsignedAssignBlock
               groups={groupsList}
               onAssigned={load}
@@ -426,6 +448,7 @@ function AdminUnsignedAssignBlock({
           proctors: res.unassigned_proctors ?? [],
         });
       })
+      .catch(()=>setData({students:[],proctors:[]}))
       .finally(() => setLoading(false));
   }, []);
 
@@ -434,7 +457,7 @@ function AdminUnsignedAssignBlock({
     if (!groupId) {
       return;
     }
-    await assignAdminStudentToGroup(studentId, Number(groupId));
+    try {await assignAdminStudentToGroup(studentId, Number(groupId));} catch(e){window.alert(e instanceof Error?e.message:"Ошибка назначения");return;}
     setData((prev) => ({
       ...prev,
       students: prev.students.filter((s) => s.student_id !== studentId),
@@ -447,7 +470,7 @@ function AdminUnsignedAssignBlock({
     if (!groupId) {
       return;
     }
-    await assignAdminProctorToGroup(proctorId, Number(groupId));
+    try {await assignAdminProctorToGroup(proctorId, Number(groupId));} catch(e){window.alert(e instanceof Error?e.message:"Ошибка назначения");return;}
     setData((prev) => ({
       ...prev,
       proctors: prev.proctors.filter((p) => p.proctor_id !== proctorId),
@@ -474,7 +497,7 @@ function AdminUnsignedAssignBlock({
               <div className={userStyles.memberMeta}>Проктор</div>
             </div>
             <div className={userStyles.tableActions}>
-              <ReadOnlyControl><select
+              <CoreReadOnlyControl section="groups"><select
                 className={userStyles.fieldSelect}
                 value={selection[`proctor_${proctor.proctor_id}`] ?? ""}
                 onChange={(e) =>
@@ -490,14 +513,14 @@ function AdminUnsignedAssignBlock({
                     {g.group_name}
                   </option>
                 ))}
-              </select></ReadOnlyControl>
-              <EditOnly><button
+              </select></CoreReadOnlyControl>
+              <CoreEditOnly section="groups"><button
                 type="button"
                 className={styles.actionBtn}
                 onClick={() => assignProctor(proctor.proctor_id)}
               >
                 Назначить
-              </button></EditOnly>
+              </button></CoreEditOnly>
             </div>
           </div>
         ))}
@@ -508,7 +531,7 @@ function AdminUnsignedAssignBlock({
               <div className={userStyles.memberMeta}>Ученик</div>
             </div>
             <div className={userStyles.tableActions}>
-              <ReadOnlyControl><select
+              <CoreReadOnlyControl section="groups"><select
                 className={userStyles.fieldSelect}
                 value={selection[`student_${student.student_id}`] ?? ""}
                 onChange={(e) =>
@@ -524,14 +547,14 @@ function AdminUnsignedAssignBlock({
                     {g.group_name}
                   </option>
                 ))}
-              </select></ReadOnlyControl>
-              <EditOnly><button
+              </select></CoreReadOnlyControl>
+              <CoreEditOnly section="groups"><button
                 type="button"
                 className={styles.actionBtn}
                 onClick={() => assignStudent(student.student_id)}
               >
                 Назначить
-              </button></EditOnly>
+              </button></CoreEditOnly>
             </div>
           </div>
         ))}

@@ -21,6 +21,9 @@ const STATUS_META: Record<
   AdminTestStatus,
   { icon: LucideIcon; badgeClass: string; iconClass: string }
 > = {
+  hidden: {icon:CircleDot,badgeClass:styles.statusBadgeUpcoming,iconClass:styles.statusIconUpcoming},
+  archived: {icon:CheckCircle2,badgeClass:styles.statusBadgeEnded,iconClass:styles.statusIconEnded},
+  bank: {icon:Link2,badgeClass:styles.statusBadgeExternal,iconClass:styles.statusIconExternal},
   active: {
     icon: CircleDot,
     badgeClass: styles.statusBadgeActive,

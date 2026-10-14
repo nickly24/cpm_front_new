@@ -1,8 +1,10 @@
-export type RatingRecalcStatus = "queued" | "running" | "completed" | "failed";
+export type RatingRecalcStatus = "preparing" | "waiting_sources" | "queued" | "running" | "validating" | "completed" | "failed" | "cancelled" | "superseded";
 
 export interface AdminRatingRow {
   id: number;
   student_id: number;
+  place?: number;
+  version_id?: string;
   student_name: string;
   student_class: string | null;
   group_name: string | null;
@@ -13,7 +15,10 @@ export interface AdminRatingRow {
 }
 
 export interface RatingRecalcJob {
-  id: number;
+  id: number | string;
+  revision?: number;
+  error_code?: string;
+  as_of?: string;
   status: RatingRecalcStatus;
   date_from: string;
   date_to: string;
@@ -24,9 +29,9 @@ export interface RatingRecalcJob {
   completed_at: string | null;
   total_students: number;
   processed_count: number;
-  successful: number;
-  failed: number;
-  skipped: number;
+  successful?: number;
+  failed?: number;
+  skipped?: number;
   message: string | null;
   errors: unknown;
   progress_percent: number;
@@ -42,13 +47,13 @@ export interface RatingHomeworkDetail {
 }
 
 export interface RatingExamDetail {
-  exam_id: number;
+  exam_id: number | string;
   exam_name: string;
   exam_date: string | null;
   score: number;
   status: string;
   exam_type?: "outside_lms" | "classic";
-  direction_id?: number;
+  direction_id?: number | null;
   attempt_no?: 1 | 2 | null;
   has_appeal?: boolean;
   missing_result?: boolean;

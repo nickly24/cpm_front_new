@@ -7,6 +7,7 @@ export interface AdminTrainingSectionRow {
   exam_id?: number;
   training_enabled?: boolean;
   parts_count?: number;
+  revision?: number;
   name: string;
   direction_id: number;
   cards_count: number;
@@ -39,6 +40,7 @@ export interface AdminTrainingCardRow {
   answer: string;
   theme_id: number;
   sort_order?: number;
+  revision?: number;
 }
 
 export interface AdminCardsByThemeResponse {
@@ -55,6 +57,7 @@ export interface TrainingMutationResponse {
   theme_id?: number;
   card_id?: number;
   direction_id?: number;
+  revision?: number;
 }
 
 export function adminSectionKey(section: AdminTrainingSectionRow): string {

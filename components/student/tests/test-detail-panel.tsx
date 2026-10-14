@@ -1,3 +1,4 @@
+import { formatAttemptDeadline } from "@/lib/student/test-attempt-catalog";
 import styles from "@/components/student/tests/tests.module.css";
 import {
   formatTestDate,
@@ -128,7 +129,7 @@ export function TestDetailPanel({
               <span className={styles.scoreHeroValue}>{score}</span>
             </div>
           ) : (
-            <p className={styles.mutedNote}>Результат пока не добавлен</p>
+            <p className={styles.mutedNote}>{test.hasResult ? "Результат добавлен, балл пока не указан" : "Результат пока не добавлен"}</p>
           )}
         </div>
       ) : (
@@ -146,12 +147,30 @@ export function TestDetailPanel({
           <div className={styles.infoRow}>
             <CalendarRange size={16} className={styles.infoRowIcon} />
             <div className={styles.infoRowText}>
-              <span className={styles.infoRowLabel}>Период сдачи</span>
+              <span className={styles.infoRowLabel}>Период начала теста</span>
               <span className={styles.infoRowValue}>
                 {formatTestDate(test.startDate)} — {formatTestDate(test.endDate)}
               </span>
             </div>
           </div>
+
+          {test.activeAttempt ? (
+            <div className={styles.attemptBanner}>
+              <p className={styles.attemptMeta}>Ответить до: {formatAttemptDeadline(test.activeAttempt.expiresAt)}</p>
+              <p className={styles.attemptMeta}>Отправить до: {formatAttemptDeadline(test.activeAttempt.uploadDeadline)}</p>
+            </div>
+          ) : null}
+
+          {test.canRequestHelp && test.activeAttempt ? (
+            <div className={styles.attemptBannerExpired} role="status">
+              <p className={styles.attemptTitleExpired}>Срок отправки истёк</p>
+              <p className={styles.attemptMeta}>Самостоятельная отправка больше недоступна. Сохранённые на устройстве ответы не удалены.</p>
+              <details>
+                <summary>Как получить помощь</summary>
+                <p className={styles.attemptMeta}>Обратитесь к администратору и передайте название теста, номер попытки {test.activeAttempt.id} и срок отправки {formatAttemptDeadline(test.activeAttempt.uploadDeadline)}. Сохраните данные этого браузера до решения вопроса.</p>
+              </details>
+            </div>
+          ) : null}
 
           {test.canResume && test.activeAttempt ? (
             <div className={styles.attemptBanner}>
@@ -168,7 +187,7 @@ export function TestDetailPanel({
 
           {test.canSubmitExpired && test.activeAttempt ? (
             <div className={styles.attemptBannerExpired}>
-              <p className={styles.attemptTitleExpired}>Время попытки истекло</p>
+              <p className={styles.attemptTitleExpired}>Время ответов истекло</p>
               <p className={styles.attemptMeta}>
                 Сохранено ответов: {test.activeAttempt.answeredCount} из{" "}
                 {test.activeAttempt.totalQuestions}
@@ -229,15 +248,25 @@ export function TestDetailPanel({
             </p>
           ) : null}
 
-          {!test.isCompleted && test.status === "missed" ? (
+          {!test.isCompleted && test.status === "missed" && !test.activeAttempt ? (
             <p className={styles.mutedNote}>
               Окно сдачи закрылось {formatTestDate(test.endDate)}
             </p>
           ) : null}
 
-          {test.isCompleted && !test.canViewResults ? (
+          {test.status === "checking" ? (
+            <p className={styles.attemptBanner} role="status">
+              {test.calculationStatus === "processing" ? "Ответы проверяются." : test.calculationStatus === "retrying" ? "Проверка будет повторена автоматически." : "Ответы приняты и ожидают проверки в очереди."} Результат появится после проверки.
+            </p>
+          ) : null}
+
+          {test.status === "calculation_failed" ? (
+            <p className={styles.attemptBannerExpired} role="alert">Проверку пока не удалось завершить. Ответы сохранены. Обратитесь к администратору.</p>
+          ) : null}
+
+          {test.isCompleted && test.status === "completed" && !test.canViewResults ? (
             <p className={styles.mutedNote}>
-              Результаты и тренировка станут доступны после публикации ответов преподавателем
+              Просмотр ответов откроется после разрешения преподавателя
             </p>
           ) : null}
 

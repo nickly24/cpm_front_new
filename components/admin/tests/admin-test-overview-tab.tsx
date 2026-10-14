@@ -46,6 +46,7 @@ export function AdminTestOverviewTab({
                 {analytics.attemptsExpired}
               </span>
             </article>
+            {analytics.calculationsQueued!==undefined ? <article className={styles.statCard}><span className={styles.statLabel}>Проверка ответов</span><strong className={styles.statValue}>{analytics.calculationsQueued}</strong><span className={styles.statSub}>ошибок: {analytics.calculationsFailed||0}</span></article> : null}
             <article className={styles.statCard}>
               <span className={styles.statLabel}>Средний балл</span>
               <strong className={styles.statValue}>

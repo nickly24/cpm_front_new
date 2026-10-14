@@ -1,7 +1,7 @@
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { ResultSummary } from "./student";
+import { PendingRetakeNotice, ResultSummary } from "./student";
 import { QuestionProtocolCard, RoundVotes } from "./protocol";
 import { RatingFreshnessNotice } from "./rating-freshness";
 import { ErrorNotice } from "./shared";
@@ -13,6 +13,16 @@ import type {
 } from "@/lib/exams-v2/types";
 
 describe("safe exam result and protocol presentation", () => {
+  it("explains a pending retake while retaining the completed grade zero", () => {
+    const result: AttemptResult = { attemptId: 1, attemptNo: 1, grade: 0, rawTotal: 0, roundedTotal: 0, maxScore: 6, hasAppeal: false, completedAt: "2026-10-01T12:00:00Z" };
+    const html = renderToStaticMarkup(<><PendingRetakeNotice active status="in_progress" /><ResultSummary result={result} /></>);
+    expect(html).toContain("Пересдача в процессе");
+    expect(html).toContain("последний завершённый результат");
+    expect(html).toContain("0 / 5");
+    expect(renderToStaticMarkup(<PendingRetakeNotice active={false} status="completed" />)).toBe("");
+    expect(renderToStaticMarkup(<PendingRetakeNotice active status="completed" />)).toBe("");
+    expect(renderToStaticMarkup(<PendingRetakeNotice active status="pending_ready" compact />)).toContain("ожидает готовности комиссии");
+  });
   it("shows grade zero after appeal and a worse retake as current facts", () => {
     const result: AttemptResult = {
       attemptId: 9,

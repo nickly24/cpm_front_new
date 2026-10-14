@@ -1,5 +1,8 @@
 "use client";
 
+import { BFF_DEV } from "@/lib/config";
+import { AdminUploadsBffWorkspace } from "./admin-uploads-bff-workspace";
+
 import { EditOnly, ReadOnlyControl } from "@/components/admin/admin-section-access";
 
 import { AdminUploadJobsTab } from "@/components/admin/upload/admin-upload-jobs-tab";
@@ -47,6 +50,10 @@ const TABS: { id: AdminUploadTab; label: string }[] = [
 ];
 
 export function AdminUploadSection() {
+  return BFF_DEV ? <AdminUploadsBffWorkspace /> : <LegacyAdminUploadSection />;
+}
+
+function LegacyAdminUploadSection() {
   const [uploadTypeId, setUploadTypeId] = useState<AdminUploadTypeId>("users");
   const uploadType =
     ADMIN_UPLOAD_TYPES.find((item) => item.id === uploadTypeId) ??

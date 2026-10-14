@@ -1,5 +1,6 @@
 "use client";
 
+import { CoreCreateRecovery } from "@/components/admin/users/core-access";
 import styles from "@/components/admin/tests/admin-tests.module.css";
 import userStyles from "@/components/admin/users/admin-users.module.css";
 import { Button } from "@/components/ui/button";
@@ -8,6 +9,8 @@ import {
   updateAdminSchool,
 } from "@/lib/admin/admin-schools-api";
 import type { AdminSchool } from "@/lib/admin/admin-schools-types";
+import { BFF_DEV } from "@/lib/config";
+import { useContextGuard } from "@/lib/bff/use-context-guard";
 import { useEffect, useState } from "react";
 
 interface AdminSchoolPanelProps {
@@ -23,6 +26,7 @@ export function AdminSchoolPanel({
   onClose,
   onSaved,
 }: AdminSchoolPanelProps) {
+  useContextGuard(BFF_DEV);
   const [name, setName] = useState(school?.name ?? "");
   const [shortName, setShortName] = useState(school?.short_name ?? "");
   const [notes, setNotes] = useState(school?.notes ?? "");
@@ -49,8 +53,8 @@ export function AdminSchoolPanel({
       if (mode === "create") {
         const res = await createAdminSchool({
           name: name.trim(),
-          short_name: shortName.trim() || undefined,
-          notes: notes.trim() || undefined,
+          short_name: shortName.trim() || (BFF_DEV ? "" : undefined),
+          notes: notes.trim() || (BFF_DEV ? "" : undefined),
         });
         if (!res.status) {
           throw new Error(res.error || "Не удалось создать школу");
@@ -58,8 +62,8 @@ export function AdminSchoolPanel({
       } else if (school) {
         const res = await updateAdminSchool(school.school_id, {
           name: name.trim(),
-          short_name: shortName.trim() || undefined,
-          notes: notes.trim() || undefined,
+          short_name: shortName.trim() || (BFF_DEV ? "" : undefined),
+          notes: notes.trim() || (BFF_DEV ? "" : undefined),
         });
         if (!res.status) {
           throw new Error(res.error || "Не удалось сохранить");
@@ -113,6 +117,7 @@ export function AdminSchoolPanel({
           />
         </label>
 
+        <CoreCreateRecovery onRecovered={onSaved} />
         {error ? <p className={styles.errorText}>{error}</p> : null}
 
         <div className={userStyles.modalActions}>

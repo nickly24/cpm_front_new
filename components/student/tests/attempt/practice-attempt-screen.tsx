@@ -1,5 +1,6 @@
 "use client";
 
+import { useContextGuard } from "@/lib/bff/use-context-guard";
 import styles from "./test-attempt.module.css";
 import { LoadingState } from "@/components/ui/loading-state";
 import {
@@ -62,6 +63,7 @@ export function PracticeAttemptScreen({
     accuracy?: number;
   } | null>(null);
   const mainRef = useRef<HTMLElement>(null);
+  useContextGuard(phase === "loading" || phase === "active" || busy);
 
   const questions = attempt?.questions ?? [];
   const currentQuestion = questions[currentIndex] ?? null;
@@ -183,7 +185,19 @@ export function PracticeAttemptScreen({
         throw new Error(response.error ?? "attempt_not_active");
       }
       setScore(response.score != null ? Math.round(Number(response.score)) : null);
-      setStats(response.stats ?? null);
+      if (response.stats) {
+        const totalQuestions = response.stats.totalQuestions ?? questions.length;
+        const correctAnswers = response.stats.correctAnswers
+          ?? attempt.practiceFeedback?.filter(item => item.isCorrect).length ?? 0;
+        setStats({
+          ...response.stats,
+          totalQuestions,
+          correctAnswers,
+          accuracy: totalQuestions ? Math.round(correctAnswers / totalQuestions * 1000) / 10 : 0,
+        });
+      } else {
+        setStats(null);
+      }
       setPhase("done");
     } catch (cause) {
       setError(getNetworkErrorMessage(cause));

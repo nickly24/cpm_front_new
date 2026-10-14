@@ -1,9 +1,11 @@
 "use client";
+import { useContextGuard } from "@/lib/bff/use-context-guard";
 
 import { useHomeworkUploads } from "@/contexts/homework-upload-context";
 import { useAuth } from "@/contexts/AuthContext";
 import { deleteScannerProject } from "@/lib/homework-scanner/project-store";
 import { homeworkErrorMessage, homeworkFilesApi } from "@/lib/homework-files/api";
+import { homeworkMiB, homeworkWorkspaceLimits } from "@/lib/homework-files/limits";
 import type { HomeworkWorkspace, SubmissionState } from "@/lib/homework-files/types";
 import { useHomeworkDialog } from "@/lib/homework-files/use-dialog";
 import { Spinner } from "@/components/ui/spinner";
@@ -11,6 +13,7 @@ import { AlertCircle, ArrowLeft, Check, CheckCircle2, ChevronDown, Clock3, Downl
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ScannerModal } from "./scanner-modal";
 import { HomeworkPdfViewer } from "./homework-pdf-viewer";
+import { homeworkFileSize } from "./staff-homework-utils";
 import styles from "./homework-workspace.module.css";
 
 const states: Record<SubmissionState, { label: string; description: string }> = {
@@ -39,6 +42,7 @@ export function HomeworkWorkspaceModal({ homeworkId, onClose }: { homeworkId: nu
   const [urlLifetime, setUrlLifetime] = useState(300);
   const [scanner, setScanner] = useState(false);
   const [action, setAction] = useState<string | null>(null);
+  useContextGuard(scanner || Boolean(action));
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [preview, setPreview] = useState(true);
   const [dragging, setDragging] = useState(false);
@@ -95,15 +99,14 @@ export function HomeworkWorkspaceModal({ homeworkId, onClose }: { homeworkId: nu
   const state: SubmissionState = processing ? (activeJob?.status === "local" || activeJob?.status === "uploading" ? "uploading" : "processing") : workspace?.submission.state === "none" && workspace.legacy_result?.status ? "graded" : workspace?.submission.state || "none";
   const info = states[state];
   const file = workspace?.submission.draft_file || workspace?.submission.current_file;
-  const maxBytes = workspace?.limits?.max_bytes || 10 * 1024 * 1024;
-  const maxPages = workspace?.limits?.max_pages || 35;
-  const uploadAllowed = Boolean(workspace?.permissions.upload && !processing && !action);
+  const uploadLimits = homeworkWorkspaceLimits(workspace?.limits);
+  const uploadAllowed = Boolean(workspace?.permissions.upload && uploadLimits && !processing && !action);
   const submitAllowed = Boolean(workspace?.permissions.submit && !processing && !action);
   const step = ["none", "uploading", "processing"].includes(state) ? 0 : ["draft", "revision_requested"].includes(state) ? 1 : 2;
   const choose = (selected?: File) => {
-    if (!selected || !uploadAllowed) return;
-    if ((!selected.name.toLowerCase().endsWith(".pdf") && selected.type !== "application/pdf") || (selected.type && selected.type !== "application/pdf") || selected.size > maxBytes || selected.size === 0) {
-      setError(`Выберите PDF до ${Math.round(maxBytes / 1024 / 1024)} МБ. Файл не должен быть пустым.`); return;
+    if (!selected || !uploadAllowed || !uploadLimits) return;
+    if ((!selected.name.toLowerCase().endsWith(".pdf") && selected.type !== "application/pdf") || (selected.type && selected.type !== "application/pdf") || selected.size > uploadLimits.max_source_bytes || selected.size === 0) {
+      setError(`Выберите PDF до ${homeworkMiB(uploadLimits.max_source_bytes)} МиБ. Файл не должен быть пустым.`); return;
     }
     try { enqueue(homeworkId, selected); setError(null); setNotice(null); setConfirmRemove(false); }
     catch (reason) { setError(reason instanceof Error ? reason.message : "Не удалось добавить файл"); }
@@ -135,13 +138,13 @@ export function HomeworkWorkspaceModal({ homeworkId, onClose }: { homeworkId: nu
           <div className={styles.layout}>
             <div className={styles.main}>
               {workspace?.submission.revision_comment ? <div className={styles.revision}><span>Комментарий проверяющего</span><p>{workspace.submission.revision_comment}</p><small>Исправьте замечания и загрузите новый PDF целиком.</small></div> : null}
-              {pdfUrl ? <section className={styles.fileCard}><div className={styles.fileHeader}><FileText size={24} /><div><strong>{file?.filename || filename}</strong><span>{file ? `${file.page_count} стр. · ${(file.size_bytes / 1024 / 1024).toFixed(1)} МБ` : "PDF"}{workspace?.submission.has_draft ? " · Черновик" : " · Отправленная работа"}</span></div><button type="button" className={styles.iconButton} aria-label="Скачать PDF" onClick={() => void download()} disabled={Boolean(action)}><Download size={18} /></button></div><button type="button" className={styles.previewToggle} aria-expanded={preview} onClick={() => setPreview(value => !value)}>{preview ? "Свернуть просмотр" : "Посмотреть страницы"}<ChevronDown size={16} data-open={preview} /></button>{preview ? <HomeworkPdfViewer url={pdfUrl} filename={filename} onRefresh={() => void refreshFile().catch(() => setError("Не удалось обновить PDF"))} /> : null}</section> : <section className={styles.dropzone} data-dragging={dragging} onDragOver={event => { event.preventDefault(); if (uploadAllowed) setDragging(true); }} onDragLeave={() => setDragging(false)} onDrop={event => { event.preventDefault(); setDragging(false); choose(event.dataTransfer.files[0]); }}>
-                <div className={styles.uploadIcon}><FileUp size={32} /></div><h2>{processing ? "Файл уже в пути" : state === "graded" ? "Работа зачтена без PDF" : "Добавьте свою работу"}</h2><p>{processing ? "Как только PDF будет готов, здесь появятся его страницы." : state === "graded" ? "Результат внесён проверяющим в журнал. Прикреплённого файла у этой сдачи нет." : "Готовый PDF с компьютера или телефона — либо фотографии страниц через сканер."}</p><span>PDF до {Math.round(maxBytes / 1024 / 1024)} МБ · не больше {maxPages} страниц</span>{uploadAllowed ? <div className={styles.desktopUpload}><button type="button" className={styles.primary} onClick={() => input.current?.click()}><FileUp size={18} />Выбрать PDF</button><button type="button" className={styles.secondary} onClick={() => setScanner(true)}><ScanLine size={18} />Сканировать</button></div> : null}
+              {pdfUrl ? <section className={styles.fileCard}><div className={styles.fileHeader}><FileText size={24} /><div><strong>{file?.filename || filename}</strong><span>{file ? `${file.page_count} стр. · ${homeworkFileSize(file.size_bytes)}` : "PDF"}{workspace?.submission.has_draft ? " · Черновик" : " · Отправленная работа"}</span></div><button type="button" className={styles.iconButton} aria-label="Скачать PDF" onClick={() => void download()} disabled={Boolean(action)}><Download size={18} /></button></div><button type="button" className={styles.previewToggle} aria-expanded={preview} onClick={() => setPreview(value => !value)}>{preview ? "Свернуть просмотр" : "Посмотреть страницы"}<ChevronDown size={16} data-open={preview} /></button>{preview ? <HomeworkPdfViewer url={pdfUrl} filename={filename} onRefresh={() => void refreshFile().catch(() => setError("Не удалось обновить PDF"))} /> : null}</section> : <section className={styles.dropzone} data-dragging={dragging} onDragOver={event => { event.preventDefault(); if (uploadAllowed) setDragging(true); }} onDragLeave={() => setDragging(false)} onDrop={event => { event.preventDefault(); setDragging(false); choose(event.dataTransfer.files[0]); }}>
+                <div className={styles.uploadIcon}><FileUp size={32} /></div><h2>{processing ? "Файл уже в пути" : state === "graded" ? "Работа зачтена без PDF" : "Добавьте свою работу"}</h2><p>{processing ? "Как только PDF будет готов, здесь появятся его страницы." : state === "graded" ? "Результат внесён проверяющим в журнал. Прикреплённого файла у этой сдачи нет." : "Готовый PDF с компьютера или телефона — либо фотографии страниц через сканер."}</p><span>{uploadLimits ? `Исходный PDF до ${homeworkMiB(uploadLimits.max_source_bytes)} МиБ · после обработки до ${homeworkMiB(uploadLimits.max_output_bytes)} МиБ · не больше ${uploadLimits.max_pages} страниц` : "Лимиты загрузки не получены. Обновите работу перед выбором файла."}</span>{uploadAllowed ? <div className={styles.desktopUpload}><button type="button" className={styles.primary} onClick={() => input.current?.click()}><FileUp size={18} />Выбрать PDF</button><button type="button" className={styles.secondary} onClick={() => setScanner(true)}><ScanLine size={18} />Сканировать</button></div> : null}
               </section>}
             </div>
             <aside className={styles.aside}>
               <section className={styles.statusCard}><span className={styles.sectionLabel}>Сейчас</span><h2>{info.label}</h2><p>{info.description}</p>{workspace?.submission.reviewer?.full_name ? <p className={styles.reviewer}>Проверяет: <strong>{workspace.submission.reviewer.full_name}</strong></p> : null}{workspace?.submission.submitted_at_utc ? <small>Отправлено {date(workspace.submission.submitted_at_utc)}</small> : null}{state === "graded" && workspace?.legacy_result ? <div className={styles.score}><strong>{workspace.legacy_result.result}</strong><span>из 100 баллов</span></div> : null}{processing ? <div className={styles.progress}><progress max={100} value={activeJob?.progress || 0} /><span>{activeJob?.progress || 0}%</span><button type="button" disabled={Boolean(action)} onClick={() => void run("cancel", () => cancel(activeJob!.id))}>Отменить загрузку</button></div> : null}</section>
-              {job?.status === "failed" ? <div className={styles.error} role="alert"><AlertCircle size={20} /><div><strong>PDF не готов</strong><p>{homeworkErrorMessage(job.error_code)}</p><div className={styles.inlineActions}>{!job.transferFailed || job.file ? <button type="button" disabled={Boolean(action)} onClick={() => void run("retry", () => retry(job.id))}>Повторить</button> : <button type="button" disabled={Boolean(action)} onClick={() => void run("cancel", () => cancel(job.id))}>Сбросить загрузку</button>}</div></div></div> : null}
+              {job?.status === "failed" ? <div className={styles.error} role="alert"><AlertCircle size={20} /><div><strong>PDF не готов</strong><p>{homeworkErrorMessage(job.error_code, job.limits)}</p><div className={styles.inlineActions}>{!job.transferFailed || job.file ? <button type="button" disabled={Boolean(action)} onClick={() => void run("retry", () => retry(job.id))}>Повторить</button> : <button type="button" disabled={Boolean(action)} onClick={() => void run("cancel", () => cancel(job.id))}>Сбросить загрузку</button>}</div></div></div> : null}
               {pdfUrl && workspace?.permissions.upload ? <section className={styles.editCard}><span className={styles.sectionLabel}>{workspace.submission.has_draft ? "Изменить черновик" : "Подготовить исправления"}</span><button type="button" disabled={!uploadAllowed} onClick={() => input.current?.click()}><FileUp size={18} />Заменить PDF</button><button type="button" disabled={!uploadAllowed} onClick={() => setScanner(true)}><ScanLine size={18} />Открыть сканер</button>{workspace.permissions.remove_draft ? <button className={styles.remove} type="button" disabled={!uploadAllowed} onClick={() => setConfirmRemove(true)}><Trash2 size={17} />Удалить черновик</button> : null}{confirmRemove ? <div className={styles.confirm}><p>Удалить этот черновик? {workspace.submission.has_file ? "Отправленная версия останется." : "После этого можно выбрать другой PDF."}</p><button type="button" disabled={Boolean(action)} onClick={() => void run("remove", async () => { await homeworkFilesApi.removeDraft(homeworkId); setConfirmRemove(false); })}>Удалить</button><button type="button" onClick={() => setConfirmRemove(false)}>Оставить</button></div> : null}</section> : null}
               <div className={styles.help}><ShieldCheck size={18} /><p>Прикрепление сохраняет черновик. Проверяющий увидит файл только после отправки.</p></div>
             </aside>
@@ -151,6 +154,6 @@ export function HomeworkWorkspaceModal({ homeworkId, onClose }: { homeworkId: nu
       {!loading && workspace ? <footer className={styles.footer}><p>{processing ? "Готовим файл…" : submitAllowed ? "Проверьте все страницы перед отправкой" : states[state].label}</p><div>{workspace.permissions.submit ? <button className={styles.primary} type="button" disabled={!submitAllowed} onClick={() => void submit()}>{action === "submit" ? <Spinner size="sm" /> : <Send size={18} />}{workspace.submission.has_file ? "Отправить исправления" : "Отправить на проверку"}</button> : uploadAllowed ? <><button type="button" className={styles.secondary} onClick={() => setScanner(true)}><ScanLine size={18} /><span>Сканировать</span></button><button type="button" className={styles.primary} onClick={() => input.current?.click()}><FileUp size={18} /><span>{pdfUrl ? "Заменить PDF" : "Выбрать PDF"}</span></button></> : <button type="button" className={styles.secondary} onClick={onClose}>К заданиям</button>}</div></footer> : null}
       <input ref={input} hidden type="file" accept="application/pdf,.pdf" onChange={event => choose(event.target.files?.[0])} />
     </div>
-    {scanner ? <ScannerModal homeworkId={homeworkId} onClose={() => setScanner(false)} /> : null}
+    {scanner ? <ScannerModal homeworkId={homeworkId} limits={workspace?.limits} onClose={() => setScanner(false)} /> : null}
   </div>;
 }

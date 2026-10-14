@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
 import { ApiError } from "@/lib/api/client";
-import { examPeriod, filterStudyCards, studyBatches, trainingError, trainingStats } from "./exam-training";
+import { describe, expect, it } from "vitest";
+import { examPeriod, filterStudyCards, studyBatches, trainingError, trainingUnavailable, trainingStats } from "./exam-training";
 import { examTrainingPath, parseExamTrainingPath, parseTrainingPath, trainingSectionPath } from "./training-routes";
 import type { TrainingCard, TrainingDirection } from "./training-types";
 import { getProgressLabel } from "./training-utils";
@@ -48,5 +48,18 @@ describe("exam training navigation and progress contracts", () => {
     expect(trainingError(new ApiError("backend", 403, undefined, "training_disabled"))).toBe("Подготовка по этому экзамену сейчас недоступна");
     expect(trainingError(new ApiError("backend", 409, undefined, "content_changed"))).toContain("Содержание карточки изменилось");
     expect(examPeriod(null, null)).toBe("Период не задан");
+  });
+});
+
+
+describe("live exam training availability", () => {
+  it("closes an active deck on owner's HTTP409 training-disabled response", () => {
+    expect(trainingUnavailable(new ApiError("disabled", 409, undefined, "training_disabled"))).toBe(true);
+    expect(trainingUnavailable(new ApiError("empty", 409, undefined, "exam_empty"))).toBe(true);
+  });
+  it("allows refreshed-content and lost-response retries without closing the deck", () => {
+    expect(trainingUnavailable(new ApiError("changed", 409, undefined, "content_changed"))).toBe(false);
+    expect(trainingUnavailable(new ApiError("offline", 0, undefined, "transport_error"))).toBe(false);
+    expect(trainingUnavailable(new ApiError("outage", 502, undefined, "upstream_unavailable"))).toBe(false);
   });
 });

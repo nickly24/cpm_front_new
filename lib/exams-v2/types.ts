@@ -44,6 +44,7 @@ export interface Capabilities {
   canConductClassic: boolean;
   canReadStudentResults: boolean;
   canReadAdminExams?: boolean;
+  canImportExams?: boolean;
 }
 export interface ExamSummary {
   id: number;
@@ -52,11 +53,19 @@ export interface ExamSummary {
   directionName: string;
   legacyName: string | null;
   date: string | null;
+  /** Current selected division's calendar date; attempt snapshots stay separate. */
+  examDate?: string | null;
   startAt: string | null;
   endAt: string | null;
-  readiness: "ready" | "incomplete" | "not_applicable";
+  readiness: "ready" | "incomplete" | "not_applicable" | "unknown";
   version: number;
   trainingEnabled?: boolean;
+  name?: string;
+  ownerDivisionId?: number;
+  connectedDivisionIds?: number[];
+  connected?: boolean;
+  inBank?: boolean;
+  originExamId?: number | null;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -313,17 +322,19 @@ export interface Appeal {
 }
 export interface DeletePreview {
   confirmationToken: string;
-  expiresAt: string;
+  expiresAt: string | null;
   counts: Record<string, number>;
   version?: number;
   historyGeneration?: number;
 }
 export interface OutsideStudentResult {
   examId: number;
+  examName?: string;
   examType: "outside_lms";
-  directionId: number;
+  directionId: number | null;
   directionName: string;
   date: string | null;
+  examDate?: string | null;
   points: number;
   grade: Grade;
   examinator: string | null;
@@ -331,22 +342,30 @@ export interface OutsideStudentResult {
 }
 export interface ClassicStudentResult {
   examId: number;
+  examName?: string;
   examType: "classic";
-  directionId: number;
+  directionId: number | null;
   directionName: string;
   startAt: string | null;
   endAt: string | null;
+  examDate?: string | null;
+  hasActiveRetake?: boolean;
+  retakeStatus?: AttemptStatus | null;
   currentAttempt: AttemptResult;
   hasPreviousAttempt: boolean;
 }
 export type StudentResult = OutsideStudentResult | ClassicStudentResult;
 export interface StudentResultDetail {
   examId: number;
+  examName?: string;
   examType: ExamType;
   directionName: string;
   current: AttemptResult | OutsideStudentResult;
   history: AttemptResult[];
   trainingEnabled?: boolean;
+  examDate?: string | null;
+  hasActiveRetake?: boolean;
+  retakeStatus?: AttemptStatus | null;
 }
 export type ImportKind = "questions" | "assignments" | "outside";
 export interface ImportRow {
@@ -360,11 +379,21 @@ export interface ImportRow {
   warnings: Validation[];
 }
 export interface ImportSession {
-  id: number;
+  id: number | string;
   examId: number;
   previewVersion: number;
   status: "editable" | "committed";
   expiresAt: string;
+  filename?: string;
+  sourceHash?: string;
+  validationHash?: string;
+  ownerSummary?: {
+    total_rows: number;
+    included_rows: number;
+    excluded_rows: number;
+    error_rows: number;
+    valid_rows: number;
+  };
   rows: ImportRow[];
   pagination?: Pagination;
   summary: {
@@ -378,7 +407,7 @@ export interface ImportSession {
   commitResult?: ImportCommit;
 }
 export interface ImportCommit {
-  sessionId: number;
+  sessionId: number | string;
   committed: boolean;
   counts: Record<string, number>;
   replayed: boolean;

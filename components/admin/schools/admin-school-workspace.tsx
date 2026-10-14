@@ -1,6 +1,6 @@
 "use client";
 
-import { EditOnly } from "@/components/admin/admin-section-access";
+import { CoreEditOnly } from "@/components/admin/users/core-access";
 
 import styles from "@/components/admin/tests/admin-tests.module.css";
 import userStyles from "@/components/admin/users/admin-users.module.css";
@@ -15,7 +15,7 @@ import {
 } from "@/lib/admin/admin-schools-api";
 import type { AdminSchool, AdminSchoolStudent } from "@/lib/admin/admin-schools-types";
 import { useDebouncedValue } from "@/lib/hooks/use-debounced-value";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 interface AdminSchoolWorkspaceProps {
   schoolId: number;
@@ -23,6 +23,7 @@ interface AdminSchoolWorkspaceProps {
 }
 
 export function AdminSchoolWorkspace({ schoolId, onBack }: AdminSchoolWorkspaceProps) {
+  const loadSerial=useRef(0);
   const [school, setSchool] = useState<AdminSchool | null>(null);
   const [students, setStudents] = useState<AdminSchoolStudent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -35,6 +36,7 @@ export function AdminSchoolWorkspace({ schoolId, onBack }: AdminSchoolWorkspaceP
   const [searching, setSearching] = useState(false);
 
   const load = useCallback(async () => {
+    const serial=++loadSerial.current;
     setLoading(true);
     setError(null);
     try {
@@ -42,36 +44,39 @@ export function AdminSchoolWorkspace({ schoolId, onBack }: AdminSchoolWorkspaceP
         fetchAdminSchoolById(schoolId),
         fetchAdminSchoolStudents(schoolId),
       ]);
+      if(serial!==loadSerial.current)return;
       if (!schoolData) {
         throw new Error("Школа не найдена");
       }
       setSchool(schoolData);
       setStudents(studentsData);
     } catch (err) {
+      if(serial!==loadSerial.current)return;
       setError(err instanceof Error ? err.message : "Ошибка загрузки");
     } finally {
-      setLoading(false);
+      if(serial===loadSerial.current)setLoading(false);
     }
   }, [schoolId]);
 
   useEffect(() => {
-    load();
+    queueMicrotask(()=>{void load();});
   }, [load]);
 
   useEffect(() => {
     if (!debouncedSearch.trim()) {
-      setSearchResults([]);
+      queueMicrotask(()=>{setSearchResults([]);setSearching(false);});
       return;
     }
 
     let cancelled = false;
-    setSearching(true);
+    queueMicrotask(()=>{if(!cancelled)setSearching(true);});
     searchAdminStudentsForSchool(debouncedSearch)
       .then((results) => {
         if (!cancelled) {
           setSearchResults(results);
         }
       })
+      .catch(error=>{if(!cancelled){setSearchResults([]);setError(error instanceof Error?error.message:"Ошибка поиска");}})
       .finally(() => {
         if (!cancelled) {
           setSearching(false);
@@ -114,7 +119,7 @@ export function AdminSchoolWorkspace({ schoolId, onBack }: AdminSchoolWorkspaceP
         <div>
           <h1 className={styles.pageTitle}>{school?.name ?? "Школа"}</h1>
           <p className={userStyles.hint}>
-            Учеников в школе: {students.length}
+            Учеников в выбранном подразделении: {students.length}
             {school?.short_name ? ` · ${school.short_name}` : ""}
           </p>
         </div>
@@ -145,14 +150,14 @@ export function AdminSchoolWorkspace({ schoolId, onBack }: AdminSchoolWorkspaceP
                   {student.group_name ? ` · ${student.group_name}` : ""}
                 </div>
               </div>
-              <EditOnly><button
+              <CoreEditOnly><button
                 type="button"
                 className={styles.actionBtn}
                 disabled={student.school_id === schoolId}
                 onClick={() => handleAssign(student.id)}
               >
                 {student.school_id === schoolId ? "Уже здесь" : "Добавить"}
-              </button></EditOnly>
+              </button></CoreEditOnly>
             </div>
           ))}
         </div>
@@ -175,13 +180,13 @@ export function AdminSchoolWorkspace({ schoolId, onBack }: AdminSchoolWorkspaceP
                   {student.group_id ? ` · группа #${student.group_id}` : ""}
                 </div>
               </div>
-              <EditOnly><button
+              <CoreEditOnly><button
                 type="button"
                 className={`${styles.actionBtn} ${styles.actionBtnDanger}`}
                 onClick={() => handleRemove(student.id)}
               >
                 Убрать
-              </button></EditOnly>
+              </button></CoreEditOnly>
             </div>
           ))}
         </div>

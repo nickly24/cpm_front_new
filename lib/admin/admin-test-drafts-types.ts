@@ -30,6 +30,10 @@ export interface DraftCanvasModel {
 
 export interface AdminTestDraft {
   id: string;
+  description?: string;
+  expectedRevision?: number;
+  maxQuestionId?: number;
+  state?: string;
   title: string;
   direction: string;
   startDate: string;

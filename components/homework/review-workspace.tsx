@@ -1,4 +1,5 @@
 "use client";
+import { useContextGuard } from "@/lib/bff/use-context-guard";
 
 import { useAuth } from "@/contexts/AuthContext";
 import { canAccessSection, isAdminCabinet } from "@/lib/auth/admin-access";
@@ -27,6 +28,7 @@ export function ReviewWorkspace({ work, onClose, onChanged }: ReviewWorkspacePro
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  useContextGuard(true);
   const [mode, setMode] = useState<"grade" | "revision">("grade");
   const [autoScore, setAutoScore] = useState(false);
   const [score, setScore] = useState("");
@@ -57,7 +59,7 @@ export function ReviewWorkspace({ work, onClose, onChanged }: ReviewWorkspacePro
 
   const state = workspace?.submission.state ?? "submitted";
   const reviewer = workspace?.submission.reviewer;
-  const mine = reviewer?.id === user?.id && reviewer?.role === user?.role;
+  const mine = reviewer?.id === (user?.account_id ?? user?.id) && reviewer?.role === user?.role;
   const admin = isAdminCabinet(user?.role);
   const editable = Boolean(workspace) && (user?.role === "proctor" ? true : canAccessSection(user, state === "graded" ? "homework-archive" : "review-queue", "edit"));
   const canReview = editable && state === "in_review" && mine;

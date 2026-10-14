@@ -5,6 +5,8 @@ import ratingStyles from "@/components/admin/ratings/admin-ratings.module.css";
 import adminStyles from "@/components/admin/tests/admin-tests.module.css";
 import { Button } from "@/components/ui/button";
 import { DismissibleOverlay } from "@/components/ui/dismissible-overlay";
+import { BFF_DEV } from "@/lib/config";
+import { pendingRatingCommand } from "@/lib/admin/admin-ratings-api";
 import { useEffect, useState } from "react";
 
 interface AdminRatingRecalcPanelProps {
@@ -25,7 +27,8 @@ export function AdminRatingRecalcPanel({
   onSubmit,
   disabled = false,
 }: AdminRatingRecalcPanelProps) {
-  const defaults = defaultYearRange();
+  const saved = BFF_DEV ? pendingRatingCommand() : null;
+  const defaults = saved && "date_from" in saved.body ? { from: saved.body.date_from, to: saved.body.date_to } : defaultYearRange();
   const [dateFrom, setDateFrom] = useState(defaults.from);
   const [dateTo, setDateTo] = useState(defaults.to);
   const [submitting, setSubmitting] = useState(false);
@@ -79,6 +82,7 @@ export function AdminRatingRecalcPanel({
           <label className={userStyles.field}>
             <span className={userStyles.fieldLabel}>Дата начала</span>
             <input
+              disabled={Boolean(saved) || submitting}
               type="date"
               className={userStyles.fieldInput}
               value={dateFrom}
@@ -89,6 +93,7 @@ export function AdminRatingRecalcPanel({
           <label className={userStyles.field}>
             <span className={userStyles.fieldLabel}>Дата окончания</span>
             <input
+              disabled={Boolean(saved) || submitting}
               type="date"
               className={userStyles.fieldInput}
               value={dateTo}
@@ -97,6 +102,7 @@ export function AdminRatingRecalcPanel({
             />
           </label>
 
+          {saved && !submitting ? <p role="status">Ответ на предыдущий запрос не получен. Повторите его с тем же периодом: сервис вернёт существующую задачу.</p> : null}
           {error ? <p className={adminStyles.errorText}>{error}</p> : null}
 
           <div className={userStyles.modalActions}>
@@ -104,7 +110,7 @@ export function AdminRatingRecalcPanel({
               Отмена
             </Button>
             <Button type="submit" disabled={submitting || disabled}>
-              {submitting ? "Запуск…" : "Запустить пересчёт"}
+              {submitting ? "Запуск…" : saved ? "Повторить запрос" : "Запустить пересчёт"}
             </Button>
           </div>
         </form>

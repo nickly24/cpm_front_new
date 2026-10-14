@@ -1,3 +1,4 @@
+import { BFF_DEV } from "@/lib/config";
 import { apiRequest } from "@/lib/api/client";
 
 export interface SupervisorOvHomework {
@@ -20,7 +21,7 @@ export interface SupervisorOvHomeworkResult {
 export interface SupervisorOvHomeworkStudent {
   id: number;
   full_name: string;
-  class: number;
+  class: number | null;
   group_name: string | null;
   results: SupervisorOvHomeworkResult[];
 }
@@ -32,6 +33,6 @@ export interface SupervisorOvHomeworkReportResponse {
   error?: string;
 }
 
-export async function fetchSupervisorOvHomeworkReport(): Promise<SupervisorOvHomeworkReportResponse> {
-  return apiRequest<SupervisorOvHomeworkReportResponse>("/api/get-ov-homework-table");
+export async function fetchSupervisorOvHomeworkReport(period?: {dateFrom: string; dateTo: string}): Promise<SupervisorOvHomeworkReportResponse> {
+  return apiRequest<SupervisorOvHomeworkReportResponse>(`/api/get-ov-homework-table${BFF_DEV && period ? `?date_from=${period.dateFrom}&date_to=${period.dateTo}` : ""}`);
 }

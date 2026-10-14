@@ -1,3 +1,5 @@
+import { BFF_DEV } from "@/lib/config";
+import { studentCatalog, studentDirections, type StudentTestsFilters } from "@/lib/bff/tests-student";
 import { apiRequest } from "@/lib/api/client";
 import type {
   Direction,
@@ -10,13 +12,16 @@ import type {
 import { STUDENT_TESTS_PAGE_SIZE } from "./tests-types";
 
 export async function fetchDirections(): Promise<Direction[]> {
+  if (BFF_DEV) return studentDirections();
   return apiRequest<Direction[]>("/directions");
 }
 
 export async function fetchStudentAvailableTests(
   page = 1,
   limit = STUDENT_TESTS_PAGE_SIZE,
+  filters: StudentTestsFilters = {},
 ): Promise<TestsWithSessionsResponse> {
+  if (BFF_DEV) return studentCatalog(null, page, limit, true, filters);
   const params = new URLSearchParams({
     page: String(page),
     limit: String(limit),
@@ -30,7 +35,9 @@ export async function fetchTestsWithSessions(
   directionName: string,
   page = 1,
   limit = STUDENT_TESTS_PAGE_SIZE,
+  filters: StudentTestsFilters = {},
 ): Promise<TestsWithSessionsResponse> {
+  if (BFF_DEV) return studentCatalog(directionName, page, limit, false, filters);
   const params = new URLSearchParams({
     page: String(page),
     limit: String(limit),
@@ -222,5 +229,5 @@ export function getExternalScore(test: StudentTestItem): number | null {
     return null;
   }
 
-  return Math.round(Number(test.rate));
+  return BFF_DEV ? Number(test.rate) : Math.round(Number(test.rate));
 }

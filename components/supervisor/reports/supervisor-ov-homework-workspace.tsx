@@ -9,6 +9,7 @@ import { ReportMacClose } from "@/components/admin/attendance/report/report-mac-
 import { LoadingState } from "@/components/ui/loading-state";
 import { fetchSupervisorOvHomeworkReport } from "@/lib/supervisor/supervisor-homework-api";
 import { exportSupervisorOvHomeworkExcel } from "@/lib/supervisor/supervisor-homework-export";
+import { filterSupervisorHomeworkStudents } from "@/lib/supervisor/supervisor-homework-filter";
 import type { HomeworkHeaderMode } from "@/lib/supervisor/supervisor-homework-display";
 import {
   filterHomeworksByPeriod,
@@ -37,7 +38,8 @@ export function SupervisorOvHomeworkWorkspace({
     Awaited<ReturnType<typeof fetchSupervisorOvHomeworkReport>>["students"]
   >([]);
   const [search, setSearch] = useState("");
-  const [typeFilter, setTypeFilter] = useState<"all" | "ОВ" | "ДЗНВ">("all");
+  const [typeFilter, setTypeFilter] = useState<string>("all");
+  const [classFilter, setClassFilter] = useState("all");
   const [headerMode, setHeaderMode] = useState<HomeworkHeaderMode>("short");
 
   const load = useCallback(async (silent = false) => {
@@ -48,7 +50,7 @@ export function SupervisorOvHomeworkWorkspace({
     }
     setError(null);
     try {
-      const response = await fetchSupervisorOvHomeworkReport();
+      const response = await fetchSupervisorOvHomeworkReport(period);
       if (!response.status) {
         throw new Error(response.error ?? "Не удалось загрузить отчёт");
       }
@@ -69,18 +71,14 @@ export function SupervisorOvHomeworkWorkspace({
   }, [period]);
 
   useEffect(() => {
-    void load();
+    const timer = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(timer);
   }, [load]);
 
   const filteredStudents = useMemo(() => {
-    const query = search.trim().toLowerCase();
-    if (!query) {
-      return students;
-    }
-    return students.filter((student) =>
-      student.full_name.toLowerCase().includes(query),
-    );
-  }, [search, students]);
+    return filterSupervisorHomeworkStudents(students, search, classFilter);
+  }, [search, students, classFilter]);
+  const visibleHomeworks = useMemo(() => typeFilter === "all" ? homeworks : homeworks.filter(homework => homework.type === typeFilter), [homeworks, typeFilter]);
 
   const visibleHomeworkCount = useMemo(() => {
     if (typeFilter === "all") {
@@ -106,7 +104,7 @@ export function SupervisorOvHomeworkWorkspace({
               <ReportMacClose onClose={onBack} />
               <div className={reportStyles.excelZoneBody}>
                 <div className={reportStyles.excelDocBlock}>
-                  <p className={reportStyles.excelDocTitle}>Домашние задания ОВ / ДЗНВ</p>
+                  <p className={reportStyles.excelDocTitle}>Домашние задания</p>
                   <p className={reportStyles.excelDocPeriod}>{periodLabel}</p>
                   <p className={reportStyles.excelDocFile}>{fileName}</p>
                 </div>
@@ -131,7 +129,7 @@ export function SupervisorOvHomeworkWorkspace({
                   setExporting(true);
                   try {
                     exportSupervisorOvHomeworkExcel(
-                      homeworks,
+                      visibleHomeworks,
                       filteredStudents,
                       fileName,
                     );
@@ -172,17 +170,24 @@ export function SupervisorOvHomeworkWorkspace({
               />
 
               <label className={gridStyles.filterField}>
+                <span className={gridStyles.filterLabel}>Класс</span>
+                <select aria-label="Класс" className={gridStyles.filterSelect} value={classFilter} onChange={event => setClassFilter(event.target.value)}>
+                  <option value="all">Все классы</option>
+                  {[...new Set(students.map(student => student.class).filter((value): value is number => value !== null))].sort((a, b) => a - b).map(value => <option key={value} value={value}>{value} класс</option>)}
+                  {students.some(student => student.class === null) ? <option value="unknown">Класс не указан</option> : null}
+                </select>
+              </label>
+              <label className={gridStyles.filterField}>
                 <span className={gridStyles.filterLabel}>Тип</span>
                 <select
                   className={gridStyles.filterSelect}
                   value={typeFilter}
                   onChange={(event) =>
-                    setTypeFilter(event.target.value as "all" | "ОВ" | "ДЗНВ")
+                    setTypeFilter(event.target.value)
                   }
                 >
                   <option value="all">Все задания</option>
-                  <option value="ОВ">Только ОВ</option>
-                  <option value="ДЗНВ">Только ДЗНВ</option>
+                  {Array.from(new Set(homeworks.map(h=>h.type))).map(name=><option key={name} value={name}>{name}</option>)}
                 </select>
               </label>
 

@@ -1,5 +1,7 @@
 "use client";
 
+import { BFF_DEV } from "@/lib/config";
+import { examContextKey } from "@/lib/bff/exams-shared";
 import { useAuth } from "@/contexts/AuthContext";
 import { ApiError } from "@/lib/api/client";
 import { isAdminCabinet } from "@/lib/auth/admin-access";
@@ -17,7 +19,7 @@ function ActorExams({ actor }: { actor: string }) {
   const resource = useExamResource<Capabilities>(
     user ? "/api/exams/capabilities" : null,
   );
-  const legacy = () =>
+  const legacy = () => BFF_DEV ? <Empty>Экзамены недоступны в выбранном кабинете</Empty> :
     isAdminCabinet(user?.role) ? (
       <AdminExamsSection />
     ) : user?.role === "student" ? (
@@ -52,7 +54,7 @@ function ActorExams({ actor }: { actor: string }) {
 export function ExamSection() {
   const { user } = useAuth();
   if (!user) return null;
-  const actor = `${user.role}:${user.id}`;
+  const actor = BFF_DEV ? `${user.role}:${examContextKey()}` : `${user.role}:${user.id}`;
   return (
     <>
       <UnsavedExamChanges />

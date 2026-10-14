@@ -273,6 +273,11 @@
   color: #16a34a;
 }
 
+.statusText_pending_upload {
+  color: #b45309;
+}
+
+.statusText_upload_window_closed,
 .statusText_missed {
   color: #dc2626;
 }
@@ -948,3 +953,7 @@
 @media (max-width: 400px) {
   .dateRow { grid-template-columns: 1fr; }
 }
+
+.statusText_running { color: #2563eb; }
+.statusText_checking { color: #a16207; }
+.statusText_calculation_failed { color: #dc2626; }

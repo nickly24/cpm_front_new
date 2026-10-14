@@ -55,7 +55,7 @@ export function ReviewQueueSection() {
     {error ? <div className={styles.error} role="alert"><span>{error}</span><button onClick={() => void load()}>Повторить</button></div> : null}
     {loading ? <div className={styles.loading}><Spinner /><span>Загружаем работы…</span></div> : !items.length ? <div className={styles.empty}><FileText size={34} /><h2>{query ? "Работы не найдены" : "Здесь пока нет работ"}</h2><p>{query ? "Попробуйте изменить имя, задание или группу." : state === "revision_requested" ? "Работы, отправленные ученикам на доработку, появятся здесь." : "Отправленные учениками работы появятся в очереди."}</p></div> : <>
       <div className={styles.cards}>{items.map((item) => {
-        const mine = item.reviewer_id === user?.id && item.reviewer_role === user?.role;
+        const mine = item.reviewer_id === (user?.account_id ?? user?.id) && item.reviewer_role === user?.role;
         return <article className={styles.workCard} key={item.id}>
           <div className={styles.cardTop}><span className={styles.badge} data-state={item.state}>{submissionLabels[item.state]}</span><span className={styles.group}>{item.group_name ?? "Без группы"}</span></div>
           <div className={styles.cardTitle}><h2>{item.student_name}</h2><p>{item.homework_name}</p></div>

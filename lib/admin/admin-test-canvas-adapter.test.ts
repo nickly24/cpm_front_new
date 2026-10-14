@@ -193,3 +193,10 @@ describe("admin-test-canvas-adapter", () => {
     expect(payload.questions[0]?.text).toBe("Keep");
   });
 });
+
+
+describe("historical question identifiers",()=>{
+  it("allocates a new question above deleted historical identifiers",()=>{
+    expect(allocateStableQuestionIds(["q_4","q_new"],12)).toEqual([4,13]);
+  });
+});

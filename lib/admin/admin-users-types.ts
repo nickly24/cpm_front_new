@@ -1,9 +1,13 @@
-export type AdminStaffRole = "proctor" | "examinator" | "supervisor";
+export type AdminStaffRole = "proctor" | "examinator" | "supervisor" | "staff_admin";
 
 export type AdminUsersTab = "students" | "groups" | "staff";
 
 export interface AdminStudent {
   id: number;
+  profile_id?: number;
+  is_active?: boolean;
+  role_id?: number | null;
+  group_name?: string | null;
   student_id?: number;
   full_name: string;
   class: number;
@@ -19,6 +23,9 @@ export interface AdminStudent {
 
 export interface AdminStaffUser {
   id: number;
+  profile_id?: number;
+  is_active?: boolean;
+  role_id?: number | null;
   full_name: string;
   group_id?: number | null;
   group_name?: string | null;
@@ -28,6 +35,8 @@ export interface AdminStaffUser {
 }
 
 export interface AdminStaffFormData {
+  password?: string;
+  role_id?: number | null;
   full_name: string;
   group_id?: number | null;
   login?: string;
@@ -120,6 +129,8 @@ export interface AdminUnsignedUsersResponse {
 }
 
 export interface AdminStudentFormData {
+  login?: string;
+  password?: string;
   full_name: string;
   class: number;
   tg_name?: string;

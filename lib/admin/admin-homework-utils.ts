@@ -1,3 +1,4 @@
+import { BFF_DEV } from "@/lib/config";
 import type {
   AdminHomeworkItem,
   AdminHomeworkStatusFilter,
@@ -13,7 +14,7 @@ export function defaultHomeworkDeadlineInputValue(): string {
 export function emptyAdminHomeworkForm() {
   return {
     name: "",
-    type: "ОВ" as const,
+    type: BFF_DEV ? "" : "ОВ",
     deadline: defaultHomeworkDeadlineInputValue(),
     published: true,
   };
@@ -26,7 +27,7 @@ export function homeworkToFormData(hw: AdminHomeworkItem) {
       : String(hw.deadline ?? "").slice(0, 10);
   return {
     name: hw.name,
-    type: (hw.type === "ОВ" ? "ОВ" : "ДЗНВ") as "ДЗНВ" | "ОВ",
+    type: BFF_DEV ? hw.type : (hw.type === "ОВ" ? "ОВ" : "ДЗНВ"),
     deadline,
     published: hw.published !== false,
   };

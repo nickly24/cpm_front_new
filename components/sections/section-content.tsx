@@ -1,7 +1,10 @@
 "use client";
 
+import { BFF_DEV, BFF_EXTERNAL_TESTS_DEV } from "@/lib/config";
+import {AttendanceWorkspace} from "@/components/attendance/workspace";
 import { AdminSectionAccess } from "@/components/admin/admin-section-access";
 import { AdminAccessSection } from "@/components/admin/access/admin-access-section";
+import { CoreOrganizationWorkspace } from "@/components/admin/organization/core-organization-workspace";
 import { isAdminCabinet } from "@/lib/auth/admin-access";
 
 import { AdminAttendanceSection } from "@/components/admin/attendance/admin-attendance-section";
@@ -31,6 +34,7 @@ import { ReviewQueueSection } from "@/components/homework/review-queue-section";
 import { HomeworkMonitoringSection } from "@/components/admin/homework/homework-monitoring-section";
 import { HomeworkArchiveSection } from "@/components/admin/homework/homework-archive-section";
 import { ProctorStudentsSection } from "@/components/proctor/proctor-students-section";
+import { ProctorRatingsSection } from "@/components/proctor/ratings/proctor-ratings-section";
 import { SupervisorDashboardSection } from "@/components/supervisor/supervisor-dashboard-section";
 import { SupervisorAttendanceSection } from "@/components/supervisor/reports/supervisor-attendance-section";
 import { SupervisorExamsSection } from "@/components/supervisor/reports/supervisor-exams-section";
@@ -48,13 +52,36 @@ interface SectionContentProps {
 }
 
 export function SectionContent(props: SectionContentProps) {
+  if(BFF_DEV && ["schedule","attendance","scan","zaps"].includes(props.section)
+    && !(props.role === "supervisor" && props.section === "attendance"))return <AttendanceWorkspace section={props.section}/>;
+  const connected = ["homework", "assignments", "review-queue", "homework-archive", "monitoring"].includes(props.section)
+    || props.section === "tests" && (props.role === "student" || isAdminCabinet(props.role))
+    || props.section === "test-results" && isAdminCabinet(props.role)
+    || props.section === "exams" && (isAdminCabinet(props.role) || props.role === "student" || props.role === "examinator")
+    || props.section === "ratings" && (isAdminCabinet(props.role) || props.role === "supervisor" || props.role === "proctor")
+    || props.section === "performance" && props.role === "student"
+    || props.section === "train" && props.role === "student"
+    || ["users", "schools", "dashboard", "train", "access", "upload", "organizations", "divisions", "directions"].includes(props.section) && isAdminCabinet(props.role)
+    || props.section === "students" && props.role === "proctor"
+    || ["dashboard", "tests", "exams", "attendance"].includes(props.section) && props.role === "supervisor";
+  if (BFF_DEV && !connected) return <div className="ds-card"><h1>{getSectionLabel(props.role, props.section)}</h1><p>Раздел ещё не подключён в локальном режиме. Домашние работы, тесты, экзамены и рейтинг доступны в выбранном кабинете с учётом прав.</p></div>;
   if (isAdminCabinet(props.role)) {
     return <AdminSectionAccess section={props.section}><SectionBody {...props} role="admin" /></AdminSectionAccess>;
   }
   return <SectionBody {...props} />;
 }
 
-function SectionBody({
+function SectionBody(props: SectionContentProps) {
+  const pendingExternalTests = BFF_DEV && !BFF_EXTERNAL_TESTS_DEV
+    && (["tests", "test-results"].includes(props.section) && (props.role === "admin" || props.role === "student")
+      || props.section === "performance" && props.role === "student");
+  return <>
+    {pendingExternalTests && <div className="ds-card" role="status"><p>Тесты вне системы пока недоступны. В этом разделе отображаются тесты, пройденные в системе.</p></div>}
+    <ConnectedSectionBody {...props} />
+  </>;
+}
+
+function ConnectedSectionBody({
   role,
   section,
   trainPathSegments = [],
@@ -96,6 +123,7 @@ function SectionBody({
   }
 
   if (role === "admin" && section === "access") return <AdminAccessSection />;
+  if (role === "admin" && (section === "organizations" || section === "divisions" || section === "directions")) return <CoreOrganizationWorkspace key={section} initialTab={section} />;
 
   if (role === "admin" && section === "dashboard") {
     return <AdminDashboardSection />;
@@ -167,6 +195,7 @@ function SectionBody({
   if (role === "proctor" && section === "students") {
     return <ProctorStudentsSection />;
   }
+  if (role === "proctor" && section === "ratings") return <ProctorRatingsSection />;
   if (role === "proctor" && section === "review-queue") return <ReviewQueueSection />;
   if (role === "proctor" && section === "homework-archive") return <HomeworkArchiveSection />;
 

@@ -293,9 +293,9 @@ export function ClassicBank(props: AdminPanelProps) {
           <h2>Банк вопросов</h2>
           {props.canEdit && (
             <div className={s.row}>
-              <Action onClick={() => setImporting(!importing)}>
+              {props.canImport !== false && <Action onClick={() => setImporting(!importing)}>
                 Импорт .xlsx
-              </Action>
+              </Action>}
               <Action
                 primary
                 disabled={!parts.data?.items.length}
@@ -306,7 +306,7 @@ export function ClassicBank(props: AdminPanelProps) {
             </div>
           )}
         </div>
-        {importing && (
+        {importing && props.canEdit && props.canImport !== false && (
           <ExamImport {...props} kind="questions" onChanged={changed} />
         )}
         <form

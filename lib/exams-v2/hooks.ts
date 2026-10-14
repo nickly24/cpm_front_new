@@ -1,6 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { BFF_DEV } from "@/lib/config";
+import { examContextKey } from "@/lib/bff/exams-shared";
+import { useContextGuard } from "@/lib/bff/use-context-guard";
 import { ApiError } from "@/lib/api/client";
 import { examGet, examMutate, updateExamQuery, type ExamCommand } from "./api";
 
@@ -85,13 +88,15 @@ function journalSet(scope: string, command: ExamCommand | null) {
 }
 
 /** Parent must key by the authenticated role/id. No automatic replay is performed. */
-export function useExamMutation<T>(scope: string, onDone: (result: T) => void) {
+export function useExamMutation<T>(operation: string, onDone: (result: T) => void) {
+  const scope = BFF_DEV ? `${examContextKey()}:${operation}` : operation;
   const [pending, setPending] = useState<ExamCommand | null>(() =>
     journalGet(scope),
   );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const [uncertain, setUncertain] = useState(() => Boolean(journalGet(scope)));
+  useContextGuard(busy || uncertain);
   const mounted = useRef(false);
   const running = useRef(false);
   const callback = useRef(onDone);

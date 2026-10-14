@@ -22,7 +22,9 @@ import {
 } from "@/lib/training/training-utils";
 import { cn } from "@/lib/cn";
 import { ApiError } from "@/lib/api/client";
-import { filterStudyCards, trainingError } from "@/lib/training/exam-training";
+import { BFF_DEV } from "@/lib/config";
+import { useContextGuard } from "@/lib/bff/use-context-guard";
+import { filterStudyCards, trainingError, trainingUnavailable } from "@/lib/training/exam-training";
 import { ArrowLeft, Check, RotateCcw } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
@@ -67,6 +69,7 @@ export function TrainingFlashcards({
   const [fatal, setFatal] = useState(false);
   const [summary, setSummary] = useState<SectionStats | null>(null);
   const submitting = useRef(false);
+  useContextGuard(BFF_DEV && animationState === "swiping-right");
 
   const touchStartX = useRef(0);
   const swipeOffsetRef = useRef(0);
@@ -114,7 +117,7 @@ export function TrainingFlashcards({
       setIsFlipped(false);
     } catch (err) {
       setError(trainingError(err));
-      setFatal(err instanceof ApiError && [403, 404, 422].includes(err.status ?? 0));
+      setFatal(trainingUnavailable(err));
     } finally {
       setLoading(false);
     }
@@ -128,12 +131,12 @@ export function TrainingFlashcards({
   }, [loadDeck]);
 
   useEffect(() => {
-    if (sectionKind !== "exam" || previewCards || loading || cards.length || !learnedCount) return;
+    if ((!BFF_DEV && sectionKind !== "exam") || previewCards || loading || cards.length || !learnedCount) return;
     let cancelled = false;
     fetchSectionStudyView(studentId, sectionKind, sectionRefId).then((view) => {
       if (!cancelled) setSummary(view.stats);
     }, (err) => {
-      if (!cancelled) { setError(trainingError(err)); setFatal(err instanceof ApiError && [403, 404, 422].includes(err.status ?? 0)); }
+      if (!cancelled) { setError(trainingError(err)); setFatal(trainingUnavailable(err)); }
     });
     return () => { cancelled = true; };
   }, [cards.length, learnedCount, loading, previewCards, sectionKind, sectionRefId, studentId]);
@@ -234,7 +237,7 @@ export function TrainingFlashcards({
         setCards((prev) => prev.filter((item) => item.card_ref !== card.card_ref));
         setTotalCount((prev) => Math.max(0, prev - 1));
         setNotice(trainingError(err));
-      } else if (err instanceof ApiError && [403, 404, 422].includes(err.status ?? 0)) {
+      } else if (trainingUnavailable(err)) {
         setError(trainingError(err));
         setFatal(true);
       } else setNotice("Не удалось сохранить прогресс. Повторите попытку.");
@@ -314,7 +317,7 @@ export function TrainingFlashcards({
             {learnedCount > 0 ? `Пройдено ${learnedCount} из ${totalCount}. ${previewCards ? "Прогресс не сохранялся." : "Прогресс сохранён."}` : "Выберите другой набор или режим заучивания."}
           </p>
           {notice ? <p role="status">{notice}</p> : null}
-          {summary ? <p>Прогресс области: {summary.learned} из {summary.total} выучено · {summary.total ? Math.round(summary.learned * 100 / summary.total) : 0}%</p> : null}
+          {summary ? <p>Прогресс области: {summary.learned} из {summary.total} выучено · {BFF_DEV ? summary.progress_percent ?? 0 : summary.total ? Math.round(summary.learned * 100 / summary.total) : 0}%</p> : null}
           <Button type="button" onClick={onBack}>
             К разделу
           </Button>

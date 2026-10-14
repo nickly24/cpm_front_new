@@ -1,4 +1,6 @@
 import { apiRequest } from "@/lib/api/client";
+import { BFF_DEV } from "@/lib/config";
+import { cardsAdminCards, cardsAdminCatalog, cardsAdminMutation } from "@/lib/bff/cards";
 import type {
   AdminCardsByThemeResponse,
   AdminTrainingCatalogResponse,
@@ -9,6 +11,7 @@ import type {
 import { normalizeAdminSection } from "./admin-training-types";
 
 export async function fetchAdminTrainingCatalog() {
+  if (BFF_DEV) return cardsAdminCatalog();
   const data = await apiRequest<AdminTrainingCatalogResponse>(
     "/get-admin-training-catalog",
   );
@@ -23,7 +26,8 @@ export async function fetchAdminTrainingCatalog() {
   })) as AdminTrainingDirectionRow[];
 }
 
-export async function fetchAdminCardsByTheme(themeId: number) {
+export async function fetchAdminCardsByTheme(themeId: number, signal?: AbortSignal) {
+  if (BFF_DEV) return cardsAdminCards(themeId, signal);
   const data = await apiRequest<AdminCardsByThemeResponse>(
     `/admin-cards-by-theme/${themeId}`,
   );
@@ -37,6 +41,7 @@ export async function createTrainingTheme(payload: {
   name: string;
   direction_id: number;
 }) {
+  if (BFF_DEV) return cardsAdminMutation("/themes", "POST", payload);
   return apiRequest<TrainingMutationResponse>("/create-training-theme", {
     method: "POST",
     body: JSON.stringify(payload),
@@ -45,15 +50,17 @@ export async function createTrainingTheme(payload: {
 
 export async function updateTrainingTheme(
   themeId: number,
-  payload: { name?: string; direction_id?: number },
+  payload: { name?: string; direction_id?: number; expected_revision?: number },
 ) {
+  if (BFF_DEV) return cardsAdminMutation(`/themes/${themeId}`, "PUT", payload);
   return apiRequest<TrainingMutationResponse>(`/training-theme/${themeId}`, {
     method: "PUT",
     body: JSON.stringify(payload),
   });
 }
 
-export async function deleteTrainingTheme(themeId: number) {
+export async function deleteTrainingTheme(themeId: number, expectedRevision?: number) {
+  if (BFF_DEV) return cardsAdminMutation(`/themes/${themeId}`, "DELETE", { expected_revision: expectedRevision });
   return apiRequest<TrainingMutationResponse>(`/training-theme/${themeId}`, {
     method: "DELETE",
   });
@@ -65,6 +72,10 @@ export async function createTrainingCard(payload: {
   answer: string;
   sort_order?: number;
 }) {
+  if (BFF_DEV) {
+    const { theme_id, ...body } = payload;
+    return cardsAdminMutation(`/themes/${theme_id}/cards`, "POST", body);
+  }
   return apiRequest<TrainingMutationResponse & AdminTrainingCardRow>(
     "/create-card",
     {
@@ -76,15 +87,20 @@ export async function createTrainingCard(payload: {
 
 export async function updateTrainingCard(
   cardId: number,
-  payload: { question?: string; answer?: string; sort_order?: number },
+  payload: { question?: string; answer?: string; sort_order?: number; theme_id?: number; expected_revision?: number },
 ) {
+  if (BFF_DEV) {
+    const { theme_id, ...body } = payload;
+    return cardsAdminMutation(`/themes/${theme_id}/cards/${cardId}`, "PUT", body);
+  }
   return apiRequest<TrainingMutationResponse>(`/card/${cardId}`, {
     method: "PUT",
     body: JSON.stringify(payload),
   });
 }
 
-export async function deleteTrainingCard(cardId: number) {
+export async function deleteTrainingCard(cardId: number, themeId?: number, expectedRevision?: number) {
+  if (BFF_DEV) return cardsAdminMutation(`/themes/${themeId}/cards/${cardId}`, "DELETE", { expected_revision: expectedRevision });
   return apiRequest<TrainingMutationResponse>(`/card/${cardId}`, {
     method: "DELETE",
   });

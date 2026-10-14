@@ -1,4 +1,7 @@
 "use client";
+import { mergeDraftLockAcknowledgement } from "@/lib/admin/admin-test-draft-lock";
+import { BFF_DEV } from "@/lib/config";
+import { useContextGuard } from "@/lib/bff/use-context-guard";
 
 import {
   closestCenter,
@@ -63,16 +66,17 @@ import {
   sortQuestions,
 } from "@/components/admin/tests/admin-test-draft-flow-layout";
 import styles from "@/components/admin/tests/admin-test-draft-editor.module.css";
-import { canvasStateToTestFormData, parseQuestionIdFromCanvasId } from "@/lib/admin/admin-test-canvas-adapter";
+import { testDetailToCanvasState, canvasStateToTestFormData, parseQuestionIdFromCanvasId } from "@/lib/admin/admin-test-canvas-adapter";
 import {
   deleteAdminTestDraft,
+  fetchAdminTestDraft,
   lockAdminTestDraft,
   publishAdminTestDraft,
   unlockAdminTestDraft,
   updateAdminTestDraft,
 } from "@/lib/admin/admin-test-drafts-api";
 import { AdminTestSaveRecalcDialog } from "@/components/admin/tests/admin-test-save-recalc-dialog";
-import { updateAdminTest, type AdminTestUpdateRecalc } from "@/lib/admin/admin-tests-api";
+import { fetchAdminTestById, updateAdminTest, type AdminTestUpdateRecalc } from "@/lib/admin/admin-tests-api";
 import type {
   AdminTestDraft,
   DraftAnswerNode,
@@ -170,6 +174,7 @@ function sameIds(a: string[], b: string[]) {
 function autosaveSnapshot(draft: AdminTestDraft) {
   return JSON.stringify({
     title: draft.title,
+    description: draft.description,
     direction: draft.direction,
     startDate: draft.startDate,
     endDate: draft.endDate,
@@ -475,7 +480,7 @@ function validateDraft(draft: AdminTestDraft): DraftValidationError[] {
   const questions = draft.canvas.questions.filter((question) => !question.markedForDeletion);
   if (!draft.title.trim()) errors.push({ targetId: "metadata", message: "Укажите название теста" });
   if (!draft.direction.trim()) errors.push({ targetId: "metadata", message: "Выберите направление" });
-  if (!draft.startDate || !draft.endDate) {
+  if ((!BFF_DEV || draft.published) && (!draft.startDate || !draft.endDate)) {
     errors.push({ targetId: "metadata", message: "Укажите даты начала и окончания" });
   }
   if (questions.length === 0) {
@@ -1231,6 +1236,7 @@ function AdminTestDraftEditorInner({
   const [selectedAnswerIds, setSelectedAnswerIds] = useState<string[]>([]);
   const [validationErrors, setValidationErrors] = useState<DraftValidationError[]>([]);
   const [autosaveState, setAutosaveState] = useState<AutosaveState>("saved");
+  const [lockReady,setLockReady] = useState(!BFF_DEV || persistenceMode === "test");
   const [lockWarning, setLockWarning] = useState<string | null>(null);
   const [copiedIds, setCopiedIds] = useState<string[]>([]);
   const [copiedAnswerIds, setCopiedAnswerIds] = useState<string[]>([]);
@@ -1344,7 +1350,8 @@ function AdminTestDraftEditorInner({
   );
   const isTestPersistence = persistenceMode === "test";
   const canEdit =
-    isTestPersistence || !draft.lockedBy || (String(draft.lockedBy) === String(user?.id) && (draft.lockedByRole ?? "admin") === user?.role);
+    isTestPersistence || (lockReady && !lockWarning && (!draft.lockedBy || (String(draft.lockedBy) === String(user?.account_id ?? user?.id) && (draft.lockedByRole ?? "admin") === user?.role)));
+  useContextGuard(canEdit);
   const requireExplicitSave = isTestPersistence;
   const currentAutosaveSnapshot = useMemo(() => autosaveSnapshot(draft), [draft]);
   const hasUnsavedChanges =
@@ -1424,6 +1431,7 @@ function AdminTestDraftEditorInner({
             question.answers,
             uid,
           );
+          if(BFF_DEV && question.type==="text" && patch.type!=="text")next.answers=next.answers.map(a=>({...a,id:uid("answer")}));
         }
         return next;
       }),
@@ -2654,11 +2662,13 @@ function AdminTestDraftEditorInner({
     setAutosaveState("saving");
     setSaveDialogError(null);
     try {
-      const result = await updateAdminTest(
-        sourceTestId,
-        canvasStateToTestFormData(draft),
-      );
-      const purged = purgeMarkedQuestions(draft);
+      const submitted=canvasStateToTestFormData(draft);
+      const result = await updateAdminTest(sourceTestId,submitted);
+      const purged = BFF_DEV ? testDetailToCanvasState(await fetchAdminTestById(sourceTestId)) : purgeMarkedQuestions(draft);
+      if(BFF_DEV) {
+        const nodes=sortQuestions(draft.canvas).filter(q=>!q.markedForDeletion);
+        submitted.questions.forEach((q,i)=>{const old=nodes[i] && draft.canvas.layout[nodes[i].id];if(old)purged.canvas.layout[`q_${q.questionId}`]={...old};});
+      }
       setDraft(purged);
       setSavedDraft({ ...purged });
       lastSavedSnapshotRef.current = autosaveSnapshot(purged);
@@ -2801,26 +2811,36 @@ function AdminTestDraftEditorInner({
 
   useEffect(() => {
     if (isTestPersistence) return;
-
+    let cancelled=false;
+    const requestedDraft=normalizedInitialDraft;
     void lockAdminTestDraft(draft.id)
       .then((res) => {
+        if(cancelled)return;
         const nextDraft = { ...res.draft, canvas: normalizeCanvas(res.draft.canvas) };
         lastSavedSnapshotRef.current = autosaveSnapshot(nextDraft);
         setSavedDraft({ ...nextDraft });
-        setDraft((prev) => ({ ...prev, ...nextDraft }));
-        setLockWarning(null);
+        setDraft((prev) => mergeDraftLockAcknowledgement(prev,requestedDraft,nextDraft));
+        setLockWarning(null);setLockReady(true);
       })
       .catch((err: Error & { status?: number }) => {
-        setLockWarning(err.message || "Драфт сейчас редактирует другой администратор");
+        if(cancelled)return;
+        setLockReady(false);setLockWarning(err.message || "Драфт сейчас редактирует другой администратор");
       });
     const interval = window.setInterval(() => {
-      void lockAdminTestDraft(draft.id).catch(() => {});
+      void lockAdminTestDraft(draft.id).then(res=>{
+        if(cancelled)return;
+        setDraft(prev=>({...prev,expectedRevision:res.draft.expectedRevision,lockedBy:res.draft.lockedBy,lockedUntil:res.draft.lockedUntil}));setLockWarning(null);setLockReady(true);
+      }).catch(err=>{
+        if(cancelled)return;
+        setLockReady(false);setLockWarning(err.message || "Не удалось продлить блокировку. Сохранение закрыто до восстановления доступа.");
+      });
     }, 45000);
     return () => {
+      cancelled=true;
       window.clearInterval(interval);
       void unlockAdminTestDraft(draft.id).catch(() => {});
     };
-  }, [draft.id, isTestPersistence]);
+  }, [draft.id, isTestPersistence, normalizedInitialDraft]);
 
   useEffect(() => {
     if (!canEdit) return;
@@ -2834,8 +2854,8 @@ function AdminTestDraftEditorInner({
           lastSavedSnapshotRef.current = snapshotAtSaveStart;
           const nextDraft = { ...saved, canvas: normalizeCanvas(saved.canvas) };
           setSavedDraft({ ...nextDraft });
-          const nextSnapshot = autosaveSnapshot(nextDraft);
-          setDraft((prev) => (nextSnapshot === snapshotAtSaveStart ? prev : { ...prev, ...nextDraft }));
+
+          setDraft((prev) => autosaveSnapshot(prev) === snapshotAtSaveStart ? { ...prev, ...nextDraft } : { ...prev,expectedRevision:saved.expectedRevision,lockedBy:saved.lockedBy,lockedUntil:saved.lockedUntil });
           setAutosaveState("saved");
         })
         .catch(() => setAutosaveState("error"));
@@ -2892,7 +2912,7 @@ function AdminTestDraftEditorInner({
   }, [cancelAreaSelection, copySelection, pasteSelection, redo, selectAllAnswersInQuestion, selectedQuestionId, undo]);
 
   const publish = async () => {
-    if (isTestPersistence) return;
+    if (isTestPersistence || !canEdit) return;
     const errors = validateDraft(draft);
     setValidationErrors(errors);
     if (errors.length > 0) return;
@@ -2945,6 +2965,20 @@ function AdminTestDraftEditorInner({
         sortedQuestions.findIndex((question) => question.id === selectedQuestionId),
       )
     : null;
+
+  if(BFF_DEV && !isTestPersistence && !lockReady) return (
+    <div className={styles.editor}>
+      <main className={styles.canvasShell}>
+        <header className={styles.topbar}><button type="button" className={styles.topbarBack} onClick={onBack} aria-label="Назад"><ArrowLeft size={20} /></button><div className={styles.titleBlock}><h1>{draft.title||"Черновик теста"}</h1><p role="status">{lockWarning||"Получаем блокировку для редактирования…"}</p></div></header>
+        {lockWarning ? <Button type="button" onClick={()=>{
+          void fetchAdminTestDraft(draft.id).then(fresh=>lockAdminTestDraft(fresh.id)).then(res=>{
+            const next={...res.draft,canvas:normalizeCanvas(res.draft.canvas)};
+            setDraft(prev=>mergeDraftLockAcknowledgement(prev,savedDraft,next));setSavedDraft(next);lastSavedSnapshotRef.current=autosaveSnapshot(next);setLockWarning(null);setLockReady(true);
+          }).catch(err=>setLockWarning(err.message));
+        }}>Повторить получение блокировки</Button> : null}
+      </main>
+    </div>
+  );
 
   return (
     <div
@@ -3327,7 +3361,8 @@ function AdminTestDraftEditorInner({
                   ))}
                 </select>
               </label>
-              <label className={styles.field}>
+              {BFF_DEV ? <label className={styles.field}><span>Описание</span><textarea className={styles.input} maxLength={2000} value={draft.description||""} onChange={e=>setDraft(prev=>({...prev,description:e.target.value}))} /></label> : null}
+              {BFF_DEV && !isTestPersistence ? <p className={styles.issueHint}>Публикация создаст самостоятельный скрытый тест. Даты, лимит и доступ задаются в тесте для выбранного подразделения.</p> : <>              <label className={styles.field}>
                 <span>Дата начала</span>
                 <input className={styles.input} type="datetime-local" value={draft.startDate} onChange={(event) => setDraft((prev) => ({ ...prev, startDate: event.target.value }))} />
               </label>
@@ -3337,7 +3372,7 @@ function AdminTestDraftEditorInner({
               </label>
               <label className={styles.field}>
                 <span>Лимит, минут</span>
-                <input className={styles.input} type="number" min={1} value={draft.timeLimitMinutes} onChange={(event) => setDraft((prev) => ({ ...prev, timeLimitMinutes: Number(event.target.value) }))} />
+                <input className={styles.input} type="number" min={BFF_DEV && !draft.published ? 0 : 1} max={BFF_DEV ? 1440 : undefined} value={draft.timeLimitMinutes} onChange={(event) => setDraft((prev) => ({ ...prev, timeLimitMinutes: Number(event.target.value) }))} />
               </label>
               <label className={styles.switchLabel}>
                 <span>Видимость теста для студентов</span>
@@ -3347,6 +3382,7 @@ function AdminTestDraftEditorInner({
                 <span>Показ правильных ответов</span>
                 <input type="checkbox" checked={draft.visible} onChange={(event) => setDraft((prev) => ({ ...prev, visible: event.target.checked }))} />
               </label>
+              </>}
             </>
           )}
 

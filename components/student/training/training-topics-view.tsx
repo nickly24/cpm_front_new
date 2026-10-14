@@ -10,6 +10,7 @@ import type {
   TrainingSectionNode,
 } from "@/lib/training/training-types";
 import { calcProgressPercent, getProgressLabel } from "@/lib/training/training-utils";
+import { BFF_DEV } from "@/lib/config";
 import { cn } from "@/lib/cn";
 import { examPeriod } from "@/lib/training/exam-training";
 import { ClipboardList, FileText, Search } from "lucide-react";
@@ -181,7 +182,7 @@ export function TrainingSectionsListView({
             section.sourceTestTitle &&
             section.sourceTestTitle.trim() !== section.name.trim();
 
-          const progressPercent = calcProgressPercent(
+          const progressPercent = BFF_DEV ? section.progress_percent : calcProgressPercent(
             section.learned_cards,
             section.total_cards,
           );

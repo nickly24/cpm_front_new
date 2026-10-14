@@ -5,6 +5,8 @@ import { useHomeworkUploads } from "@/contexts/homework-upload-context";
 import { getScannerProject, saveScannerProject, type ScannerPage } from "@/lib/homework-scanner/project-store";
 import { renderScannerPage, scannerCanvasBlob } from "@/lib/homework-scanner/page-render";
 import { scannerFilterLabels } from "@/lib/homework-scanner/image-filters";
+import { homeworkMiB, homeworkWorkspaceLimits } from "@/lib/homework-files/limits";
+import type { HomeworkWorkspace } from "@/lib/homework-files/types";
 import { PDFDocument } from "pdf-lib";
 import { ArrowDown, ArrowLeft, ArrowUp, Camera, CheckCircle2, FilePlus2, Images, Pencil, RotateCw, SlidersHorizontal, Trash2, Undo2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -54,7 +56,9 @@ function PagePreview({ page, thumbnail = false }: { page: ScannerPage; thumbnail
 
 type Screen = "pages" | "adjust" | "markup" | "camera";
 
-export function ScannerModal({ homeworkId, onClose }: { homeworkId: number; onClose: () => void }) {
+export function ScannerModal({ homeworkId, limits, onClose }: { homeworkId: number; limits?: HomeworkWorkspace["limits"]; onClose: () => void }) {
+  const uploadLimits = homeworkWorkspaceLimits(limits);
+  const maxPages = uploadLimits?.max_pages ?? 0;
   const { user } = useAuth();
   const { enqueue } = useHomeworkUploads();
   const [pages, setPages] = useState<ScannerPage[]>([]);
@@ -113,14 +117,14 @@ export function ScannerModal({ homeworkId, onClose }: { homeworkId: number; onCl
   };
 
   const add = async (files: FileList | File[] | null, replace = false) => {
-    if (!files || !files.length || busy) return;
+    if (!files || !files.length || busy || !uploadLimits) return;
     setAdding(true);
     setError(null);
     const next = [...pagesRef.current];
     const errors: string[] = [];
     try {
       for (const file of Array.from(files)) {
-        if (!replace && next.length >= 35) { errors.push("В одном PDF может быть до 35 страниц."); break; }
+        if (!replace && next.length >= maxPages) { errors.push(`В одном PDF может быть до ${maxPages} страниц.`); break; }
         if (file.size > 25 * 1024 * 1024) { errors.push(`${file.name}: размер больше 25 МБ.`); continue; }
         try {
           const image = await normalize(file);
@@ -167,7 +171,8 @@ export function ScannerModal({ homeworkId, onClose }: { homeworkId: number; onCl
   };
 
   const build = async () => {
-    if (!pages.length || busy) return;
+    if (!pages.length || busy || !uploadLimits) return;
+    if (pages.length > maxPages) { setError(`В PDF больше ${maxPages} страниц. Удалите лишние страницы перед загрузкой.`); return; }
     setBuilding(true);
     setError(null);
     try {
@@ -180,7 +185,7 @@ export function ScannerModal({ homeworkId, onClose }: { homeworkId: number; onCl
       }
       const bytes = await pdf.save({ useObjectStreams: true });
       const file = new File([Uint8Array.from(bytes).buffer], `homework-${homeworkId}.pdf`, { type: "application/pdf" });
-      if (file.size > 10 * 1024 * 1024) throw new Error("PDF получился больше 10 МБ. Удалите лишние страницы или выберите фильтр «Документ».");
+      if (file.size > uploadLimits.max_source_bytes) throw new Error(`Исходный PDF получился больше ${homeworkMiB(uploadLimits.max_source_bytes)} МиБ. Удалите лишние страницы или выберите фильтр «Документ».`);
       enqueue(homeworkId, file);
       onClose();
     } catch (reason) {
@@ -208,7 +213,7 @@ export function ScannerModal({ homeworkId, onClose }: { homeworkId: number; onCl
       : <>
         <header className={styles.header}>
           <button className={styles.back} disabled={busy} onClick={onClose}><ArrowLeft /><span>К работе</span></button>
-          <div className={styles.headerTitle}><h2>Сканер</h2><p>{pages.length} из 35 страниц</p></div>
+          <div className={styles.headerTitle}><h2>Сканер</h2><p>{pages.length} из {uploadLimits ? maxPages : "—"} страниц</p></div>
           <span className={styles.localBadge}><CheckCircle2 />На устройстве</span>
         </header>
         <ol className={styles.steps} aria-label="Подготовка файла"><li data-active={!pages.length}><b>1</b>Добавьте</li><li data-active={Boolean(pages.length)}><b>2</b>Проверьте</li><li><b>3</b>Подготовьте PDF</li></ol>
@@ -218,10 +223,10 @@ export function ScannerModal({ homeworkId, onClose }: { homeworkId: number; onCl
           {saveState === "loading" ? <div className={styles.empty}><Spinner /><h3>Открываем страницы…</h3></div>
           : !pages.length ? <div className={styles.empty}>
             <div className={styles.emptyIcon}><Images /></div><h3>Соберите работу из фотографий</h3><p>Каждый снимок станет страницей PDF. После добавления проверьте, что текст читается целиком.</p>
-            <div className={styles.addActions}><button className={styles.primary} disabled={busy} onClick={() => setScreen("camera")}><Camera />Снять страницу</button><button disabled={busy} onClick={() => input.current?.click()}><Images />Выбрать фото</button></div>
+            <div className={styles.addActions}><button className={styles.primary} disabled={busy || !uploadLimits} onClick={() => setScreen("camera")}><Camera />Снять страницу</button><button disabled={busy || !uploadLimits} onClick={() => input.current?.click()}><Images />Выбрать фото</button></div>
             <small>JPEG, PNG, HEIC или WebP · до 25 МБ на фото</small>
           </div> : <>
-            <div className={styles.pageBar}><h3>Страницы <span>{pages.length}</span></h3><div className={styles.addActions}><button disabled={busy || pages.length >= 35} onClick={() => setScreen("camera")}><Camera /><span>Камера</span></button><button disabled={busy || pages.length >= 35} onClick={() => input.current?.click()}>{adding ? <Spinner size="sm" /> : <Images />}<span>Добавить фото</span></button></div></div>
+            <div className={styles.pageBar}><h3>Страницы <span>{pages.length}</span></h3><div className={styles.addActions}><button disabled={busy || pages.length >= maxPages} onClick={() => setScreen("camera")}><Camera /><span>Камера</span></button><button disabled={busy || pages.length >= maxPages} onClick={() => input.current?.click()}>{adding ? <Spinner size="sm" /> : <Images />}<span>Добавить фото</span></button></div></div>
             <div className={styles.thumbnails} aria-label="Страницы PDF">{pages.map((page, index) => <button key={page.id} aria-label={`Страница ${index + 1}`} aria-pressed={index === selected} disabled={busy} data-active={index === selected} onClick={() => setSelected(index)}><PagePreview page={page} thumbnail /><span>{index + 1}</span></button>)}</div>
             {current ? <div className={styles.pageWorkspace}>
               <section className={styles.previewSection}><PagePreview page={current} /></section>
@@ -238,12 +243,13 @@ export function ScannerModal({ homeworkId, onClose }: { homeworkId: number; onCl
               </section>
             </div> : null}
           </>}
-          {deleted ? <div className={styles.undo}><span>Страница удалена</span><button disabled={busy || pages.length >= 35} onClick={() => { const next = [...pagesRef.current]; const index = Math.min(deleted.index, next.length); next.splice(index, 0, deleted.page); setSelected(index); setDeleted(null); void persist(next); }}><Undo2 />Вернуть</button></div> : null}
+          {deleted ? <div className={styles.undo}><span>Страница удалена</span><button disabled={busy || pages.length >= maxPages} onClick={() => { const next = [...pagesRef.current]; const index = Math.min(deleted.index, next.length); next.splice(index, 0, deleted.page); setSelected(index); setDeleted(null); void persist(next); }}><Undo2 />Вернуть</button></div> : null}
         </main>
+        {!uploadLimits ? <p role="alert" className={styles.error}>Лимиты загрузки не получены. Вернитесь к работе и обновите её.</p> : null}
         {(error || saveError) ? <div className={styles.error} role="alert">{error ? <p>{error}</p> : null}{saveError ? <p>{saveError}</p> : null}</div> : null}
         <footer className={styles.footer}>
           <div><p aria-live="polite">{saveState === "saving" ? "Сохраняем страницы…" : saveState === "failed" ? "Есть несохранённые изменения" : "Проект хранится на этом устройстве"}</p><small>PDF загрузится в работу. Отправить на проверку можно следующим шагом.</small></div>
-          <button className={styles.primary} disabled={!pages.length || busy} onClick={() => void build()}>{building ? <Spinner size="sm" /> : <FilePlus2 />}{building ? "Подготавливаем…" : "Подготовить PDF"}</button>
+          <button className={styles.primary} disabled={!pages.length || busy || !uploadLimits} onClick={() => void build()}>{building ? <Spinner size="sm" /> : <FilePlus2 />}{building ? "Подготавливаем…" : "Подготовить PDF"}</button>
         </footer>
       </>}
     </div>

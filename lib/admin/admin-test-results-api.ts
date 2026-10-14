@@ -1,3 +1,5 @@
+import { BFF_DEV } from "@/lib/config";
+import * as bffTests from "@/lib/bff/tests-admin";
 import { apiRequest } from "@/lib/api/client";
 import type {
   StudentTestSession,
@@ -7,6 +9,7 @@ import type {
 export async function fetchStudentTestSessions(
   studentId: number,
 ): Promise<StudentTestSession[]> {
+  if(BFF_DEV)return bffTests.testsStudentSessions(studentId);
   const data = await apiRequest<StudentTestSession[]>(
     `/test-sessions/student/${studentId}`,
   );
@@ -16,6 +19,7 @@ export async function fetchStudentTestSessions(
 export async function fetchTestSessionStats(
   sessionId: string,
 ): Promise<TestSessionStats> {
+  if(BFF_DEV)return bffTests.testsSessionStats(sessionId);
   return apiRequest<TestSessionStats>(
     `/test-session/${encodeURIComponent(sessionId)}/stats`,
   );

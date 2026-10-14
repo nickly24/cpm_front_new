@@ -1,4 +1,6 @@
 "use client";
+import { useHomeworkTypes } from "@/lib/bff/use-homework-types";
+import { useContextGuard } from "@/lib/bff/use-context-guard";
 
 import { AdminFullscreenBack } from "@/components/admin/admin-fullscreen-back";
 import styles from "@/components/admin/tests/admin-tests.module.css";
@@ -37,6 +39,8 @@ export function AdminHomeworkForm({
   onBack,
   onSaved,
 }: AdminHomeworkFormProps) {
+  useContextGuard(mode !== "view");
+  const { names: typeNames, error: typeError } = useHomeworkTypes();
   const publishedId = useId();
   const isReadOnly = mode === "view";
   const [form, setForm] = useState<AdminHomeworkFormData>(emptyAdminHomeworkForm);
@@ -121,6 +125,7 @@ export function AdminHomeworkForm({
           </div>
         ) : null}
 
+        {typeError ? <p role="alert">{typeError}</p> : null}
         {error ? <p className={styles.errorText}>{error}</p> : null}
 
         <form
@@ -159,8 +164,7 @@ export function AdminHomeworkForm({
                   }))
                 }
               >
-                <option value="ОВ">ОВ</option>
-                <option value="ДЗНВ">ДЗНВ</option>
+                <option value="" disabled>Выберите тип</option>{Array.from(new Set([...typeNames, form.type].filter(Boolean))).map(name=><option key={name} value={name}>{name}</option>)}
               </select>
             </label>
 

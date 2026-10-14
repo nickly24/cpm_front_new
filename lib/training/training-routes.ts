@@ -1,4 +1,5 @@
 import type { UserRole } from "@/lib/auth/types";
+import { BFF_DEV } from "@/lib/config";
 import type { StudyFilter, TrainingDirection, TrainingSectionNode } from "./training-types";
 
 export function encodeTrainingSegment(value: string): string {
@@ -33,6 +34,7 @@ export function trainingSectionPath(
     const [examId, partId] = section.refId.split(":").map(Number);
     return examTrainingPath(role, examId, partId ? { partId, area: true } : undefined);
   }
+  if (BFF_DEV && section.kind && section.refId) return `${trainingBasePath(role)}/${section.kind}/${encodeURIComponent(section.refId)}`;
   return `${trainingDirectionPath(role, direction)}/${encodeTrainingSegment(section.name)}`;
 }
 
@@ -75,7 +77,7 @@ export function parseExamTrainingPath(segments: string[], params: Pick<URLSearch
 export function trainingStudyPath(
   role: UserRole,
   direction: Pick<TrainingDirection, "name">,
-  section: Pick<TrainingSectionNode, "name">,
+  section: Pick<TrainingSectionNode, "name"> & Partial<Pick<TrainingSectionNode, "kind" | "refId">>,
   options?: { batch?: number; mode?: StudyFilter },
 ): string {
   const path = `${trainingSectionPath(role, direction, section)}/study`;
@@ -145,6 +147,13 @@ export function parseTrainingPath(
 
   if (segments.length === 0) {
     return emptyState;
+  }
+  if (BFF_DEV && ["manual", "test"].includes(segments[0])) {
+    const direction = directions.find(item => item.sections.some(section => section.kind === segments[0] && section.refId === segments[1])) ?? null;
+    const section = direction?.sections.find(item => item.kind === segments[0] && item.refId === segments[1]) ?? null;
+    const batch = Number(searchParams.get("batch") ?? 0), rawMode = searchParams.get("mode");
+    const study = segments[2] === "study";
+    return { ...emptyState, direction, section, view: study ? "flashcards" : "detail", batch: Number.isInteger(batch) && batch >= -1 ? batch : 0, studyMode: ["all", "unlearned", "learned", "stale"].includes(rawMode ?? "") ? rawMode as StudyFilter : "unlearned", isValid: Boolean(section) && segments.length === (study ? 3 : 2) };
   }
 
   const direction = findTrainingDirection(directions, segments[0]);

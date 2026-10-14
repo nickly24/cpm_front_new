@@ -1,3 +1,4 @@
+import { BFF_DEV } from "@/lib/config";
 import type { User, UserRole } from "@/lib/auth/types";
 import { canAccessSection } from "@/lib/auth/admin-access";
 import { adminNavigation } from "./admin";
@@ -17,12 +18,19 @@ export const navigationByRole: Record<UserRole, RoleNavigation> = {
 };
 
 export function getNavigation(role: UserRole, user?: User | null): RoleNavigation {
-  const navigation = navigationByRole[role];
+  const original = navigationByRole[role];
+  const navigation = { ...original, groups: original.groups.map(g=>({...g,items:g.items.filter(i=>BFF_DEV ? i.id!=="telegram-bot" : !["organizations","divisions","directions"].includes(i.id))})) };
   if (role !== "staff_admin") return navigation;
-  return { ...navigation, groups: navigation.groups.map((group) => ({ ...group, items: group.items.filter((item) => canAccessSection(user ?? null, item.id)) })).filter((group) => group.items.length > 0) };
+  return { ...navigation, groups: navigation.groups.map((group) => ({ ...group, items: group.items.filter((item) => canAccessSection(user ?? null, item.id) || BFF_DEV && (item.id==="schedule" || ["attendance","scan","zaps"].includes(item.id) && (user?.organizations?.find(o=>o.id===user.organization_id)?.divisions as {permissions?:Record<string,{view:boolean}>}[]|undefined)?.some(d=>d.permissions?.[item.id]?.view))) })).filter((group) => group.items.length > 0) };
 }
 
-export function getDefaultSection(role: UserRole): string {
+export function getDefaultSection(role: UserRole, user?: User | null): string {
+  if (BFF_DEV) {
+    if (role === "staff_admin" && user) {
+      return ["assignments", "tests", "test-results", "exams", "ratings", "users", "schools", "train", "dashboard", "review-queue", "homework-archive", "monitoring", "schedule", "attendance", "zaps", "scan", "organizations", "divisions", "directions"].find(section => canAccessSection(user, section)) ?? "assignments";
+    }
+    return role === "admin" || role === "staff_admin" ? "assignments" : role === "examinator" ? "exams" : role === "supervisor" ? "ratings" : "homework";
+  }
   return navigationByRole[role].groups[0].items[0].id;
 }
 

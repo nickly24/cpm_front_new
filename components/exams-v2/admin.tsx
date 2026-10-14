@@ -1,5 +1,7 @@
 "use client";
 
+import { BFF_DEV } from "@/lib/config";
+import { ExamSharing } from "./admin-sharing";
 import { FilterPopover } from "@/components/ui/filter-popover";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -86,7 +88,8 @@ function CreateExam({
       capabilities.canCreateClassic ? "classic" : "outside_lms",
     ),
     [direction, setDirection] = useState(""),
-    [date, setDate] = useState("");
+    [date, setDate] = useState(""),
+    [name, setName] = useState("");
   const mutation = useExamMutation<{ exam: ExamSummary }>(
     `${actor}:create-exam`,
     (result) => created(result.exam),
@@ -102,6 +105,7 @@ function CreateExam({
             path: "/api/exams",
             method: "POST",
             body: {
+              ...(BFF_DEV && name.trim() ? { name: name.trim() } : {}),
               examType: type,
               directionId: Number(direction),
               ...(type === "outside_lms" ? { date } : {}),
@@ -140,9 +144,9 @@ function CreateExam({
             ))}
           </select>
         </Field>
+        {BFF_DEV && <Field label="Название экзамена (необязательно)"><input className={s.input} value={name} maxLength={250} disabled={mutation.busy || mutation.uncertain} onChange={e=>setName(e.target.value)} placeholder="По умолчанию — название направления" /></Field>}
         <p className={s.muted}>
-          Название экзамена берётся из направления и обновляется при его
-          переименовании. После создания можно постепенно дополнить настройки.
+          {BFF_DEV ? "Направление и название экзамена сохраняются отдельно. После создания можно дополнить настройки." : "Название экзамена берётся из направления и обновляется при его переименовании. После создания можно постепенно дополнить настройки."}
         </p>
         {type === "outside_lms" && (
           <Field label="Дата экзамена">
@@ -294,6 +298,8 @@ function OutsideDate({
 }
 interface Overview {
   exam: ExamSummary;
+  canEditContent?: boolean;
+  bankOnly?: boolean;
   classic?: {
     partsCount: number;
     questionsCount: number;
@@ -330,13 +336,16 @@ function Workspace({
   const editable =
     canEdit &&
     (exam?.examType !== "outside_lms" || capabilities.canManageOutside);
+  const contentEditable = editable && (!BFF_DEV || overview.data?.canEditContent === true);
+  const bankOnly = overview.data?.bankOnly === true;
   const props = {
     examId,
     actor,
     canEdit: editable,
+    canImport: !BFF_DEV || capabilities.canImportExams === true,
     onChanged: overview.reload,
   };
-  const tabs =
+  const tabs = bankOnly ? (exam?.examType === "classic" ? ["overview", "questions"] : ["overview"]) :
     exam?.examType === "classic"
       ? [
           "overview",
@@ -375,7 +384,8 @@ function Workspace({
         <>
           <div className={s.header}>
             <div>
-              <h1>{exam.directionName}</h1>
+              <h1>{BFF_DEV ? exam.name || exam.directionName : exam.directionName}</h1>
+              {BFF_DEV && <p className={s.subtitle}>{exam.directionName}</p>}
               <p className={s.subtitle}>
                 {typeLabel(exam.examType)} · ID {exam.id}
               </p>
@@ -385,7 +395,7 @@ function Workspace({
                   : formatDate(exam.date)}
               </p>
             </div>
-            {editable && (
+            {contentEditable && (
               <div className={s.row}>
                 <Action onClick={() => setDirectionEdit(true)}>
                   Изменить направление
@@ -439,7 +449,9 @@ function Workspace({
               </Action>
             ))}
           </nav>
-          {exam.examType === "classic" ? <ExamTrainingToolbar key={exam.version} examId={examId} canEdit={editable} onChanged={overview.reload} openBank={() => navigate({ tab: "questions", attemptId: null })} /> : null}
+          {BFF_DEV && <ExamSharing key={`sharing:${exam.version}`} exam={exam} actor={actor} canEdit={editable} canEditContent={contentEditable} changed={overview.reload} copied={id=>navigate({examId:id,tab:"overview",attemptId:null})} />}
+          {bankOnly && <p className={s.warning}>Экзамен не подключён к текущему подразделению. Подключите подразделение или создайте независимую копию для настроек и результатов.</p>}
+          {!bankOnly && exam.examType === "classic" ? <ExamTrainingToolbar key={exam.version} examId={examId} canEdit={editable} onChanged={overview.reload} openBank={() => navigate({ tab: "questions", attemptId: null })} /> : null}
           {attemptId && exam.examType === "classic" ? (
             <AdminAttemptDetail
               key={attemptId}
@@ -451,8 +463,8 @@ function Workspace({
             <div key={`${examId}:${activeTab}`}>
               {exam.examType === "classic" ? (
                 <>
-                  {activeTab === "overview" && <ClassicSettings {...props} />}
-                  {activeTab === "questions" && <ClassicBank {...props} />}
+                  {!bankOnly && activeTab === "overview" && <ClassicSettings {...props} />}
+                  {activeTab === "questions" && <ClassicBank {...props} canEdit={contentEditable && !bankOnly} />}
                   {activeTab === "scoring" && <ClassicScoring {...props} />}
                   {activeTab === "commissions" && (
                     <ClassicCommissions {...props} />
@@ -470,7 +482,7 @@ function Workspace({
                     <ClassicResults {...props} selectAttempt={selectAttempt} />
                   )}
                 </>
-              ) : activeTab === "overview" ? (
+              ) : activeTab === "overview" && !bankOnly ? (
                 <OutsideDate
                   key={exam.version}
                   exam={exam}
@@ -478,9 +490,9 @@ function Workspace({
                   canEdit={editable}
                   changed={overview.reload}
                 />
-              ) : (
+              ) : !bankOnly ? (
                 <OutsideResults {...props} />
-              )}
+              ) : null}
             </div>
           )}
           {directionEdit && (
@@ -497,7 +509,7 @@ function Workspace({
               actor={actor}
               canEdit={editable}
               title={`Удалить экзамен «${exam.directionName}»?`}
-              description="Будет удалён весь экзамен: настройки, банк, комиссии, назначения, привилегии, все сдачи, голоса, апелляции и результаты. Студенты, экзаменаторы и направление останутся."
+              description="Будет удалён весь экзамен во всех подключённых подразделениях: настройки, банк, комиссии, назначения, привилегии, все сдачи, голоса, апелляции и результаты. Студенты, экзаменаторы и направление останутся."
               path={`/api/exams/${examId}`}
               previewPath={`/api/exams/${examId}/delete-preview`}
               onClose={() => setDeleting(false)}
@@ -526,13 +538,14 @@ export function AdminExams({
     sort = nav.params?.get("sort") ?? "date_desc",
     directionId = nav.params?.get("directionId") ?? "",
     dateFrom = nav.params?.get("dateFrom") ?? "",
-    dateTo = nav.params?.get("dateTo") ?? "";
+    dateTo = nav.params?.get("dateTo") ?? "",
+    scope = nav.params?.get("scope") ?? "division";
   const page = nav.id("page") ?? 1;
   const [creating, setCreating] = useState(false);
   const directions = useExamDirections(nav.initialized && canView && !examId);
   const resource = useExamResource<Page<ExamSummary>>(
     nav.initialized && canView && !examId
-      ? `/api/exams${queryString({ type, page, limit: 20, search: query, sort, directionId, dateFrom, dateTo })}`
+      ? `/api/exams${queryString({ ...(BFF_DEV ? {scope} : {}), type, page, limit: 20, search: query, sort, directionId, dateFrom, dateTo })}`
       : null,
   );
   if (!canView) return <Empty>Нет доступа к экзаменам</Empty>;
@@ -567,6 +580,7 @@ export function AdminExams({
             </Action>
           )}
       </div>
+      {BFF_DEV && <nav className={s.tabs} aria-label="Каталог экзаменов">{[{id:"division",label:"Экзамены подразделения"},{id:"bank",label:"Банк организации"},...(user?.organization_admin?[{id:"organization",label:"Все экзамены организации"}]:[])].map(item=><Action key={item.id} className={scope===item.id?s.selected:""} aria-current={scope===item.id?"page":undefined} onClick={()=>nav.navigate({scope:item.id,page:null})}>{item.label}</Action>)}</nav>}
       <form
         className={s.toolbar}
         onSubmit={(e) => {
@@ -669,18 +683,19 @@ export function AdminExams({
       <div className={s.grid}>
         {resource.data?.items.map((exam) => (
           <article key={exam.id} className={`${s.panel} ${s.examCard}`}>
-            <h2>{exam.directionName}</h2>
+            <h2>{BFF_DEV ? exam.name || exam.directionName : exam.directionName}</h2>
+            {BFF_DEV && <p className={s.muted}>{exam.directionName} · {exam.connected ? "Подключён" : "Из банка"}{exam.inBank ? " · Доступен в банке" : ""}{exam.originExamId ? ` · Копия ${exam.originExamId}` : ""}</p>}
             <span className={s.badge}>{typeLabel(exam.examType)}</span>
             <p className={s.muted}>
               {formatDate(
-                exam.examType === "classic" ? exam.startAt : exam.date,
+                exam.examDate !== undefined ? exam.examDate : exam.examType === "classic" ? exam.startAt : exam.date,
               )}{" "}
               · ID {exam.id}
             </p>
             <div className={s.cardTags}>
             {exam.examType === "classic" && (
               <span className={s.badge}>
-                {exam.readiness === "ready" ? "Настроен" : "Требует настройки"}
+                {exam.readiness === "ready" ? "Настроен" : exam.readiness === "unknown" ? "Не проверена" : "Требует настройки"}
               </span>
             )}
             {exam.examType === "classic" ? <span className={s.badge}>{exam.trainingEnabled ? "Подготовка открыта" : "Подготовка скрыта"}</span> : null}

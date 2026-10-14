@@ -1,3 +1,8 @@
+import { BFF_DEV } from "@/lib/config";
+import { examsAdminGet, examsAdminMutate, examsParseImport, examsDownloadTemplate } from "@/lib/bff/exams-admin";
+import { examsDirections } from "@/lib/bff/exams-shared";
+import { examsConductGet, examsConductMutate } from "@/lib/bff/exams-conduct";
+import { examsStudentGet, examsStudentMutate } from "@/lib/bff/exams-student";
 import {
   apiFormRequest,
   apiRequest,
@@ -9,7 +14,21 @@ import type {
   CommandResult,
   Direction,
   ImportSession,
+  ImportKind,
 } from "./types";
+
+/** Keep uncertain transport failures in the existing durable command journal. */
+async function bffBoundary<T>(run: () => Promise<T>): Promise<T> {
+  try { return await run(); }
+  catch (error) {
+    if (error instanceof ApiError) throw error;
+    if (error instanceof Error && "status" in error && typeof error.status === "number") {
+      const details = error as Error & { status: number; code?: string; details?: Record<string, unknown>; correlationId?: string; retryAfterSeconds?: number };
+      throw new ApiError(details.message, details.status, details.retryAfterSeconds, details.code, details.details, details.correlationId);
+    }
+    throw error;
+  }
+}
 
 export type Query = Record<
   string,
@@ -61,6 +80,11 @@ export async function examGet<T>(
   params: Query = {},
   signal?: AbortSignal,
 ): Promise<T> {
+  if (BFF_DEV) return bffBoundary(async () => {
+    if (/^\/api\/student\/exams(?:\/|$)/.test(path) || /^\/api\/exams\/\d+\/training(?:\/preview)?(?:\?|$)/.test(path)) return await examsStudentGet(path, params, signal) as T;
+    if (/^\/api\/examiner\//.test(path) || /^\/api\/exams\/lookups/.test(path) || /\/attempts\/\d+\/questions(?:\/|\?|$)/.test(path)) return await examsConductGet(path, params, signal) as T;
+    return await examsAdminGet(path, params, signal) as T;
+  });
   return unwrap<T>(
     await apiRequest<unknown>(`${path}${queryString(params)}`, {
       cache: "no-store",
@@ -78,6 +102,11 @@ export interface ExamCommand {
   createdAt?: number;
 }
 export async function examMutate<T>(command: ExamCommand): Promise<T> {
+  if (BFF_DEV) return bffBoundary(async () => {
+    if (/^\/api\/student\/exams(?:\/|$)/.test(command.path) || /^\/api\/exams\/\d+\/training(?:\/preview)?(?:\?|$)/.test(command.path)) return await examsStudentMutate(command) as T;
+    if (/^\/api\/examiner\//.test(command.path)) return await examsConductMutate(command) as T;
+    return await examsAdminMutate(command) as T;
+  });
   const headers: Record<string, string> = { "Idempotency-Key": command.key };
   if (command.confirmationToken)
     headers["X-Exam-Confirmation"] = command.confirmationToken;
@@ -95,9 +124,15 @@ export function importPrefix(
   examId: number,
   kind: "questions" | "assignments" | "outside",
 ) {
+  if (BFF_DEV) return `/api/exams/${examId}/imports/${kind}`;
   return kind === "outside"
     ? "/api/outside-exam-results-import"
     : `/api/exams/${examId}/imports/${kind}`;
+}
+/** Native templates exist only in the new owner contract. Legacy flows stay unchanged. */
+export async function downloadExamImportTemplate(examId: number, kind: ImportKind, signal?: AbortSignal): Promise<Blob> {
+  if (!BFF_DEV) throw new ApiError("Шаблон нового сервиса недоступен в этом режиме", 501);
+  return bffBoundary(() => examsDownloadTemplate(examId, kind, signal));
 }
 export async function parseExamImport(
   examId: number,
@@ -105,6 +140,7 @@ export async function parseExamImport(
   file: File,
   key: string,
 ): Promise<{ session: ImportSession }> {
+  if (BFF_DEV) return bffBoundary(() => examsParseImport(examId, kind, file, key));
   const form = new FormData();
   form.append("file", file);
   if (kind === "outside") form.append("exam_id", String(examId));
@@ -119,6 +155,7 @@ export const getCapabilities = (signal?: AbortSignal) =>
 export async function getExamDirections(
   signal?: AbortSignal,
 ): Promise<Direction[]> {
+  if (BFF_DEV) return bffBoundary(() => examsDirections(signal));
   const response = await apiRequest<{ directions: Direction[] } | Direction[]>(
     "/directions",
     { signal, cache: "no-store" },
@@ -130,9 +167,11 @@ export function attemptCommand(
   command: "ready" | "start" | "vote" | "next-question" | "replace-question",
   body: unknown,
   key: string,
+  examId?: number,
 ) {
+  if (BFF_DEV && (!examId || !Number.isSafeInteger(examId) || examId < 1)) throw new ApiError("Выберите экзамен перед изменением сдачи", 400, undefined, "exam_required");
   return examMutate<CommandResult>({
-    path: `/api/examiner/attempts/${attemptId}/${command}`,
+    path: BFF_DEV ? `/api/examiner/exams/${examId}/attempts/${attemptId}/${command}` : `/api/examiner/attempts/${attemptId}/${command}`,
     method: "POST",
     body,
     key,

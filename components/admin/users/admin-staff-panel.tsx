@@ -13,6 +13,11 @@ import type {
   AdminStaffRole,
   AdminStaffUser,
 } from "@/lib/admin/admin-users-types";
+import { BFF_DEV } from "@/lib/config";
+import { coreCan, coreFullAdmin, coreRoles, type CoreRole } from "@/lib/bff/core-admin";
+import { CoreCreateRecovery } from "./core-access";
+import { useAuth } from "@/contexts/AuthContext";
+import { useContextGuard } from "@/lib/bff/use-context-guard";
 import { useEffect, useState } from "react";
 
 interface AdminStaffPanelProps {
@@ -28,6 +33,7 @@ const ROLE_LABELS: Record<AdminStaffRole, string> = {
   proctor: "проктор",
   examinator: "экзаменатор",
   supervisor: "супервайзер",
+  staff_admin: "администратор подразделения",
 };
 
 export function AdminStaffPanel({
@@ -38,6 +44,11 @@ export function AdminStaffPanel({
   onClose,
   onSaved,
 }: AdminStaffPanelProps) {
+  const {user: actor}=useAuth();
+  useContextGuard(BFF_DEV);
+  const [password,setPassword]=useState("");
+  const [roles,setRoles]=useState<CoreRole[]>([]);
+  const [roleId,setRoleId]=useState(user?.role_id!=null?String(user.role_id):"");
   const [fullName, setFullName] = useState(user?.full_name ?? "");
   const [login, setLogin] = useState(user?.login ?? "");
   const [groupId, setGroupId] = useState(
@@ -49,6 +60,8 @@ export function AdminStaffPanel({
     login: string;
     password: string;
   } | null>(null);
+
+  useEffect(()=>{if(BFF_DEV&&role==="staff_admin"&&coreFullAdmin(actor))void coreRoles().then(setRoles).catch(e=>setError(e instanceof Error?e.message:"Ошибка загрузки ролей"));},[role,actor]);
 
   useEffect(() => {
     document.body.style.overflow = "hidden";
@@ -65,12 +78,14 @@ export function AdminStaffPanel({
       setError("Укажите ФИО");
       return;
     }
+    if(BFF_DEV&&role==="staff_admin"&&!roleId){setError("Выберите роль подразделения");return;}
 
     setSubmitting(true);
     try {
       if (mode === "add") {
         const res = await addAdminStaffUser(role, {
           full_name: fullName.trim(),
+          ...(BFF_DEV ? {login:login.trim(),password,role_id:role==="staff_admin"?Number(roleId):null} : {}),
           group_id:
             role === "proctor" && groupId !== "none" ? Number(groupId) : null,
         });
@@ -94,6 +109,8 @@ export function AdminStaffPanel({
         full_name?: string;
         group_id?: number | null;
         login?: string;
+        password?: string;
+        role_id?: number | null;
       } = {
         role,
         user_id: user.id,
@@ -103,7 +120,7 @@ export function AdminStaffPanel({
         payload.full_name = fullName.trim();
       }
 
-      if (role === "proctor") {
+      if (role === "proctor" && (!BFF_DEV || coreCan("groups",true,actor))) {
         const nextGroup = groupId === "none" ? null : Number(groupId);
         if (nextGroup !== (user.group_id ?? null)) {
           payload.group_id = nextGroup;
@@ -111,10 +128,11 @@ export function AdminStaffPanel({
       }
 
       const nextLogin = login.trim();
-      if (nextLogin && nextLogin !== (user.login ?? "")) {
+      if ((!BFF_DEV||coreFullAdmin(actor)) && nextLogin && nextLogin !== (user.login ?? "")) {
         payload.login = nextLogin;
       }
 
+      if(BFF_DEV&&coreFullAdmin(actor)){if(password)payload.password=password;if(role==="staff_admin"&&Number(roleId)!==user.role_id)payload.role_id=Number(roleId);}
       const res = await editAdminStaffUser(payload);
       if (!res.status) {
         throw new Error(res.error || "Не удалось сохранить");
@@ -152,7 +170,7 @@ export function AdminStaffPanel({
             />
           </label>
 
-          {mode === "edit" ? (
+          {(!BFF_DEV && mode === "edit") || (BFF_DEV && coreFullAdmin(actor)) ? (
             <label className={userStyles.field}>
               <span className={userStyles.fieldLabel}>Логин</span>
               <input
@@ -164,7 +182,9 @@ export function AdminStaffPanel({
             </label>
           ) : null}
 
-          {role === "proctor" ? (
+          {BFF_DEV&&coreFullAdmin(actor)?<label className={userStyles.field}><span className={userStyles.fieldLabel}>{mode==="add"?"Пароль":"Новый пароль"}</span><input className={userStyles.fieldInput} type="password" autoComplete="new-password" minLength={8} required={mode==="add"} value={password} onChange={e=>setPassword(e.target.value)} /><span className={userStyles.memberMeta}>Для смены логина укажите новый пароль.</span></label>:null}
+          {BFF_DEV&&role==="staff_admin"&&coreFullAdmin(actor)?<label className={userStyles.field}><span className={userStyles.fieldLabel}>Роль подразделения</span><select className={userStyles.fieldSelect} value={roleId} onChange={e=>setRoleId(e.target.value)} required><option value="">Выберите роль</option>{roles.map(r=><option key={r.id} value={r.id}>{r.name}</option>)}</select></label>:null}
+          {role === "proctor" && (!BFF_DEV || coreCan("groups",true,actor)) ? (
             <label className={userStyles.field}>
               <span className={userStyles.fieldLabel}>Группа CPM</span>
               <select
@@ -182,6 +202,7 @@ export function AdminStaffPanel({
             </label>
           ) : null}
 
+          <CoreCreateRecovery onRecovered={onSaved} />
           {error ? <p className={styles.errorText}>{error}</p> : null}
 
           {credentials ? (

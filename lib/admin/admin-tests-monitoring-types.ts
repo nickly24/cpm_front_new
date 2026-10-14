@@ -14,6 +14,8 @@ export interface AdminTestAnalytics {
   attemptsExpired: number;
   attemptsSubmitted: number;
   attemptsActive: number;
+  calculationsQueued?: number;
+  calculationsFailed?: number;
 }
 
 export interface AdminTestOverviewResponse {
@@ -25,6 +27,10 @@ export interface AdminTestOverviewResponse {
 
 export interface AdminTestSessionListItem {
   sessionId: string;
+  attemptId?: string;
+  calculationStatus?: string;
+  calculationRevision?: number;
+  revision?: number;
   studentId: number | string;
   studentFullName: string;
   testTitle?: string;
@@ -92,4 +98,5 @@ export interface AdminListQuery {
   page?: number;
   limit?: number;
   search?: string;
+  calculationStatus?: string;
 }

@@ -35,6 +35,7 @@ export interface AdminPanelProps {
   examId: number;
   actor: string;
   canEdit: boolean;
+  canImport?: boolean;
   onChanged: () => void;
 }
 function PeriodForm({

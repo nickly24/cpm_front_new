@@ -1,3 +1,5 @@
+import { BFF_DEV } from "@/lib/config";
+import { coreStudents } from "@/lib/bff/core-admin";
 import { apiRequest } from "@/lib/api/client";
 import type {
   ProctorEditSessionResponse,
@@ -35,10 +37,13 @@ export async function fetchProctorHomeworks(options?: {
 
 export async function fetchProctorGroupStudents(
   groupId: number,
+  signal?: AbortSignal,
 ): Promise<ProctorGroupStudentsResponse> {
+  if (BFF_DEV) return {status:true,res:(await coreStudents(signal)).map(s=>({id:s.account_id,full_name:s.full_name}))};
   return apiRequest<ProctorGroupStudentsResponse>("/api/student-group-filter", {
     method: "POST",
     body: JSON.stringify({ id: groupId }),
+    signal,
   });
 }
 

@@ -1,4 +1,4 @@
-import { API_BASE_URL } from "../config";
+import { API_BASE_URL, BFF_DEV } from "../config";
 import { getToken } from "../auth/storage";
 
 export class ApiError extends Error {
@@ -53,6 +53,7 @@ export async function apiRequest<T>(
   path: string,
   options: RequestInit = {},
 ): Promise<T> {
+  if (BFF_DEV) return (await import("@/lib/bff/homework")).legacyHomework(path, options) as Promise<T>;
   const token = getToken();
   const headers = new Headers(options.headers);
 
@@ -96,6 +97,7 @@ export async function apiFormRequest<T>(
   formData: FormData,
   options: Omit<RequestInit, "body"> = {},
 ): Promise<T> {
+  if (BFF_DEV) throw new ApiError("Раздел ещё не подключён в локальном режиме", 501);
   const token = getToken();
   const headers = new Headers(options.headers);
   // The browser must attach the multipart boundary itself.

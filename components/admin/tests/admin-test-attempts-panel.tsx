@@ -1,6 +1,8 @@
 "use client";
+import { BFF_DEV } from "@/lib/config";
+import { useContextGuard } from "@/lib/bff/use-context-guard";
 
-import { EditOnly } from "@/components/admin/admin-section-access";
+import { useAdminSectionAccess } from "@/components/admin/admin-section-access";
 
 import {
   AdminAnswerItemsList,
@@ -40,12 +42,15 @@ const emptyPagination: AdminListPagination = {
 
 function statusLabel(status: string) {
   if (status === "in_progress") return "В процессе";
-  if (status === "expired") return "Время вышло";
+  if (status === "expired" || status === "expired_pending_upload") return "Время вышло";
   if (status === "submitted") return "Отправлено";
   return status;
 }
 
 export function AdminTestAttemptsPanel({ testId }: AdminTestAttemptsPanelProps) {
+  const {canEdit:canEditResults} = useAdminSectionAccess("test-results");
+  const [mutating,setMutating] = useState(false);
+  useContextGuard(mutating);
   const [searchInput, setSearchInput] = useState("");
   const debouncedSearch = useDebouncedValue(searchInput, 350);
   const [page, setPage] = useState(1);
@@ -106,13 +111,14 @@ export function AdminTestAttemptsPanel({ testId }: AdminTestAttemptsPanelProps) 
     ) {
       return;
     }
+    setMutating(true);
     try {
       await deleteAdminAttempt(attemptId);
       setDetail(null);
       await load();
     } catch (err) {
       window.alert(err instanceof Error ? err.message : "Ошибка удаления");
-    }
+    } finally {setMutating(false);}
   };
 
   const handleForceSubmit = async (attemptId: string) => {
@@ -124,8 +130,10 @@ export function AdminTestAttemptsPanel({ testId }: AdminTestAttemptsPanelProps) 
       return;
     }
 
+    setMutating(true);
     try {
-      await forceSubmitAdminAttempt(attemptId);
+      const result = await forceSubmitAdminAttempt(attemptId);
+      if(BFF_DEV)window.alert(result.message || "Сдача принята в очередь проверки");
       setDetail(null);
       await load();
     } catch (err) {
@@ -134,12 +142,13 @@ export function AdminTestAttemptsPanel({ testId }: AdminTestAttemptsPanelProps) 
           ? err.message
           : "Не удалось принудительно завершить попытку",
       );
-    }
+    } finally {setMutating(false);}
   };
 
   return (
     <div className={styles.panel}>
       <div className={styles.panelToolbar}>
+        <Button size="sm" variant="ghost" onClick={()=>void load()}>Обновить</Button>
         <input
           type="search"
           className={styles.searchInput}
@@ -192,20 +201,20 @@ export function AdminTestAttemptsPanel({ testId }: AdminTestAttemptsPanelProps) 
                     >
                       Детали
                     </button>
-                    <EditOnly><button
+                    {canEditResults ? <><button
                       type="button"
                       className={styles.linkBtn}
                       onClick={() => handleForceSubmit(row.attemptId)}
                     >
                       Завершить
-                    </button></EditOnly>
-                    <EditOnly><button
+                    </button></> : null}
+                    {canEditResults ? <><button
                       type="button"
                       className={styles.linkBtnDanger}
                       onClick={() => handleDelete(row.attemptId)}
                     >
                       Удалить
-                    </button></EditOnly>
+                    </button></> : null}
                   </td>
                 </tr>
               ))}
@@ -247,7 +256,7 @@ export function AdminTestAttemptsPanel({ testId }: AdminTestAttemptsPanelProps) 
           <h4 className={styles.detailSectionTitle}>Ответы по вопросам</h4>
           <AdminAnswerItemsList items={attemptItemsToRows(detail.items)} />
           <div className={styles.detailCardActions}>
-            <EditOnly><Button
+            {canEditResults ? <><Button
               type="button"
               variant="primary"
               size="sm"
@@ -260,8 +269,8 @@ export function AdminTestAttemptsPanel({ testId }: AdminTestAttemptsPanelProps) 
               }
             >
               Завершить попытку
-            </Button></EditOnly>
-            <EditOnly><Button
+            </Button></> : null}
+            {canEditResults ? <><Button
               type="button"
               variant="ghost"
               size="sm"
@@ -274,7 +283,7 @@ export function AdminTestAttemptsPanel({ testId }: AdminTestAttemptsPanelProps) 
               }
             >
               Удалить попытку
-            </Button></EditOnly>
+            </Button></> : null}
           </div>
         </div>
       ) : null}

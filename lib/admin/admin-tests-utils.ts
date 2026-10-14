@@ -12,6 +12,9 @@ import {
 } from "@/lib/admin/admin-tests-api";
 
 export function getAdminTestStatus(test: AdminTestListItem): AdminTestStatus {
+  if(test.isArchived)return "archived";
+  if(test.isAttached===false)return "bank";
+  if(test.isAttached===true && test.published===false)return "hidden";
   if (isAdminExternalTest(test)) {
     return "external";
   }
@@ -33,6 +36,9 @@ export function getAdminTestStatus(test: AdminTestListItem): AdminTestStatus {
 
 export function getAdminTestStatusLabel(status: AdminTestStatus): string {
   switch (status) {
+    case "hidden": return "Скрыт";
+    case "archived": return "Архивирован";
+    case "bank": return "В банке";
     case "upcoming":
       return "Скоро начнётся";
     case "ended":
@@ -240,11 +246,15 @@ export function testDetailToFormData(test: AdminTestDetail): AdminTestFormData {
   }));
 
   return {
+    expectedRevision: test.expectedRevision,
+    maxQuestionId: test.maxQuestionId,
+    description: test.description,
+    passingScore: test.passingScore,
     title: test.title || "",
     direction: test.direction || "",
     startDate: toDatetimeLocalValue(test.startDate),
     endDate: toDatetimeLocalValue(test.endDate),
-    timeLimitMinutes: test.timeLimitMinutes || 30,
+    timeLimitMinutes: test.timeLimitMinutes ?? 30,
     questions: processedQuestions,
     visible: test.visible ?? false,
     published: test.published ?? true,

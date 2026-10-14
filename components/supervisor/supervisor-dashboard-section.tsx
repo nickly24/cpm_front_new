@@ -2,8 +2,9 @@
 
 import dashboardStyles from "@/components/admin/dashboard/admin-dashboard.module.css";
 import { useAuth } from "@/contexts/AuthContext";
-import { getSectionHref } from "@/lib/navigation";
-import { supervisorNavigation } from "@/lib/navigation/supervisor";
+import { getNavigation, getSectionHref } from "@/lib/navigation";
+import { BFF_DEV } from "@/lib/config";
+import { CoreDashboardSummary } from "@/components/admin/dashboard/core-dashboard-summary";
 import {
   SUPERVISOR_READY_SECTIONS,
   SUPERVISOR_SECTION_DESCRIPTIONS,
@@ -48,8 +49,9 @@ export function SupervisorDashboardSection() {
         </p>
       </header>
 
-      {supervisorNavigation.groups.map((group) => {
-        const items = group.items.filter((item) => item.id !== "dashboard");
+      {BFF_DEV ? <CoreDashboardSummary /> : null}
+      {getNavigation("supervisor",user).groups.map((group) => {
+        const items = group.items.filter((item) => item.id !== "dashboard" && (!BFF_DEV || ["ratings","attendance","homework","tests","exams"].includes(item.id)));
         if (items.length === 0) {
           return null;
         }
@@ -69,7 +71,6 @@ export function SupervisorDashboardSection() {
                     <article
                       key={item.id}
                       className={`${dashboardStyles.card} ${dashboardStyles.cardSoon}`}
-                      aria-disabled
                     >
                       <div className={dashboardStyles.cardTop}>
                         <span className={dashboardStyles.cardIcon}>

@@ -1,3 +1,4 @@
+import { BFF_DEV } from "@/lib/config";
 import { apiRequest } from "@/lib/api/client";
 import type {
   AdminHomeworkFormData,
@@ -12,11 +13,13 @@ export async function fetchAdminHomeworks(params: {
   limit?: number;
   type?: string;
   search?: string;
+  status?: string;
 }): Promise<AdminHomeworkListResponse> {
   const qs = new URLSearchParams();
   qs.set("page", String(params.page ?? 1));
   qs.set("limit", String(params.limit ?? 10));
   if (params.type) qs.set("type", params.type);
+  if (BFF_DEV && params.status) qs.set("status", params.status);
   if (params.search?.trim()) qs.set("search", params.search.trim());
   return apiRequest<AdminHomeworkListResponse>(`/api/get-homeworks?${qs}`);
 }

@@ -2,8 +2,13 @@ export type TestStatus =
   | "available"
   | "upcoming"
   | "completed"
+  | "pending_upload"
+  | "upload_window_closed"
   | "missed"
-  | "external";
+  | "external"
+  | "running"
+  | "checking"
+  | "calculation_failed";
 
 export type TestStatusFilter = "all" | TestStatus;
 
@@ -15,6 +20,7 @@ export interface Direction {
 export interface ActiveAttemptSummary {
   id: string;
   expiresAt?: string;
+  uploadDeadline?: string;
   remainingSeconds: number;
   answeredCount: number;
   totalQuestions: number;
@@ -39,10 +45,12 @@ export interface StudentTestItem {
   canStart?: boolean;
   canResume?: boolean;
   canSubmitExpired?: boolean;
+  canRequestHelp?: boolean;
   canPractice?: boolean;
   canViewResults?: boolean;
   hasResult?: boolean;
   rate?: number | null;
+  calculationStatus?: string;
   activeAttempt?: ActiveAttemptSummary | null;
 }
 
@@ -60,6 +68,7 @@ export interface TestSession {
   score?: number;
   timeSpentMinutes?: number;
   completedAt?: string;
+  calculationStatus?: string;
   stats?: TestSessionStats | null;
 }
 
@@ -88,9 +97,14 @@ export interface TestsDateFilter {
 export const STUDENT_TESTS_PAGE_SIZE = 5;
 
 export const TESTS_STATUS_LABELS: Record<TestStatus, string> = {
+  running: "В процессе",
+  checking: "Проверка ответов",
+  calculation_failed: "Ошибка проверки",
   available: "Доступен",
   upcoming: "Скоро",
   completed: "Сдан",
+  pending_upload: "Ожидает отправки",
+  upload_window_closed: "Срок отправки истёк",
   missed: "Пропущен",
   external: "Вне системы",
 };

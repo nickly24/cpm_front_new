@@ -32,7 +32,7 @@ export async function fetchStudentHomework(
 }
 
 export function isHomeworkSubmitted(item: StudentHomeworkItem): boolean {
-  return ["submitted", "in_review", "graded"].includes(item.submission_state || "") || (!item.submission_state || item.submission_state === "none") && item.status.includes("сдано");
+  return ["submitted", "in_review", "graded"].includes(item.submission_state || "") || (!item.submission_state || item.submission_state === "none") && item.result !== null;
 }
 
 export function filterHomeworkByStatus(

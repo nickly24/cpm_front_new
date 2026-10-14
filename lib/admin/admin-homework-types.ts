@@ -1,4 +1,4 @@
-export type HomeworkKind = "ДЗНВ" | "ОВ";
+export type HomeworkKind = string;
 
 export type AdminHomeworkView =
   | "list"

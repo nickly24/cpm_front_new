@@ -27,7 +27,7 @@ export function RequireAuth({ role, children }: RequireAuthProps) {
     }
 
     if (role && user.role !== role) {
-      router.replace(getCabinetPath(user.role));
+      router.replace(getCabinetPath(user.role, user));
     }
   }, [loading, role, router, user]);
 

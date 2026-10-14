@@ -1,5 +1,8 @@
 "use client";
 
+import { useState } from "react";
+import { BFF_DEV } from "@/lib/config";
+import type { TrainingSectionNode } from "@/lib/training/training-types";
 import { FilterPopover } from "@/components/ui/filter-popover";
 import { queryString } from "@/lib/exams-v2/api";
 import Link from "next/link";
@@ -7,6 +10,7 @@ import { examTrainingPath } from "@/lib/training/training-routes";
 import { useExamNavigation, useExamResource } from "@/lib/exams-v2/hooks";
 import type {
   AttemptResult,
+  AttemptStatus,
   Page,
   StudentResult,
   StudentResultDetail,
@@ -21,6 +25,11 @@ import { Action, Empty, ErrorNotice, Field, Loading, Pager } from "./shared";
 import { ExamProtocol } from "./protocol";
 import s from "./exams.module.css";
 
+export function PendingRetakeNotice({ active, status, compact = false }: { active?: boolean; status?: AttemptStatus | null; compact?: boolean }) {
+  if (!active || status === "completed") return null;
+  const label = status === "in_progress" ? "Пересдача в процессе" : status === "pending_ready" ? "Пересдача ожидает готовности комиссии" : "Пересдача ожидает начала";
+  return compact ? <span className={s.badge}>{label}</span> : <p className={s.warning} role="status">{label}. До её завершения показан последний завершённый результат.</p>;
+}
 export function ResultSummary({ result }: { result: AttemptResult }) {
   return (
     <section className={s.panel}>
@@ -85,12 +94,13 @@ function Detail({
       {data && (
         <>
           <div>
-            <h1>{data.directionName}</h1>
-            <p className={s.subtitle}>{typeLabel(data.examType)}</p>
+            <h1>{data.examName || data.directionName}</h1>
+            <p className={s.subtitle}>{data.examName ? `${data.directionName} · ` : ""}{typeLabel(data.examType)}</p>
             {data.examType === "classic" && data.trainingEnabled ? <Link className={s.button} href={examTrainingPath("student", examId)}>Подготовка по карточкам</Link> : null}
           </div>
           {current && (
             <>
+              <PendingRetakeNotice active={data.hasActiveRetake} status={data.retakeStatus} />
               <div className={s.tabs} role="group" aria-label="Сдачи экзамена">
                 {attempts.map((attempt, index) => (
                   <Action
@@ -130,6 +140,22 @@ function Detail({
     </div>
   );
 }
+function AvailableExamTraining() {
+  const [page, setPage] = useState(1);
+  const resource = useExamResource<Page<TrainingSectionNode>>(BFF_DEV ? `/api/student/exams/training?page=${page}&limit=12` : null);
+  if (!BFF_DEV) return null;
+  return <section className={s.panel} aria-label="Доступная подготовка к экзаменам">
+    <h2>Подготовка к экзаменам</h2>
+    <ErrorNotice error={resource.error} reload={resource.reload} />
+    {resource.loading && <Loading />}
+    <div className={s.grid}>{resource.data?.items.map(exam => <article className={s.item} key={exam.refId}>
+      <h3>{exam.name}</h3><p>{exam.learned_cards} из {exam.total_cards} карточек выучено</p>
+      <Link className={s.button} href={examTrainingPath("student", exam.exam_id!)}>Подготовка по карточкам</Link>
+    </article>)}</div>
+    {resource.data?.items.length === 0 ? <p className={s.muted}>Здесь появятся экзамены с открытой подготовкой.</p> : null}
+    <Pager pagination={resource.data?.pagination} onPage={setPage} />
+  </section>;
+}
 export function StudentExamResults() {
   const nav = useExamNavigation();
   const examId = nav.id("examId");
@@ -164,6 +190,7 @@ export function StudentExamResults() {
           Обновить
         </Action>
       </div>
+      <AvailableExamTraining />
       <div className={s.toolbar}>
         <p className={s.toolbarSummary}>{resource.data ? `Результатов: ${resource.data.pagination.total}` : "История ваших экзаменов"}</p>
         <FilterPopover
@@ -223,15 +250,17 @@ export function StudentExamResults() {
           return (
             <article key={result.examId} className={`${s.panel} ${s.examCard}`}>
               <div className={s.header}>
-                <h2>{result.directionName}</h2>
+                <h2>{result.examName || result.directionName}</h2>
                 <strong className={s.score}>{gradeValue} / 5</strong>
               </div>
+              {result.examName ? <p className={s.muted}>{result.directionName}</p> : null}
               <span className={s.badge}>{typeLabel(result.examType)}</span>
               <p className={s.muted}>
-                {formatDate(classic ? result.startAt : result.date)}
+                {formatDate(result.examDate !== undefined ? result.examDate : classic ? result.startAt : result.date)}
               </p>
               {classic ? (
                 <>
+                  <PendingRetakeNotice active={result.hasActiveRetake} status={result.retakeStatus} compact />
                   <p>
                     Баллы: {formatScore(result.currentAttempt.roundedTotal)} /{" "}
                     {formatScore(result.currentAttempt.maxScore)}

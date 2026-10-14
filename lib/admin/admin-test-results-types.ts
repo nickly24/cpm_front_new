@@ -1,5 +1,6 @@
 export interface StudentTestSession {
   id: string;
+  calculationStatus?: string;
   testId: string;
   testTitle?: string | null;
   score?: number | null;

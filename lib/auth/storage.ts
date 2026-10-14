@@ -1,7 +1,8 @@
+import { BFF_DEV } from "@/lib/config";
 const TOKEN_KEY = "auth_token";
 
 export function getToken(): string | null {
-  if (typeof window === "undefined") {
+  if (BFF_DEV || typeof window === "undefined") {
     return null;
   }
 
@@ -9,9 +10,11 @@ export function getToken(): string | null {
 }
 
 export function setToken(token: string): void {
+  if (BFF_DEV) return;
   localStorage.setItem(TOKEN_KEY, token);
 }
 
 export function removeToken(): void {
+  if (BFF_DEV) return;
   localStorage.removeItem(TOKEN_KEY);
 }

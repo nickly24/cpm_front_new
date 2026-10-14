@@ -19,6 +19,7 @@ export interface RatingsReportColumn {
 export interface RatingsReportStudent {
   student_id: number;
   rating_id: number;
+  place?: number;
   full_name: string;
   class: string | number | null;
   group_id: number | null;
@@ -35,8 +36,9 @@ export interface RatingsReportStudent {
 export interface RatingsReportValue {
   student_id: number;
   column_key: string;
-  score: number;
+  score: number | null;
   status?: string | null;
+  details?: unknown;
 }
 
 export interface RatingsReportPeriod {
@@ -47,6 +49,7 @@ export interface RatingsReportPeriod {
 
 export interface RatingsReportData {
   ratingFreshness?: RatingFreshness;
+  versionId?: string;
   period: RatingsReportPeriod | null;
   students: RatingsReportStudent[];
   columns: RatingsReportColumn[];
@@ -57,6 +60,7 @@ export interface RatingsReportData {
 export interface RatingsReportResponse {
   ratingFreshness?: RatingFreshness;
   status: boolean;
+  versionId?: string;
   error?: string;
   message?: string;
   period?: RatingsReportPeriod | null;

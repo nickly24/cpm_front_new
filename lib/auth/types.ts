@@ -12,6 +12,12 @@ export type UserRole = (typeof USER_ROLES)[number];
 export type SectionPermissions = Record<string, { view: boolean; edit: boolean }>;
 
 export interface User {
+  account_id?: number;
+  organization_id?: number;
+  division_id?: number | null;
+  organization_admin?: boolean;
+  organizations?: import("@/lib/bff/client").Organization[];
+  context_revision?: string;
   role: UserRole;
   id: number;
   full_name: string;

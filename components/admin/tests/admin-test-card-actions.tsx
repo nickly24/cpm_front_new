@@ -20,6 +20,10 @@ import {
 
 interface AdminTestCardActionsProps {
   external?: boolean;
+  canEditClassic?: boolean;
+  canEditNew?: boolean;
+  canDelete?: boolean;
+  canOpenExternal?: boolean;
   onOpen?: () => void;
   onEditClassic?: () => void;
   onEditNew?: () => void;
@@ -28,6 +32,10 @@ interface AdminTestCardActionsProps {
 
 export function AdminTestCardActions({
   external = false,
+  canEditClassic = true,
+  canEditNew = true,
+  canDelete = true,
+  canOpenExternal = false,
   onOpen,
   onEditClassic,
   onEditNew,
@@ -85,7 +93,8 @@ export function AdminTestCardActions({
   if (external) {
     return (
       <div className={styles.listCardActions}>
-        <EditOnly><button
+        {canOpenExternal ? <button type="button" className={styles.openBtn} onClick={onOpen}><ExternalLink size={14} aria-hidden />Открыть</button> : null}
+        {canDelete ? <EditOnly><button
           type="button"
           className={cn(styles.iconAction, styles.iconActionDanger)}
           aria-label="Удалить"
@@ -93,7 +102,7 @@ export function AdminTestCardActions({
           onClick={onDelete}
         >
           <Trash2 size={16} aria-hidden />
-        </button></EditOnly>
+        </button></EditOnly> : null}
       </div>
     );
   }
@@ -109,7 +118,7 @@ export function AdminTestCardActions({
         Открыть
       </button>
 
-      <div
+      {canEditClassic || canEditNew ? <div
         className={styles.editMenuWrap}
         ref={wrapRef}
         onMouseEnter={openMenu}
@@ -138,7 +147,7 @@ export function AdminTestCardActions({
             onMouseEnter={openMenu}
             onMouseLeave={scheduleClose}
           >
-            <EditOnly><button
+            {canEditClassic ? <EditOnly><button
               type="button"
               role="menuitem"
               className={styles.editMicroItem}
@@ -151,8 +160,8 @@ export function AdminTestCardActions({
                 <FilePenLine size={14} aria-hidden />
               </span>
               Старый редактор
-            </button></EditOnly>
-            <EditOnly><button
+            </button></EditOnly> : null}
+            {canEditNew ? <EditOnly><button
               type="button"
               role="menuitem"
               className={styles.editMicroItem}
@@ -165,12 +174,12 @@ export function AdminTestCardActions({
                 <Wand2 size={14} aria-hidden />
               </span>
               Новый интерфейс
-            </button></EditOnly>
+            </button></EditOnly> : null}
           </div>
         ) : null}
-      </div>
+      </div> : null}
 
-      <EditOnly><button
+      {canDelete ? <EditOnly><button
         type="button"
         className={cn(styles.iconAction, styles.iconActionDanger)}
         aria-label="Удалить"
@@ -178,7 +187,7 @@ export function AdminTestCardActions({
         onClick={onDelete}
       >
         <Trash2 size={16} aria-hidden />
-      </button></EditOnly>
+      </button></EditOnly> : null}
     </div>
   );
 }

@@ -23,6 +23,7 @@ export interface ReportPeriodSelection {
 }
 
 interface PeriodModalProps {
+  title?: string;
   onClose: () => void;
   onCreate: (period: ReportPeriodSelection) => void;
 }
@@ -37,7 +38,7 @@ const MODE_OPTIONS: {
   { id: "date_range", label: "Диапазон дат", icon: CalendarRange },
 ];
 
-export function PeriodModal({ onClose, onCreate }: PeriodModalProps) {
+export function PeriodModal({ title = "Журнал посещаемости", onClose, onCreate }: PeriodModalProps) {
   const now = new Date();
   const [mode, setMode] = useState<PeriodMode>("current_month");
   const [year, setYear] = useState(now.getFullYear());
@@ -102,7 +103,7 @@ export function PeriodModal({ onClose, onCreate }: PeriodModalProps) {
         onClick={(event) => event.stopPropagation()}
         onSubmit={handleSubmit}
       >
-        <h3 className={attendanceStyles.modalTitle}>Журнал посещаемости</h3>
+        <h3 className={attendanceStyles.modalTitle}>{title}</h3>
         <p className={attendanceStyles.pageSubtitle}>
           Выберите период для отчёта.
         </p>

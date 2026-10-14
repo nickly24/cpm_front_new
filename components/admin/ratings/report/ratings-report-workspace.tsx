@@ -33,6 +33,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 interface RatingsReportWorkspaceProps {
   onBack: () => void;
+  version?: string;
   title?: string;
   fileNamePrefix?: string;
   columnKinds?: RatingsReportColumnKind[];
@@ -42,6 +43,7 @@ interface RatingsReportWorkspaceProps {
 
 export function RatingsReportWorkspace({
   onBack,
+  version,
   title,
   fileNamePrefix = "reyting",
   columnKinds,
@@ -91,12 +93,13 @@ export function RatingsReportWorkspace({
     }
     setError(null);
     try {
-      const response = await fetchRatingsReport();
+      const response = await fetchRatingsReport(version);
       if (!response.status) {
         throw new Error(response.error ?? "Не удалось загрузить отчёт");
       }
       applyResponse({
         ratingFreshness: response.ratingFreshness,
+        versionId: response.versionId,
         period: response.period ?? null,
         students: response.students ?? [],
         columns: response.columns ?? [],
@@ -104,17 +107,17 @@ export function RatingsReportWorkspace({
         message: response.message,
       });
     } catch (err) {
-      setReport(null);
-      setValueMap(buildValueMap([]));
+      if (!silent) { setReport(null); setValueMap(buildValueMap([])); }
       setError(err instanceof Error ? err.message : "Ошибка загрузки отчёта");
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [applyResponse]);
+  }, [applyResponse, version]);
 
   useEffect(() => {
-    void loadReport();
+    const timer = window.setTimeout(() => void loadReport(), 0);
+    return () => window.clearTimeout(timer);
   }, [loadReport]);
 
   const filterOptions = useMemo(

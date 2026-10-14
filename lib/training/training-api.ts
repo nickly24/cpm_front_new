@@ -1,3 +1,5 @@
+import { BFF_DEV } from "@/lib/config";
+import { cardsTrainingTree, cardsSectionsPage, cardsStudyView, cardsStudyBatch, cardsStudySettings, cardsStudyMark, cardsStudyUnmark } from "@/lib/bff/cards";
 import { apiRequest } from "@/lib/api/client";
 import { calcProgressPercent } from "./training-utils";
 import type {
@@ -72,6 +74,7 @@ export function normalizeTrainingDirections(
 export async function fetchTrainingTree(
   studentId: number,
 ): Promise<TrainingDirection[]> {
+  if (BFF_DEV) return cardsTrainingTree();
   const data = await apiRequest<TrainingTreeResponse>(
     `/get-training-tree/${studentId}`,
   );
@@ -93,6 +96,7 @@ export async function fetchTrainingSectionsByDirection(
     progress?: "all" | "in_progress" | "learned";
   },
 ): Promise<TrainingSectionsResponse> {
+  if (BFF_DEV) return cardsSectionsPage(await cardsTrainingTree(), directionId, params);
   const query = new URLSearchParams();
   if (params?.page) query.set("page", String(params.page));
   if (params?.limit) query.set("limit", String(params.limit));
@@ -117,6 +121,8 @@ export async function fetchSectionStudyView(
   sectionKind: SectionKind,
   sectionRefId: string,
 ): Promise<SectionStudyViewResponse> {
+  if (BFF_DEV && sectionKind === "exam") return (await import("@/lib/bff/exams-student")).examTrainingView(sectionRefId);
+  if (BFF_DEV) return cardsStudyView(sectionKind, sectionRefId);
   const data = await apiRequest<SectionStudyViewResponse>(
     `/section-study/${studentId}/${sectionKind}/${encodeURIComponent(sectionRefId)}`,
   );
@@ -133,6 +139,8 @@ export async function fetchSectionBatch(
   batchIndex: number,
   studyMode?: StudyFilter,
 ): Promise<SectionBatchResponse> {
+  if (BFF_DEV && sectionKind === "exam") return (await import("@/lib/bff/exams-student")).examTrainingBatch(sectionRefId, batchIndex, studyMode);
+  if (BFF_DEV) return cardsStudyBatch(sectionKind, sectionRefId, batchIndex, studyMode);
   const query = studyMode ? `?study_mode=${encodeURIComponent(studyMode)}` : "";
   const data = await apiRequest<SectionBatchResponse>(
     `/section-batch/${studentId}/${sectionKind}/${encodeURIComponent(sectionRefId)}/${batchIndex}${query}`,
@@ -149,6 +157,8 @@ export async function updateSectionStudySettings(
   sectionRefId: string,
   payload: StudySettingsPayload,
 ): Promise<StudySettingsResponse> {
+  if (BFF_DEV && sectionKind === "exam") return (await import("@/lib/bff/exams-student")).examTrainingSettings(sectionRefId, payload);
+  if (BFF_DEV) return cardsStudySettings(sectionKind, sectionRefId, payload);
   return apiRequest<StudySettingsResponse>(
     `/section-study-settings/${studentId}/${sectionKind}/${encodeURIComponent(sectionRefId)}`,
     {
@@ -161,6 +171,8 @@ export async function updateSectionStudySettings(
 export async function markCardLearned(
   payload: MarkCardLearnedPayload,
 ): Promise<MarkCardLearnedResponse> {
+  if (BFF_DEV && payload.section_kind === "exam") return (await import("@/lib/bff/exams-student")).examTrainingMark(payload);
+  if (BFF_DEV) return cardsStudyMark(payload);
   return apiRequest<MarkCardLearnedResponse>("/mark-card-learned", {
     method: "POST",
     body: JSON.stringify(payload),
@@ -170,7 +182,10 @@ export async function markCardLearned(
 export async function unmarkCardLearned(
   studentId: number,
   cardRef: string,
+  section?: { kind: SectionKind; ref: string },
 ): Promise<MarkCardLearnedResponse> {
+  if (BFF_DEV && cardRef.startsWith("exam:")) return (await import("@/lib/bff/exams-student")).examTrainingUnmark(cardRef);
+  if (BFF_DEV) return cardsStudyUnmark(cardRef, section);
   return apiRequest<MarkCardLearnedResponse>(
     `/mark-card-learned/${studentId}/${encodeURIComponent(cardRef)}`,
     { method: "DELETE" },

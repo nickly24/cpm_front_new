@@ -2,6 +2,8 @@ export type SubmissionState =
   | "none" | "uploading" | "processing" | "draft" | "submitted"
   | "in_review" | "revision_requested" | "graded";
 
+export interface HomeworkUploadLimits { max_source_bytes: number; max_output_bytes: number; max_pages: number; dpi: number; jpeg_quality: number }
+
 export interface HomeworkWorkspace {
   homework: { id: number; name: string; deadline: string | null; published: boolean };
   legacy_result: { id: number; status: number; result: number; date_pass: string | null } | null;
@@ -16,7 +18,7 @@ export interface HomeworkWorkspace {
   permissions: { upload: boolean; submit: boolean; remove_draft?: boolean };
   suggested_score?: number;
   active_job?: UploadJob | null;
-  limits?: { max_bytes: number; max_pages: number; poll_after_seconds: number };
+  limits?: (Partial<HomeworkUploadLimits> & { max_bytes?: number; poll_after_seconds?: number }) | null;
 }
 
 export interface HomeworkFile {
@@ -36,6 +38,7 @@ export interface UploadJob {
   id: string; homework_id?: number; status: string; stage: string;
   progress: number; error_code?: string | null; attempts?: number;
   manual_attempts?: number;
+  limits?: HomeworkUploadLimits | null;
 }
 
 export interface ActiveJobsResponse {

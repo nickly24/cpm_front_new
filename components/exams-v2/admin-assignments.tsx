@@ -1,5 +1,6 @@
 "use client";
 
+import { BFF_DEV } from "@/lib/config";
 import { FilterPopover } from "@/components/ui/filter-popover";
 import { useState } from "react";
 import { queryString } from "@/lib/exams-v2/api";
@@ -345,7 +346,7 @@ function AssignmentEditor({
           {privilege.data?.replacementLimit ?? initial?.replacementLimit ?? "—"}{" "}
           замен. При пересдаче лимит предоставляется полностью заново.
         </p>
-        <label>
+        {BFF_DEV ? <p className={s.muted}>Лимит замен сохраняется отдельно во вкладке «Привилегии».</p> : <label>
           <input
             type="checkbox"
             checked={changeLimit}
@@ -353,7 +354,7 @@ function AssignmentEditor({
             disabled={mutation.busy || mutation.uncertain}
           />{" "}
           Изменить лимит замен
-        </label>
+        </label>}
         {changeLimit && (
           <Field label="Число замен">
             <input
@@ -439,16 +440,16 @@ export function ClassicAssignments(props: AdminPanelProps) {
         <h2>Экзаменационный лист</h2>
         {props.canEdit && (
           <div className={s.row}>
-            <Action onClick={() => setImporting(!importing)}>
+            {props.canImport !== false && <Action onClick={() => setImporting(!importing)}>
               Импорт .xlsx
-            </Action>
+            </Action>}
             <Action primary onClick={() => setEditing("new")}>
               Назначить студента
             </Action>
           </div>
         )}
       </div>
-      {importing && (
+      {importing && props.canEdit && props.canImport !== false && (
         <ExamImport {...props} kind="assignments" onChanged={changed} />
       )}
       <form

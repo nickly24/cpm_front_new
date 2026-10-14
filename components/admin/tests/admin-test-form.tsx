@@ -1,4 +1,6 @@
 "use client";
+import { BFF_DEV } from "@/lib/config";
+import { useContextGuard } from "@/lib/bff/use-context-guard";
 
 import { AdminFullscreenBack } from "@/components/admin/admin-fullscreen-back";
 import { AdminTestSaveRecalcDialog } from "@/components/admin/tests/admin-test-save-recalc-dialog";
@@ -79,6 +81,9 @@ export function AdminTestForm({
   onSaved,
 }: AdminTestFormProps) {
   const isReadOnly = mode === "view";
+  const contentReadOnly = isReadOnly || (BFF_DEV && mode === "edit" && !editingTest?.actions?.can_edit_metadata);
+  const settingsReadOnly = isReadOnly || (BFF_DEV && mode === "edit" && !editingTest?.actions?.can_edit_settings);
+  useContextGuard(!isReadOnly);
   const [testData, setTestData] = useState<AdminTestFormData>(() => {
     const base = emptyAdminTestForm();
     if (defaultDirection) {
@@ -110,6 +115,7 @@ export function AdminTestForm({
       if (defaultDirection) {
         base.direction = defaultDirection;
       }
+      if(BFF_DEV)base.published=false;
       setTestData(base);
     }
   }, [editingTest, mode, defaultDirection]);
@@ -134,7 +140,7 @@ export function AdminTestForm({
   const openNewQuestion = (type: AdminTestQuestionType) => {
     setQuestionEditorMode("add");
     setCurrentQuestion(
-      buildNewQuestion(type, nextQuestionId(testData.questions)),
+      buildNewQuestion(type, Math.max(nextQuestionId(testData.questions), (testData.maxQuestionId || 0) + 1)),
     );
     setShowQuestionPopup(true);
   };
@@ -165,7 +171,7 @@ export function AdminTestForm({
         );
         if (existingIndex < 0) {
           // Редактируемый ID пропал — не затираем чужой, добавляем как новый.
-          const questionId = nextQuestionId(prev.questions);
+          const questionId = Math.max(nextQuestionId(prev.questions), (prev.maxQuestionId || 0) + 1);
           return {
             ...prev,
             questions: [...prev.questions, { ...draft, questionId }],
@@ -180,7 +186,7 @@ export function AdminTestForm({
       }
 
       // add: всегда append со свежим свободным ID (на случай устаревшего popup state)
-      const questionId = nextQuestionId(prev.questions);
+      const questionId = Math.max(nextQuestionId(prev.questions), (prev.maxQuestionId || 0) + 1);
       return {
         ...prev,
         questions: [...prev.questions, { ...draft, questionId }],
@@ -189,7 +195,7 @@ export function AdminTestForm({
 
     setQuestionEditorMode("add");
     setCurrentQuestion(
-      defaultQuestion(nextQuestionId(testData.questions) + 1),
+      defaultQuestion(Math.max(nextQuestionId(testData.questions), (testData.maxQuestionId || 0) + 1) + 1),
     );
     setShowQuestionPopup(false);
   };
@@ -197,7 +203,7 @@ export function AdminTestForm({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (testData.questions.length === 0) {
+    if (testData.questions.length === 0 && (!BFF_DEV || testData.published)) {
       setError("Добавьте хотя бы один вопрос");
       return;
     }
@@ -230,6 +236,7 @@ export function AdminTestForm({
     setSaveDialogError(null);
     try {
       const result = await updateAdminTest(editingTest._id, testData);
+      setTestData(prev=>({...prev,expectedRevision:result.revision??prev.expectedRevision,maxQuestionId:result.maxQuestionId??prev.maxQuestionId}));
       setSaveRecalc(result.recalc ?? null);
       setSaveDialog("result");
     } catch (err) {
@@ -292,10 +299,11 @@ export function AdminTestForm({
               value={testData.title}
               onChange={handleFieldChange}
               required
-              disabled={isReadOnly}
+              disabled={contentReadOnly}
             />
           </label>
 
+          {BFF_DEV ? <label className={styles.field}><span className={styles.fieldLabel}>Описание</span><textarea className={styles.input} maxLength={2000} value={testData.description||""} disabled={contentReadOnly} onChange={e=>setTestData(p=>({...p,description:e.target.value}))} /></label> : null}
           <label className={styles.field}>
             <span className={styles.fieldLabel}>Направление</span>
             <select
@@ -304,7 +312,7 @@ export function AdminTestForm({
               value={testData.direction}
               onChange={handleFieldChange}
               required
-              disabled={isReadOnly}
+              disabled={contentReadOnly}
             >
               <option value="">Выберите направление</option>
               {directions.map((d) => (
@@ -324,8 +332,8 @@ export function AdminTestForm({
                 name="startDate"
                 value={testData.startDate}
                 onChange={handleFieldChange}
-                required
-                disabled={isReadOnly}
+                required={!BFF_DEV || testData.published}
+                disabled={settingsReadOnly}
               />
             </label>
             <label className={styles.field}>
@@ -336,8 +344,8 @@ export function AdminTestForm({
                 name="endDate"
                 value={testData.endDate}
                 onChange={handleFieldChange}
-                required
-                disabled={isReadOnly}
+                required={!BFF_DEV || testData.published}
+                disabled={settingsReadOnly}
               />
             </label>
           </div>
@@ -348,15 +356,17 @@ export function AdminTestForm({
               className={styles.input}
               type="number"
               name="timeLimitMinutes"
-              min={1}
+              min={BFF_DEV && !testData.published ? 0 : 1}
+              max={BFF_DEV ? 1440 : undefined}
               value={testData.timeLimitMinutes}
               onChange={handleFieldChange}
               required
-              disabled={isReadOnly}
+              disabled={settingsReadOnly}
             />
           </label>
 
-          {!isReadOnly ? (
+          {BFF_DEV ? <label className={styles.field}><span className={styles.fieldLabel}>Проходной процент (необязательно)</span><input className={styles.input} type="number" min={0} max={100} value={testData.passingScore??""} disabled={settingsReadOnly} onChange={e=>setTestData(p=>({...p,passingScore:e.target.value===""?null:Number(e.target.value)}))} /></label> : null}
+          {!settingsReadOnly ? (
             <>
               <div className={styles.formToggles}>
                 <Toggle
@@ -377,8 +387,7 @@ export function AdminTestForm({
                 />
               </div>
               <p className={styles.readonlyFlags}>
-                При скрытых ответах раздел этого теста в тренировках не
-                отображается у студентов.
+                Настройки действуют в выбранном подразделении. Разбор и тренировка доступны при разрешённом просмотре ответов.
               </p>
             </>
           ) : (
@@ -402,7 +411,7 @@ export function AdminTestForm({
             <article key={`${question.questionId}-${index}`} className={styles.questionCard}>
               <div className={styles.questionCardHead}>
                 <strong>Вопрос {index + 1}</strong>
-                {!isReadOnly ? (
+                {!contentReadOnly ? (
                   <div className={styles.questionCardActions}>
                     <button
                       type="button"
@@ -433,7 +442,7 @@ export function AdminTestForm({
             </article>
           ))}
 
-          {!isReadOnly ? (
+          {!contentReadOnly ? (
             <div className={styles.addQuestionRow}>
               <Button type="button" variant="secondary" size="sm" onClick={() => openNewQuestion("single")}>
                 + Одиночный
@@ -449,7 +458,7 @@ export function AdminTestForm({
         </section>
 
         {!isReadOnly ? (
-          <Button type="submit" disabled={saving || testData.questions.length === 0}>
+          <Button type="submit" disabled={saving || (!BFF_DEV && testData.questions.length === 0)}>
             {saving
               ? "Сохранение…"
               : mode === "edit"
@@ -459,7 +468,7 @@ export function AdminTestForm({
         ) : null}
       </form>
 
-        {showQuestionPopup && !isReadOnly ? (
+        {showQuestionPopup && !contentReadOnly ? (
           <QuestionPopup
             question={currentQuestion}
             onChange={setCurrentQuestion}
@@ -515,7 +524,7 @@ function QuestionPopup({
   };
 
   const addAnswer = () => {
-    const newId = String.fromCharCode(97 + question.answers.length);
+    const newId = BFF_DEV ? `option_${crypto.randomUUID()}` : String.fromCharCode(97 + question.answers.length);
     onChange({
       ...question,
       answers: [...question.answers, { id: newId, text: "", isCorrect: false }],
@@ -554,6 +563,7 @@ function QuestionPopup({
             className={styles.input}
             type="number"
             min={1}
+            max={BFF_DEV ? 100000 : undefined}
             value={question.points}
             onChange={(e) =>
               onChange({ ...question, points: Number(e.target.value) })
@@ -585,7 +595,7 @@ function QuestionPopup({
                 </label>
               </div>
             ))}
-            <button type="button" className={styles.linkBtn} onClick={addAnswer}>
+            <button type="button" className={styles.linkBtn} disabled={BFF_DEV && question.answers.length>=50} onClick={addAnswer}>
               + Вариант
             </button>
           </div>

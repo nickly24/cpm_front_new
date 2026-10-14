@@ -30,9 +30,10 @@ const ROLE_TITLES: Record<UserRole, string> = {
 const SIDEBAR_COLLAPSED_KEY = "cpm-sidebar-collapsed";
 
 export function CabinetShell({ role, children }: CabinetShellProps) {
+  const { user } = useAuth();
   return (
     <RequireAuth role={role}>
-      <CabinetChromeProvider>
+      <CabinetChromeProvider key={user?.context_revision}>
         <HomeworkUploadProvider>
           <CabinetLayout role={role}>{children}</CabinetLayout>
         </HomeworkUploadProvider>

@@ -29,6 +29,12 @@ export function examSection(view: SectionStudyViewResponse): TrainingSectionNode
     progress_percent: view.stats.progress_percent ?? 0 };
 }
 
+/** Owner availability conflicts close a deck; content changes remain retryable. */
+export function trainingUnavailable(error: unknown): boolean {
+  return error instanceof ApiError && ([403, 404, 422].includes(error.status ?? 0)
+    || ["training_disabled", "exam_empty"].includes(error.code ?? ""));
+}
+
 export function trainingError(error: unknown): string {
   const code = error instanceof ApiError ? error.code : undefined;
   const messages: Record<string, string> = {

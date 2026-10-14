@@ -1,4 +1,6 @@
 "use client";
+import { useHomeworkTypes } from "@/lib/bff/use-homework-types";
+import { BFF_DEV } from "@/lib/config";
 
 import type { ProctorHomeworkTypeFilter } from "@/lib/proctor/proctor-types";
 import { BookOpen, ClipboardList, Layers } from "lucide-react";
@@ -25,8 +27,11 @@ export function ProctorHomeworkTypeToggle({
   value,
   onChange,
 }: ProctorHomeworkTypeToggleProps) {
+  const {names,error} = useHomeworkTypes();
+  const options = BFF_DEV ? [{value:"all",label:"Все",icon:Layers},...names.map(name=>({value:name,label:name,icon:BookOpen}))] : TYPE_OPTIONS;
   return (
     <div className={styles.typeToggleField}>
+      {error ? <p role="alert">{error}</p> : null}
       <span className={styles.filterLabel} id="proctor-hw-type-label">
         Тип задания
       </span>
@@ -35,7 +40,7 @@ export function ProctorHomeworkTypeToggle({
         role="tablist"
         aria-labelledby="proctor-hw-type-label"
       >
-        {TYPE_OPTIONS.map((option) => {
+        {options.map((option) => {
           const Icon = option.icon;
           const active = value === option.value;
 
@@ -47,7 +52,7 @@ export function ProctorHomeworkTypeToggle({
               aria-selected={active}
               className={`${styles.typeToggleBtn} ${
                 active ? styles.typeToggleBtnActive : ""
-              } ${active && option.activeClass ? option.activeClass : ""}`.trim()}
+              } ${active && "activeClass" in option && option.activeClass ? option.activeClass : ""}`.trim()}
               onClick={() => onChange(option.value)}
             >
               <Icon size={15} aria-hidden />

@@ -24,6 +24,9 @@ export const adminNavigation: RoleNavigation = {
       title: "Меню",
       items: [
         { id: "dashboard", label: "Главная", icon: LayoutDashboard },
+        { id: "organizations", label: "Организация", icon: Building2 },
+        { id: "divisions", label: "Подразделения", icon: Building2 },
+        { id: "directions", label: "Направления", icon: BookOpen },
         { id: "users", label: "Пользователи", icon: Users },
         { id: "access", label: "Доступ и роли", icon: Users },
         { id: "schools", label: "Школы", icon: Building2 },

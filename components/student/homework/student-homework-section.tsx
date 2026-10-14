@@ -1,4 +1,5 @@
 "use client";
+import { useHomeworkTypes } from "@/lib/bff/use-homework-types";
 
 import { HomeworkCard } from "./homework-card";
 import { HomeworkPagination } from "./homework-pagination";
@@ -18,6 +19,7 @@ export function StudentHomeworkSection() {
   return <Suspense fallback={<LoadingState label="Открываем домашние задания…" variant="block" />}><StudentHomeworkContent /></Suspense>;
 }
 function StudentHomeworkContent() {
+  const { names: typeNames, error: typeError } = useHomeworkTypes();
   const [items, setItems] = useState<StudentHomeworkItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -72,7 +74,8 @@ function StudentHomeworkContent() {
     <header className={styles.pageHeading}><div><span className={styles.eyebrow}>Учёба · Мои работы</span><h1>Домашние задания</h1><p>Подготовьте работу, отправьте PDF и следите за проверкой.</p></div><button type="button" className={styles.refresh} aria-label="Обновить задания" disabled={loading} onClick={() => setRefresh(value => value + 1)}><RefreshCw size={18} /></button></header>
     {revisions ? <button type="button" className={styles.revisionBanner} onClick={() => { setStatusFilter("revision"); setCurrentPage(1); }}>Есть работы на доработке: {revisions}<span>Посмотреть комментарии →</span></button> : null}
     <div className={styles.tabs} role="group" aria-label="Статус заданий">{tabs.map(tab => <button key={tab.value} type="button" aria-pressed={statusFilter === tab.value} onClick={() => { setStatusFilter(tab.value); setCurrentPage(1); }}>{tab.label}<span>{filterHomeworkByStatus(items, tab.value).length}</span></button>)}</div>
-    <section className={styles.toolbar}><label className={styles.search}><Search size={18} /><input type="search" value={search} onChange={event => { setSearch(event.target.value); setCurrentPage(1); }} placeholder="Найти задание" aria-label="Найти задание" /></label><FilterPopover activeCount={Number(typeFilter !== "all")} onReset={() => { setTypeFilter("all"); setCurrentPage(1); }}><label className={styles.typeFilter}><span>Тип задания</span><select aria-label="Тип задания" value={typeFilter} onChange={event => { setTypeFilter(event.target.value as HomeworkTypeFilter); setCurrentPage(1); }}><option value="all">Все типы</option><option value="ОВ">ОВ</option><option value="ДЗНВ">ДЗНВ</option></select></label></FilterPopover></section>
+    <section className={styles.toolbar}><label className={styles.search}><Search size={18} /><input type="search" value={search} onChange={event => { setSearch(event.target.value); setCurrentPage(1); }} placeholder="Найти задание" aria-label="Найти задание" /></label><FilterPopover activeCount={Number(typeFilter !== "all")} onReset={() => { setTypeFilter("all"); setCurrentPage(1); }}><label className={styles.typeFilter}><span>Тип задания</span><select aria-label="Тип задания" value={typeFilter} onChange={event => { setTypeFilter(event.target.value as HomeworkTypeFilter); setCurrentPage(1); }}><option value="all">Все типы</option>{typeNames.map(name=><option key={name} value={name}>{name}</option>)}</select></label></FilterPopover></section>
+    {typeError ? <p role="alert">{typeError}</p> : null}
     {error ? <div className={styles.alert} role="alert">{error}</div> : null}
     {loading && !items.length ? <LoadingState label="Загружаем задания…" variant="block" /> : pagination.items.length ? <section className={styles.grid} aria-label="Задания">{pagination.items.map(item => <HomeworkCard key={item.homework_id} item={item} onOpen={() => open(item.homework_id)} />)}</section> : !error ? <div className={styles.empty}><BookOpen size={32} /><h2>Здесь пока нет заданий</h2><p>Попробуйте другой статус или измените поиск.</p></div> : null}
     {pagination.totalPages > 1 ? <HomeworkPagination currentPage={pagination.currentPage} totalPages={pagination.totalPages} onPageChange={setCurrentPage} /> : null}

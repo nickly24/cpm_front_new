@@ -39,6 +39,11 @@ export interface PracticeFeedback {
 export interface TestAttempt {
   attemptId: string;
   studentId?: number;
+  organizationId?: number;
+  divisionId?: number;
+  submissionId?: string;
+  calculationStatus?: string;
+  serverCommits?: { commit_id: string; sequence: number; question_id: number; value: string | string[]; answered_at: string }[];
   testId: string;
   status: string;
   isPractice?: boolean;
@@ -74,6 +79,8 @@ export interface AttemptEnvelope {
 }
 
 export interface SubmitAttemptResponse {
+  submissionStatus?: string;
+  calculationStatus?: string;
   success: boolean;
   isPractice?: boolean;
   sessionId?: string;

@@ -1,6 +1,6 @@
 "use client";
 
-import { ReadOnlyControl, EditOnly } from "@/components/admin/admin-section-access";
+import { CoreReadOnlyControl, CoreEditOnly } from "@/components/admin/users/core-access";
 
 import styles from "@/components/admin/tests/admin-tests.module.css";
 import userStyles from "@/components/admin/users/admin-users.module.css";
@@ -10,7 +10,7 @@ import {
   fetchAdminUnassignedSchoolStudents,
 } from "@/lib/admin/admin-schools-api";
 import type { AdminSchool } from "@/lib/admin/admin-schools-types";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 interface AdminSchoolsUnassignedTabProps {
   schools: AdminSchool[];
@@ -21,6 +21,7 @@ export function AdminSchoolsUnassignedTab({
   schools,
   onChanged,
 }: AdminSchoolsUnassignedTabProps) {
+  const loadSerial=useRef(0);
   const [students, setStudents] = useState<
     Awaited<ReturnType<typeof fetchAdminUnassignedSchoolStudents>>
   >([]);
@@ -29,20 +30,24 @@ export function AdminSchoolsUnassignedTab({
   const [selection, setSelection] = useState<Record<number, string>>({});
 
   const load = useCallback(async () => {
+    const serial=++loadSerial.current;
     setLoading(true);
     setError(null);
     try {
-      setStudents(await fetchAdminUnassignedSchoolStudents());
+      const data=await fetchAdminUnassignedSchoolStudents();
+      if(serial!==loadSerial.current)return;
+      setStudents(data);
     } catch (err) {
+      if(serial!==loadSerial.current)return;
       setStudents([]);
       setError(err instanceof Error ? err.message : "Ошибка загрузки");
     } finally {
-      setLoading(false);
+      if(serial===loadSerial.current)setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    load();
+    queueMicrotask(()=>{void load();});
   }, [load]);
 
   const assign = async (studentId: number) => {
@@ -103,7 +108,7 @@ export function AdminSchoolsUnassignedTab({
               </div>
             </div>
             <div className={userStyles.tableActions}>
-              <ReadOnlyControl><select
+              <CoreReadOnlyControl><select
                 className={userStyles.fieldSelect}
                 value={selection[student.student_id] ?? ""}
                 onChange={(e) =>
@@ -119,14 +124,14 @@ export function AdminSchoolsUnassignedTab({
                     {school.short_name || school.name}
                   </option>
                 ))}
-              </select></ReadOnlyControl>
-              <EditOnly><button
+              </select></CoreReadOnlyControl>
+              <CoreEditOnly><button
                 type="button"
                 className={styles.actionBtn}
                 onClick={() => assign(student.student_id)}
               >
                 Привязать
-              </button></EditOnly>
+              </button></CoreEditOnly>
             </div>
           </div>
         ))}

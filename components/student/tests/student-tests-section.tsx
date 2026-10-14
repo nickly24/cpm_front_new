@@ -1,5 +1,6 @@
 "use client";
 
+import { BFF_DEV } from "@/lib/config";
 import { TestAttemptScreen } from "@/components/student/tests/attempt/test-attempt-screen";
 import { TestReviewScreen } from "@/components/student/tests/review/test-review-screen";
 import { TestsListSearch } from "@/components/student/tests/tests-list-search";
@@ -32,6 +33,7 @@ import type {
 } from "@/lib/student/tests-types";
 import { useMediaQuery } from "@/lib/hooks/use-media-query";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { mergeLocalAttempt } from "@/lib/student/test-attempt-catalog";
 import { listV2Bundles } from "@/lib/student/test-attempt-v2-store";
 
 type TestsViewMode = "overview" | "catalog";
@@ -51,6 +53,11 @@ export function StudentTestsSection() {
   const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<TestStatusFilter>("all");
   const [searchTerm, setSearchTerm] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  useEffect(() => {
+    const timer = window.setTimeout(() => setSearchQuery(searchTerm), 250);
+    return () => window.clearTimeout(timer);
+  }, [searchTerm]);
   const [dateFilter, setDateFilter] = useState<TestsDateFilter>({
     startDate: "",
     endDate: "",
@@ -120,6 +127,7 @@ export function StudentTestsSection() {
   useEffect(() => {
     let cancelled = false;
 
+    const controller = new AbortController();
     async function loadTests() {
       if (viewMode === "catalog" && !directionName) {
         return;
@@ -131,58 +139,30 @@ export function StudentTestsSection() {
       try {
         const response =
           viewMode === "overview"
-            ? await fetchStudentAvailableTests(page)
-            : await fetchTestsWithSessions(directionName, page);
+            ? await fetchStudentAvailableTests(page, undefined, { signal: controller.signal, search: searchQuery, status: statusFilter, dates: dateFilter })
+            : await fetchTestsWithSessions(directionName, page, undefined, { signal: controller.signal, search: searchQuery, status: statusFilter, dates: dateFilter });
 
         if (cancelled) {
           return;
         }
 
         let loadedTests = Array.isArray(response.tests) ? response.tests : [];
-        if (viewMode === "overview") {
-          const localBundles = await listV2Bundles().catch(() => []);
-          const byTest = new Map(localBundles.map((bundle) => [bundle.testId, bundle]));
-          loadedTests = loadedTests.map((test) => {
-            const local = byTest.get(String(test.id));
-            if (!local || local.localStatus === "uploaded") return test;
-            const sealed = local.localStatus === "sealed_pending_upload" || local.localStatus === "upload_window_closed";
-            return {
-              ...test,
-              canStart: false,
-              canResume: !sealed,
-              canSubmitExpired: sealed,
-              activeAttempt: {
-                id: local.attemptId,
-                expiresAt: local.time.answerDeadlineMoscow,
-                remainingSeconds: Math.max(0, Math.floor((local.time.answerDeadlineEpochMs - Date.now() - local.time.serverOffsetMs) / 1000)),
-                answeredCount: Object.keys(local.committedByQuestion).length,
-                totalQuestions: local.questions.length,
-                expired: sealed,
-              },
-            };
-          });
+        const localBundles = await listV2Bundles().catch(() => []);
+        const byTest = new Map(localBundles.map((bundle) => [bundle.testId, bundle]));
+        loadedTests = loadedTests.map((test) => {
+          const local = byTest.get(String(test.id));
+          // Local delivery state must not reopen access revoked by the owner.
+          if (!local || (BFF_DEV && (test.activeAttempt?.id !== local.attemptId || (!test.canResume && !test.canSubmitExpired && !test.canRequestHelp)))) return test;
+          return mergeLocalAttempt(test, local);
+        });
+        if (viewMode === "overview" && !BFF_DEV) {
           const loadedIds = new Set(loadedTests.map((test) => String(test.id)));
           for (const local of localBundles) {
             if (loadedIds.has(local.testId) || local.localStatus === "uploaded") continue;
-            const sealed = local.localStatus === "sealed_pending_upload" || local.localStatus === "upload_window_closed";
-            loadedTests.push({
-              id: local.testId,
-              title: local.testTitle,
-              status: sealed ? "missed" : "available",
-              canStart: false,
-              canResume: !sealed,
-              canSubmitExpired: sealed,
-              activeAttempt: {
-                id: local.attemptId,
-                expiresAt: local.time.answerDeadlineMoscow,
-                remainingSeconds: Math.max(0, Math.floor((local.time.answerDeadlineEpochMs - Date.now() - local.time.serverOffsetMs) / 1000)),
-                answeredCount: Object.keys(local.committedByQuestion).length,
-                totalQuestions: local.questions.length,
-                expired: sealed,
-              },
-            });
+            loadedTests.push(mergeLocalAttempt({ id: local.testId, title: local.testTitle, status: "running" }, local));
           }
         }
+        if (cancelled) return;
         setTests(loadedTests);
         setSessions(Array.isArray(response.sessions) ? response.sessions : []);
         setPagination(response.pagination ?? null);
@@ -206,53 +186,41 @@ export function StudentTestsSection() {
 
     return () => {
       cancelled = true;
+      controller.abort();
     };
-  }, [viewMode, directionName, page, reloadToken]);
+  }, [viewMode, directionName, page, reloadToken, searchQuery, statusFilter, dateFilter]);
+
+  const awaitingCalculation = tests.some(test => test.status === "checking");
+  useEffect(() => {
+    if (!BFF_DEV || !awaitingCalculation || attemptLaunch) return;
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === "visible") setReloadToken(value => value + 1);
+    }, 5000);
+    return () => window.clearInterval(timer);
+  }, [awaitingCalculation, attemptLaunch]);
 
   const sessionMap = useMemo(() => buildSessionMap(sessions), [sessions]);
 
   const filteredTests = useMemo(() => {
+    if (BFF_DEV) return tests;
     let result = filterTestsByStatus(tests, statusFilter);
     result = filterTestsBySearch(result, searchTerm);
     result = filterTestsByDate(result, dateFilter);
     return result;
   }, [tests, statusFilter, searchTerm, dateFilter]);
 
-  useEffect(() => {
-    if (filteredTests.length === 0) {
-      setSelectedTestId(null);
-      return;
-    }
+  const effectiveSelectedTestId = filteredTests.some(test => getTestId(test) === selectedTestId)
+    ? selectedTestId : filteredTests[0] ? getTestId(filteredTests[0]) : null;
 
-    const stillVisible = filteredTests.some(
-      (test) => getTestId(test) === selectedTestId,
-    );
-
-    if (!stillVisible) {
-      setSelectedTestId(getTestId(filteredTests[0]));
-    }
-  }, [filteredTests, selectedTestId]);
-
-  useEffect(() => {
-    if (selectedTestId || filteredTests.length === 0) {
-      return;
-    }
-
-    setSelectedTestId(getTestId(filteredTests[0]));
-  }, [filteredTests, selectedTestId]);
-
-  useEffect(() => {
-    setStatusFilter("all");
-    setSearchTerm("");
-    setDateFilter({ startDate: "", endDate: "" });
-    setSelectedTestId(null);
-    setPage(1);
-  }, [directionName, viewMode]);
+  const resetFilters = useCallback(() => {
+    setStatusFilter("all"); setSearchTerm(""); setSearchQuery("");
+    setDateFilter({ startDate: "", endDate: "" }); setSelectedTestId(null); setPage(1);
+  }, []);
 
   const selectedTest = useMemo(
     () =>
-      filteredTests.find((test) => getTestId(test) === selectedTestId) ?? null,
-    [filteredTests, selectedTestId],
+      filteredTests.find((test) => getTestId(test) === effectiveSelectedTestId) ?? null,
+    [filteredTests, effectiveSelectedTestId],
   );
 
   const selectedSession = useMemo(() => {
@@ -277,9 +245,9 @@ export function StudentTestsSection() {
   }, [isMobileLayout, mobileSheetOpen]);
 
   useEffect(() => {
-    if (!isMobileLayout) {
-      setMobileSheetOpen(false);
-    }
+    if (isMobileLayout) return;
+    const timer = window.setTimeout(() => setMobileSheetOpen(false), 0);
+    return () => window.clearTimeout(timer);
   }, [isMobileLayout]);
 
   const closeMobileSheet = useCallback(() => {
@@ -366,16 +334,14 @@ export function StudentTestsSection() {
   );
 
   const openCatalog = useCallback(() => {
-    setViewMode("catalog");
-    setPage(1);
-  }, []);
+    resetFilters(); setViewMode("catalog");
+  }, [resetFilters]);
 
   const backToOverview = useCallback(() => {
-    setViewMode("overview");
-    setPage(1);
+    resetFilters(); setViewMode("overview");
     setDirectionName("");
     setDirections([]);
-  }, []);
+  }, [resetFilters]);
 
   const handlePageChange = useCallback((nextPage: number) => {
     setPage(nextPage);
@@ -438,7 +404,7 @@ export function StudentTestsSection() {
           timeLimitMinutes={attemptLaunch.timeLimitMinutes}
           resumeAttemptId={attemptLaunch.resumeAttemptId}
           isPractice={attemptLaunch.isPractice}
-          onExit={() => setAttemptLaunch(null)}
+          onExit={() => { setAttemptLaunch(null); setReloadToken(value => value + 1); }}
           onCompleted={() => {
             setAttemptLaunch(null);
             if (!attemptLaunch.isPractice) {
@@ -474,11 +440,11 @@ export function StudentTestsSection() {
           <TestsToolbar
             directions={directions}
             directionName={directionName}
-            onDirectionChange={setDirectionName}
+            onDirectionChange={(value) => { resetFilters(); setDirectionName(value); }}
             statusFilter={statusFilter}
-            onStatusFilterChange={setStatusFilter}
+            onStatusFilterChange={(value) => { setStatusFilter(value); setPage(1); }}
             dateFilter={dateFilter}
-            onDateFilterChange={setDateFilter}
+            onDateFilterChange={(value) => { setDateFilter(value); setPage(1); }}
           />
         ) : null}
 
@@ -491,7 +457,7 @@ export function StudentTestsSection() {
             {viewMode === "catalog" ? (
               <TestsListSearch
                 value={searchTerm}
-                onChange={setSearchTerm}
+                onChange={(value) => { setSearchTerm(value); setPage(1); }}
                 disabled={!directionName || loadingTests}
                 resultCount={filteredTests.length}
               />
@@ -503,7 +469,7 @@ export function StudentTestsSection() {
                   <TestsListItem
                     key={getTestId(test)}
                     test={test}
-                    selected={getTestId(test) === selectedTestId}
+                    selected={getTestId(test) === effectiveSelectedTestId}
                     onSelect={handleSelectTest}
                     showDirection={isOverview}
                   />

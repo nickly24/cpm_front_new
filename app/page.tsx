@@ -16,7 +16,7 @@ export default function HomePage() {
     }
 
     if (user) {
-      router.replace(getCabinetPath(user.role));
+      router.replace(getCabinetPath(user.role, user));
       return;
     }
 

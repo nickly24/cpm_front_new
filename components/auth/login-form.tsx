@@ -20,7 +20,7 @@ export function LoginForm() {
 
   useEffect(() => {
     if (!loading && user) {
-      router.replace(getCabinetPath(user.role));
+      router.replace(getCabinetPath(user.role, user));
     }
   }, [loading, router, user]);
 

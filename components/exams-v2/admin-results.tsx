@@ -1,5 +1,6 @@
 "use client";
 
+import { BFF_DEV } from "@/lib/config";
 import { FilterPopover } from "@/components/ui/filter-popover";
 import { useState } from "react";
 import { queryString } from "@/lib/exams-v2/api";
@@ -178,16 +179,16 @@ export function OutsideResults(props: AdminPanelProps) {
         <h2>Результаты вне LMS</h2>
         {props.canEdit && (
           <div className={s.row}>
-            <Action onClick={() => setImporting(!importing)}>
+            {props.canImport !== false && <Action onClick={() => setImporting(!importing)}>
               Импорт .xlsx
-            </Action>
+            </Action>}
             <Action primary onClick={() => setEditing("new")}>
               Добавить результат
             </Action>
           </div>
         )}
       </div>
-      {importing && (
+      {importing && props.canEdit && props.canImport !== false && (
         <ExamImport {...props} kind="outside" onChanged={changed} />
       )}
       <form
@@ -221,7 +222,7 @@ export function OutsideResults(props: AdminPanelProps) {
                 <option value="student_asc">По студенту</option>
                 <option value="grade_desc">По оценке</option>
                 <option value="points_desc">По баллам</option>
-                <option value="updated_desc">По изменению</option>
+                {!BFF_DEV && <option value="updated_desc">По изменению</option>}
               </select>
             </Field>
           </div>
@@ -289,7 +290,7 @@ function AppealEditor({
     attempt.result?.grade ?? attempt.grade ?? 0,
   );
   const mutation = useExamMutation(
-    `${props.actor}:appeal:${attempt.id}`,
+    `${props.actor}:appeal:${props.examId}:${attempt.id}`,
     () => {
       props.onChanged();
       close();
@@ -727,7 +728,7 @@ export function ClassicResults({
       {resource.data?.items.map((row) => (
         <article key={row.student.id} className={s.item}>
           <div className={s.header}>
-            <strong>{row.student.fullName}</strong>
+            <strong>{row.student.fullName} · ID {row.student.id}</strong>
             <strong className={s.score}>{row.effectiveGrade} / 5</strong>
           </div>
           <p>

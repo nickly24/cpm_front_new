@@ -1,3 +1,7 @@
+import { BFF_DEV } from "@/lib/config";
+import { domain } from "@/lib/bff/client";
+import { answerValue, studentAttempt, studentStart, studentCommits, studentFinalize, studentSubmit, studentPracticeAnswer } from "@/lib/bff/tests-student";
+import type { FinalAttemptSnapshot } from "./test-attempt-v2-store";
 import { ApiError, apiRequest } from "@/lib/api/client";
 import type {
   AttemptEnvelope,
@@ -11,6 +15,7 @@ export async function startTestAttempt(
   testId: string,
   options?: { practice?: boolean },
 ): Promise<AttemptEnvelope> {
+  if (BFF_DEV) return studentStart(testId, Boolean(options?.practice));
   return apiRequest<AttemptEnvelope>("/test-attempt/start", {
     method: "POST",
     body: JSON.stringify({
@@ -36,6 +41,7 @@ export async function syncTestAttemptCommits(
   attemptId: string,
   commits: Array<StoredAttemptAnswer & { commitId: string; sequence: number; committedAtMoscow: string }>,
 ): Promise<CommitSyncResponse> {
+  if (BFF_DEV) return studentCommits(attemptId, commits);
   return apiRequest(`/test-attempt/${attemptId}/commits`, {
     method: "POST",
     body: JSON.stringify({ commits }),
@@ -46,6 +52,7 @@ export async function finalizeTestAttemptV2(
   attemptId: string,
   snapshot: unknown,
 ): Promise<SubmitAttemptResponse & { alreadyFinalized?: boolean }> {
+  if (BFF_DEV) return studentFinalize(attemptId, snapshot as FinalAttemptSnapshot);
   return apiRequest(`/test-attempt/${attemptId}/finalize`, {
     method: "POST",
     body: JSON.stringify({ snapshot }),
@@ -55,6 +62,11 @@ export async function finalizeTestAttemptV2(
 export async function fetchActiveTestAttempt(
   testId: string,
 ): Promise<AttemptEnvelope> {
+  if (BFF_DEV) {
+    const data = await domain<{ items: { id: string; status: string }[] }>(`/tests/attempts?test_id=${encodeURIComponent(testId)}&limit=100`);
+    const active = data.items.find(a => a.status === "in_progress" || a.status === "expired_pending_upload");
+    return active ? studentAttempt(active.id) : { success: true, attempt: null };
+  }
   return apiRequest<AttemptEnvelope>(
     `/test-attempt/active?testId=${encodeURIComponent(testId)}`,
   );
@@ -63,6 +75,7 @@ export async function fetchActiveTestAttempt(
 export async function fetchTestAttempt(
   attemptId: string,
 ): Promise<AttemptEnvelope> {
+  if (BFF_DEV) return studentAttempt(attemptId);
   return apiRequest<AttemptEnvelope>(`/test-attempt/${attemptId}`);
 }
 
@@ -70,6 +83,10 @@ export async function saveTestAttemptAnswer(
   attemptId: string,
   answer: StoredAttemptAnswer,
 ): Promise<AttemptEnvelope> {
+  if (BFF_DEV) {
+    await domain(`/tests/attempts/${encodeURIComponent(attemptId)}/answer`, { method: "PATCH", body: JSON.stringify(answerValue(answer)) });
+    return studentAttempt(attemptId);
+  }
   return apiRequest<AttemptEnvelope>(`/test-attempt/${attemptId}/answer`, {
     method: "PATCH",
     body: JSON.stringify(answer),
@@ -89,6 +106,7 @@ export async function checkPracticeAnswer(
   attemptId: string,
   answer: StoredAttemptAnswer,
 ): Promise<PracticeAnswerResponse> {
+  if (BFF_DEV) return studentPracticeAnswer(attemptId, answer);
   return apiRequest<PracticeAnswerResponse>(
     `/test-attempt/${attemptId}/practice-answer`,
     {
@@ -111,6 +129,11 @@ export async function syncTestAttemptAnswersBatch(
   attemptId: string,
   answers: StoredAttemptAnswer[],
 ): Promise<BatchSyncResponse> {
+  if (BFF_DEV) {
+    await domain(`/tests/attempts/${encodeURIComponent(attemptId)}/answers`, { method: "PATCH", body: JSON.stringify({ answers: answers.map(answerValue) }) });
+    const fresh = await studentAttempt(attemptId);
+    return { success: true, attempt: fresh.attempt ?? undefined, syncedQuestionIds: answers.map(a => a.questionId) };
+  }
   return apiRequest<BatchSyncResponse>(`/test-attempt/${attemptId}/answers`, {
     method: "POST",
     body: JSON.stringify({ answers }),
@@ -120,6 +143,7 @@ export async function syncTestAttemptAnswersBatch(
 export async function submitTestAttempt(
   attemptId: string,
 ): Promise<SubmitAttemptResponse> {
+  if (BFF_DEV) return studentSubmit(attemptId);
   return apiRequest<SubmitAttemptResponse>(`/test-attempt/${attemptId}/submit`, {
     method: "POST",
   });
@@ -143,6 +167,7 @@ export function getNetworkErrorMessage(err: unknown): string {
 
 export function getAttemptErrorMessage(code: string): string {
   const messages: Record<string, string> = {
+    transport_error: "Связь с сервером прервана. Ответы сохранены и будут отправлены автоматически после восстановления связи.",
     testId_required: "Не указан тест",
     test_not_found: "Тест не найден",
     test_has_no_questions: "В тесте нет вопросов",
@@ -177,9 +202,18 @@ export function getAttemptErrorMessage(code: string): string {
     test_version_mismatch: "Версия теста не совпадает. Локальные данные сохранены — обратитесь к администратору.",
     snapshot_hash_mismatch: "Локальный слепок повреждён. Данные не удалены — обратитесь к администратору.",
     corrupted_local_bundle: "Локальные данные попытки повреждены. Они не удалены и не будут смешаны с новой попыткой.",
+    calculation_pending: "Ответы приняты. Проверка ещё выполняется.",
+    already_submitted: "Тест уже сдан",
+    attempt_closed: "Попытка уже завершена",
+    attempt_reset: "Попытка сброшена администратором. Локальные ответы сохранены отдельно.",
+    review_hidden: "Просмотр ответов пока закрыт преподавателем",
+    practice_unavailable: "Тренировка пока недоступна",
+    answer_deadline_passed: "Время ответов истекло",
+    upload_deadline_passed: "Срок отправки истёк. Локальные ответы сохранены — обратитесь к администратору.",
     indexeddb_upgrade_blocked: "Закройте другие вкладки CPM, обновите страницу и попробуйте снова.",
   };
 
+  if (/failed to fetch|network|load failed|timeout|timed out|aborted|aborterror/i.test(code)) return messages.transport_error;
   return messages[code] ?? code;
 }
 

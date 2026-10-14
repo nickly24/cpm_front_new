@@ -1,6 +1,7 @@
 "use client";
+import { BFF_DEV } from "@/lib/config";
 
-import { EditOnly } from "@/components/admin/admin-section-access";
+import { EditOnly, useAdminSectionAccess } from "@/components/admin/admin-section-access";
 
 import { AdminFullscreenBack } from "@/components/admin/admin-fullscreen-back";
 import { AdminTestAttemptsPanel } from "@/components/admin/tests/admin-test-attempts-panel";
@@ -31,6 +32,8 @@ export function AdminTestWorkspace({
   onEdit,
   onEditInNew,
 }: AdminTestWorkspaceProps) {
+  const { canView: canViewResults } = useAdminSectionAccess("test-results");
+  const [metaError,setMetaError] = useState<string|null>(null);
   const [tab, setTab] = useState<WorkspaceTab>("test");
   const [title, setTitle] = useState("Тест");
   const [testDetail, setTestDetail] = useState<AdminTestDetail | null>(null);
@@ -40,19 +43,19 @@ export function AdminTestWorkspace({
   const loadMeta = useCallback(async () => {
     setLoadingOverview(true);
     try {
-      const [test, overview] = await Promise.all([
-        fetchAdminTestById(testId),
-        fetchAdminTestOverview(testId),
-      ]);
+      const test = await fetchAdminTestById(testId);
+      const overview = !BFF_DEV || canViewResults ? await fetchAdminTestOverview(testId) : null;
       setTestDetail(test);
-      setTitle(test.title || overview.testTitle || "Тест");
-      setAnalytics(overview.analytics);
-    } catch {
+      setTitle(test.title || overview?.testTitle || "Тест");
+      setAnalytics(overview?.analytics || null);
+      setMetaError(null);
+    } catch (err) {
       setAnalytics(null);
+      setMetaError(err instanceof Error?err.message:"Не удалось загрузить тест");
     } finally {
       setLoadingOverview(false);
     }
-  }, [testId]);
+  }, [testId,canViewResults]);
 
   useEffect(() => {
     loadMeta();
@@ -60,8 +63,7 @@ export function AdminTestWorkspace({
 
   const tabs: { id: WorkspaceTab; label: string }[] = [
     { id: "test", label: "Тест" },
-    { id: "sessions", label: "Сдачи" },
-    { id: "attempts", label: "В процессе" },
+    ...(!BFF_DEV || canViewResults ? [{ id: "sessions" as const, label: "Сдачи" }, { id: "attempts" as const, label: "В процессе" }] : []),
   ];
 
   return (
@@ -77,7 +79,7 @@ export function AdminTestWorkspace({
               variant="ghost"
               size="sm"
               onClick={() => testDetail && onEdit(testDetail)}
-              disabled={!testDetail}
+              disabled={!testDetail || (BFF_DEV && !testDetail.actions?.can_edit_metadata && !testDetail.actions?.can_edit_settings)}
             >
               Редактировать
             </Button></EditOnly>
@@ -85,6 +87,7 @@ export function AdminTestWorkspace({
               type="button"
               variant="ghost"
               size="sm"
+              disabled={BFF_DEV && !testDetail?.actions?.can_edit_metadata}
               onClick={() => onEditInNew(testId)}
             >
               Редактировать в новом интерфейсе
@@ -111,6 +114,7 @@ export function AdminTestWorkspace({
       </nav>
 
       <div className={styles.fullscreenBody}>
+        {metaError?<p className={styles.errorText}>{metaError}</p>:null}
         {tab === "test" ? (
           <AdminTestOverviewTab
             loading={loadingOverview}

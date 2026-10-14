@@ -100,4 +100,4 @@ export interface ProctorOvTableResponse {
   error?: string;
 }
 
-export type ProctorHomeworkTypeFilter = "all" | "ОВ" | "ДЗНВ";
+export type ProctorHomeworkTypeFilter = string;

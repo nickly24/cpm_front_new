@@ -14,7 +14,7 @@ export interface AdminAnswerItemRow {
   questionText: string;
   studentLabel: string;
   correctLabel: string | null;
-  isCorrect: boolean;
+  isCorrect: boolean | null;
   points: number;
 }
 
@@ -59,7 +59,7 @@ function formatAttemptCorrect(item: AdminAttemptDetailItem): string | null {
   if (!q) return null;
   if (q.type === "text") {
     const vals = q.correctAnswers ?? [];
-    return vals.length ? vals.join(", ") : "—";
+    return vals.length ? vals.join(", ") : null;
   }
   const labels = (q.answers ?? [])
     .filter((a) => a.isCorrect)
@@ -76,7 +76,7 @@ export function attemptItemsToRows(
       (item.question as { text?: string })?.text ?? `Вопрос ${item.questionId}`,
     studentLabel: formatAttemptAnswer(item),
     correctLabel: formatAttemptCorrect(item),
-    isCorrect: false,
+    isCorrect: null,
     points: 0,
   }));
 }
@@ -99,14 +99,14 @@ export function AdminAnswerItemsList({
       {items.map((item) => (
         <li
           key={item.questionId}
-          className={`${styles.reviewItem} ${item.isCorrect ? styles.reviewItemOk : styles.reviewItemBad}`}
+          className={`${styles.reviewItem} ${item.isCorrect===null ? "" : item.isCorrect ? styles.reviewItemOk : styles.reviewItemBad}`}
         >
           <div className={styles.reviewItemHead}>
             <span className={styles.reviewItemNum}>Вопрос {item.questionId}</span>
             {item.points > 0 ? (
               <span className={styles.reviewItemPoints}>{item.points} б.</span>
             ) : null}
-            {item.isCorrect ? (
+            {item.isCorrect===null ? <span className={styles.panelHint}>Без оценки</span> : item.isCorrect ? (
               <CheckCircle2 size={18} className={styles.iconOk} aria-hidden />
             ) : (
               <XCircle size={18} className={styles.iconBad} aria-hidden />

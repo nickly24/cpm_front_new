@@ -1,4 +1,11 @@
-const DB_NAME = "cpm_test_attempts";
+import { BFF_DEV } from "@/lib/config";
+import { getIdentity } from "@/lib/bff/client";
+export function attemptDatabaseName() {
+  if (!BFF_DEV) return "cpm_test_attempts";
+  const user = getIdentity()?.user;
+  if (!user?.account_id || !user.organization_id || !user.division_id) throw new Error("attempt_context_missing");
+  return `cpm_test_attempts_dev_${user.account_id}_${user.organization_id}_${user.division_id}`;
+}
 const DB_VERSION = 3;
 
 export const LEGACY_ATTEMPT_STORE = "bundles";
@@ -10,7 +17,7 @@ export function openAttemptDb(): Promise<IDBDatabase> {
   }
 
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
+    const request = indexedDB.open(attemptDatabaseName(), DB_VERSION);
     request.onerror = () => reject(request.error);
     request.onblocked = () => reject(new Error("indexeddb_upgrade_blocked"));
     request.onupgradeneeded = () => {

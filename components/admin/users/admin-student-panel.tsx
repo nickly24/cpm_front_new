@@ -12,6 +12,10 @@ import type { AdminGroupItem, AdminStudent } from "@/lib/admin/admin-users-types
 import { useAuth } from "@/contexts/AuthContext";
 import { adminHref, canAccessSection } from "@/lib/auth/admin-access";
 import Link from "next/link";
+import { BFF_DEV } from "@/lib/config";
+import { coreCan, coreFullAdmin } from "@/lib/bff/core-admin";
+import { CoreCreateRecovery } from "./core-access";
+import { useContextGuard } from "@/lib/bff/use-context-guard";
 import { useEffect, useState } from "react";
 
 interface AdminStudentPanelProps {
@@ -30,6 +34,7 @@ export function AdminStudentPanel({
   onSaved,
 }: AdminStudentPanelProps) {
   const { user } = useAuth();
+  useContextGuard(BFF_DEV);
   const [fullName, setFullName] = useState(student?.full_name ?? "");
   const [classNumber, setClassNumber] = useState(String(student?.class ?? 9));
   const [tgName, setTgName] = useState(student?.tg_name ?? "");
@@ -61,8 +66,8 @@ export function AdminStudentPanel({
       return;
     }
     const parsedClass = Number(classNumber);
-    if (!Number.isInteger(parsedClass) || parsedClass <= 0) {
-      setError("Класс должен быть положительным целым числом");
+    if (!Number.isInteger(parsedClass) || parsedClass <= 0 || (BFF_DEV && parsedClass > 99)) {
+      setError(BFF_DEV ? "Класс должен быть целым числом от 1 до 99" : "Класс должен быть положительным целым числом");
       return;
     }
 
@@ -73,6 +78,7 @@ export function AdminStudentPanel({
           full_name: fullName.trim(),
           class: parsedClass,
           tg_name: tgName.trim() || undefined,
+          ...(BFF_DEV ? {login:login.trim(),password} : {}),
         });
         if (!res.status || !res.student_data) {
           throw new Error(res.error || "Не удалось создать ученика");
@@ -87,7 +93,7 @@ export function AdminStudentPanel({
       if (!student) {
         return;
       }
-      if (!login.trim()) {
+      if ((!BFF_DEV || coreFullAdmin(user)) && !login.trim()) {
         setError("Логин не может быть пустым");
         return;
       }
@@ -110,7 +116,7 @@ export function AdminStudentPanel({
       }
       const nextGroup =
         groupId === "none" ? null : Number(groupId);
-      if (nextGroup !== student.group_id) {
+      if ((!BFF_DEV || coreCan("groups",true,user)) && nextGroup !== student.group_id) {
         payload.group_id = nextGroup;
       }
       const nextTg = tgName.trim() || null;
@@ -118,11 +124,11 @@ export function AdminStudentPanel({
         payload.tg_name = nextTg;
       }
       const nextLogin = login.trim();
-      if (nextLogin && nextLogin !== (student.login ?? "")) {
+      if ((!BFF_DEV || coreFullAdmin(user)) && nextLogin && nextLogin !== (student.login ?? "")) {
         payload.login = nextLogin;
       }
       const nextPassword = password.trim();
-      if (nextPassword && nextPassword !== (student.password ?? "")) {
+      if ((!BFF_DEV || coreFullAdmin(user)) && nextPassword && nextPassword !== (student.password ?? "")) {
         payload.password = nextPassword;
       }
 
@@ -182,6 +188,7 @@ export function AdminStudentPanel({
             <input
               type="number"
               min="1"
+              max={BFF_DEV ? 99 : undefined}
               step="1"
               className={userStyles.fieldInput}
               value={classNumber}
@@ -190,7 +197,7 @@ export function AdminStudentPanel({
             />
           </label>
 
-          {mode === "edit" ? (
+          {mode === "edit" && (!BFF_DEV || coreCan("groups",true,user)) ? (
             <label className={userStyles.field}>
               <span className={userStyles.fieldLabel}>Группа CPM</span>
               <select
@@ -217,7 +224,7 @@ export function AdminStudentPanel({
             />
           </label>
 
-          {mode === "edit" ? (
+          {(mode === "edit" && (!BFF_DEV || coreFullAdmin(user))) || (mode === "add" && BFF_DEV) ? (
             <>
               <label className={userStyles.field}>
                 <span className={userStyles.fieldLabel}>Логин</span>
@@ -229,21 +236,26 @@ export function AdminStudentPanel({
               </label>
 
               <label className={userStyles.field}>
-                <span className={userStyles.fieldLabel}>Пароль</span>
+                <span className={userStyles.fieldLabel}>{mode === "edit" ? "Новый пароль" : "Пароль"}</span>
                 <input
                   className={userStyles.fieldInput}
+                  type="password"
+                  autoComplete="new-password"
+                  minLength={BFF_DEV ? 8 : undefined}
+                  required={BFF_DEV && mode === "add"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                 />
                 {student?.password_hidden && !student.password ? (
                   <span className={userStyles.memberMeta}>
-                    Старый пароль сохранён только хэшем. Введите новый, чтобы он был виден администратору.
+                    Сохранённый пароль прочитать нельзя. При смене логина укажите новый пароль.
                   </span>
                 ) : null}
               </label>
             </>
           ) : null}
 
+          <CoreCreateRecovery onRecovered={onSaved} />
           {error ? <p className={styles.errorText}>{error}</p> : null}
 
           {credentials ? (

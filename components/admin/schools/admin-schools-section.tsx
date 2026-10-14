@@ -1,7 +1,8 @@
 "use client";
 
-import { EditOnly } from "@/components/admin/admin-section-access";
+import { CoreEditOnly } from "@/components/admin/users/core-access";
 
+import { CoreCreateRecovery } from "@/components/admin/users/core-access";
 import styles from "@/components/admin/tests/admin-tests.module.css";
 import userStyles from "@/components/admin/users/admin-users.module.css";
 import { AdminSchoolPanel } from "@/components/admin/schools/admin-school-panel";
@@ -15,7 +16,10 @@ import {
 import type { AdminSchool, AdminSchoolsTab } from "@/lib/admin/admin-schools-types";
 import { AdminSchoolsUnassignedTab } from "@/components/admin/schools/admin-schools-unassigned-tab";
 import { useDebouncedValue } from "@/lib/hooks/use-debounced-value";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { BFF_DEV } from "@/lib/config";
+import { coreCan } from "@/lib/bff/core-admin";
+import { useAuth } from "@/contexts/AuthContext";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 const TABS: { id: AdminSchoolsTab; label: string }[] = [
   { id: "catalog", label: "Справочник" },
@@ -23,6 +27,8 @@ const TABS: { id: AdminSchoolsTab; label: string }[] = [
 ];
 
 export function AdminSchoolsSection() {
+  const {user}=useAuth();
+  const loadSerial=useRef(0);
   const [tab, setTab] = useState<AdminSchoolsTab>("catalog");
   const [schools, setSchools] = useState<AdminSchool[]>([]);
   const [loading, setLoading] = useState(true);
@@ -34,20 +40,24 @@ export function AdminSchoolsSection() {
   const [workspaceId, setWorkspaceId] = useState<number | null>(null);
 
   const load = useCallback(async () => {
+    const serial=++loadSerial.current;
     setLoading(true);
     setError(null);
     try {
-      setSchools(await fetchAdminSchools());
+      const data=await fetchAdminSchools();
+      if(serial!==loadSerial.current)return;
+      setSchools(data);
     } catch (err) {
+      if(serial!==loadSerial.current)return;
       setSchools([]);
       setError(err instanceof Error ? err.message : "Не удалось загрузить школы");
     } finally {
-      setLoading(false);
+      if(serial===loadSerial.current)setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    load();
+    queueMicrotask(()=>{void load();});
   }, [load]);
 
   const filtered = useMemo(() => {
@@ -110,23 +120,23 @@ export function AdminSchoolsSection() {
 
   return (
     <div className={styles.page}>
+      <CoreCreateRecovery onRecovered={load} />
       <header className={styles.pageHeader}>
         <div>
           <h1 className={styles.pageTitle}>Школы</h1>
           <p className={userStyles.hint}>
-            Справочник школ и привязка учеников. Группы CPM настраиваются в разделе
-            «Пользователи».
+            {BFF_DEV ? "Справочник общий для организации. Состав школ показан по выбранному подразделению." : "Справочник школ и привязка учеников. Группы CPM настраиваются в разделе «Пользователи»."}
           </p>
         </div>
         {tab === "catalog" ? (
-          <EditOnly><Button type="button" onClick={() => setPanelMode("create")}>
+          <CoreEditOnly fullAdmin><Button type="button" onClick={() => setPanelMode("create")}>
             + Добавить школу
-          </Button></EditOnly>
+          </Button></CoreEditOnly>
         ) : null}
       </header>
 
       <div className={userStyles.sectionTabs}>
-        {TABS.map((item) => (
+        {TABS.filter(t=>t.id!=="unassigned"||!BFF_DEV||coreCan("users",false,user)).map((item) => (
           <button
             key={item.id}
             type="button"
@@ -180,7 +190,7 @@ export function AdminSchoolsSection() {
                     ) : null}
                     <div className={styles.infoRow}>
                       <dt>Учеников</dt>
-                      <dd className={styles.infoValue}>{school.student_count ?? 0}</dd>
+                      <dd className={styles.infoValue}>{school.student_count === undefined && BFF_DEV ? "недоступно" : school.student_count ?? 0}</dd>
                     </div>
                   </dl>
 
@@ -192,11 +202,12 @@ export function AdminSchoolsSection() {
                     <button
                       type="button"
                       className={styles.actionBtn}
+                      disabled={BFF_DEV && !coreCan("users",false,user)}
                       onClick={() => setWorkspaceId(school.school_id)}
                     >
                       Состав
                     </button>
-                    <EditOnly><button
+                    <CoreEditOnly fullAdmin><button
                       type="button"
                       className={styles.actionBtn}
                       onClick={() => {
@@ -205,14 +216,14 @@ export function AdminSchoolsSection() {
                       }}
                     >
                       Изменить
-                    </button></EditOnly>
-                    <EditOnly><button
+                    </button></CoreEditOnly>
+                    <CoreEditOnly fullAdmin><button
                       type="button"
                       className={styles.actionBtn}
                       onClick={() => handleToggleActive(school)}
                     >
                       {school.is_active ? "Деактивировать" : "Активировать"}
-                    </button></EditOnly>
+                    </button></CoreEditOnly>
                   </div>
                 </article>
               ))}

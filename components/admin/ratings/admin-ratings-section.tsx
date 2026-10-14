@@ -1,5 +1,8 @@
 "use client";
 
+import { BFF_DEV } from "@/lib/config";
+import { useContextGuard } from "@/lib/bff/use-context-guard";
+import { hasPendingRatingCommands } from "@/lib/bff/ratings-shared";
 import { EditOnly } from "@/components/admin/admin-section-access";
 
 import { AdminRatingDetailsView } from "@/components/admin/ratings/admin-rating-details-view";
@@ -16,29 +19,33 @@ import { canAccessSection } from "@/lib/auth/admin-access";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   fetchAdminRatings,
+  fetchRatingVersions,
+  pendingRatingCommand,
   startRatingRecalc,
 } from "@/lib/admin/admin-ratings-api";
-import type { AdminRatingRow, AdminRatingsTab } from "@/lib/admin/admin-ratings-types";
+import type { AdminRatingRow, AdminRatingsTab, RatingRecalcJob } from "@/lib/admin/admin-ratings-types";
 import { useDebouncedValue } from "@/lib/hooks/use-debounced-value";
 import { useCabinetChrome } from "@/contexts/cabinet-chrome-context";
 import { Calculator, RefreshCw, TableProperties } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 const TABS: { id: AdminRatingsTab; label: string }[] = [
   { id: "ratings", label: "Рейтинг" },
   { id: "jobs", label: "Журнал пересчётов" },
 ];
 
-function placeClass(index: number): string {
-  if (index === 0) return ratingStyles.place1;
-  if (index === 1) return ratingStyles.place2;
-  if (index === 2) return ratingStyles.place3;
+function placeClass(place: number): string {
+  if (place === 1) return ratingStyles.place1;
+  if (place === 2) return ratingStyles.place2;
+  if (place === 3) return ratingStyles.place3;
   return ratingStyles.placeOther;
 }
 
 export function AdminRatingsSection() {
   const { user } = useAuth();
-  const isAdmin = canAccessSection(user, "ratings", "edit");
+  const isAdmin = BFF_DEV
+    ? user?.role === "admin" && user.organization_admin === true || user?.role === "staff_admin" && user.permissions?.ratings?.view === true && user.permissions?.ratings?.edit === true
+    : canAccessSection(user, "ratings", "edit");
 
   const [tab, setTab] = useState<AdminRatingsTab>("ratings");
   const [ratings, setRatings] = useState<AdminRatingRow[]>([]);
@@ -51,8 +58,15 @@ export function AdminRatingsSection() {
   const [jobsRefreshToken, setJobsRefreshToken] = useState(0);
   const [recalcBusy, setRecalcBusy] = useState(false);
   const [hasActiveJob, setHasActiveJob] = useState(false);
+  const [versions, setVersions] = useState<RatingRecalcJob[]>([]);
+  const [version, setVersion] = useState("");
+  const [, setCommandRefresh] = useState(0);
+  const pendingStart = BFF_DEV ? pendingRatingCommand() : null;
+  useContextGuard(BFF_DEV && (showRecalc || recalcBusy || hasPendingRatingCommands()));
+  const onCommandsChange = useCallback(() => setCommandRefresh(v => v + 1), []);
   const [details, setDetails] = useState<{
     ratingId: number;
+    version?: string;
     studentName?: string;
   } | null>(null);
   const [showReport, setShowReport] = useState(false);
@@ -63,11 +77,14 @@ export function AdminRatingsSection() {
     return () => setImmersive(false);
   }, [showReport, setImmersive]);
 
+  const requestSerial = useRef(0);
   const loadRatings = useCallback(async () => {
+    const request = ++requestSerial.current;
     setLoading(true);
     setError(null);
     try {
-      const response = await fetchAdminRatings();
+      const response = await fetchAdminRatings(version || undefined);
+      if (request !== requestSerial.current) return;
       setFreshness(response.ratingFreshness ?? null);
       if (response.status) {
         setRatings(response.ratings ?? []);
@@ -76,16 +93,22 @@ export function AdminRatingsSection() {
         setError("Не удалось загрузить рейтинг");
       }
     } catch (err) {
-      setRatings([]);
+      if (request !== requestSerial.current) return;
       setError(err instanceof Error ? err.message : "Ошибка загрузки рейтинга");
     } finally {
-      setLoading(false);
+      if (request === requestSerial.current) setLoading(false);
     }
+  }, [version]);
+  const loadVersions = useCallback(async () => {
+    if (!BFF_DEV) return;
+    try { setVersions(await fetchRatingVersions()); } catch { /* Table requests surface access and transport failures. */ }
   }, []);
+  const onPublished = useCallback(() => { void loadRatings(); void loadVersions(); }, [loadRatings, loadVersions]);
 
   useEffect(() => {
-    void loadRatings();
-  }, [loadRatings]);
+    const timer = window.setTimeout(() => {void loadVersions(); void loadRatings();}, 0);
+    return () => window.clearTimeout(timer);
+  }, [loadRatings, loadVersions]);
 
   const filtered = useMemo(() => {
     const query = debouncedSearch.trim().toLowerCase();
@@ -104,9 +127,10 @@ export function AdminRatingsSection() {
 
   useEffect(() => {
     if (!hasActiveJob && jobsRefreshToken > 0) {
-      void loadRatings();
+      const timer = window.setTimeout(() => { void loadRatings(); void loadVersions(); }, 0);
+      return () => window.clearTimeout(timer);
     }
-  }, [hasActiveJob, jobsRefreshToken, loadRatings]);
+  }, [hasActiveJob, jobsRefreshToken, loadRatings, loadVersions]);
 
   const handleStartRecalc = async (payload: {
     date_from: string;
@@ -120,17 +144,19 @@ export function AdminRatingsSection() {
       setHasActiveJob(true);
     } finally {
       setRecalcBusy(false);
+      onCommandsChange();
     }
   };
 
   if (showReport) {
-    return <RatingsReportWorkspace onBack={() => setShowReport(false)} />;
+    return <RatingsReportWorkspace version={version || freshness?.versionId} onBack={() => setShowReport(false)} />;
   }
 
   if (details) {
     return (
       <AdminRatingDetailsView
         ratingId={details.ratingId}
+        version={details.version}
         studentName={details.studentName}
         onBack={() => setDetails(null)}
       />
@@ -147,7 +173,7 @@ export function AdminRatingsSection() {
           </p>
         </div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
-          <Button type="button" variant="ghost" onClick={() => void loadRatings()}>
+          <Button type="button" variant="ghost" onClick={() => {void loadRatings(); void loadVersions(); setJobsRefreshToken(v => v + 1);}}>
             <RefreshCw size={16} style={{ marginRight: 6 }} />
             Обновить
           </Button>
@@ -155,7 +181,7 @@ export function AdminRatingsSection() {
             type="button"
             variant="ghost"
             onClick={() => setShowReport(true)}
-            disabled={ratings.length === 0}
+            disabled={!BFF_DEV && ratings.length === 0}
           >
             <TableProperties size={16} style={{ marginRight: 6 }} />
             Отчёт
@@ -164,16 +190,24 @@ export function AdminRatingsSection() {
             <EditOnly><Button
               type="button"
               onClick={() => setShowRecalc(true)}
-              disabled={hasActiveJob || recalcBusy}
+              disabled={(hasActiveJob && !pendingStart) || recalcBusy}
             >
               <Calculator size={16} style={{ marginRight: 6 }} />
-              {hasActiveJob ? "Пересчёт выполняется…" : "Пересчитать"}
+              {pendingStart ? "Повторить запрос" : hasActiveJob ? "Пересчёт выполняется…" : "Пересчитать"}
             </Button></EditOnly>
           ) : null}
         </div>
       </header>
 
-      <RatingFreshnessNotice value={freshness} />
+      <RatingFreshnessNotice value={freshness ? { ...freshness, activeJobId: hasActiveJob ? "active" : null } : null} />
+      {BFF_DEV && version ? <p className={ratingStyles.pageSubtitle}>Показана сохранённая публикация. Новые исходные данные не меняют её оценки.</p> : null}
+      {BFF_DEV ? <div className={styles.filters}>
+        <label>Опубликованная версия <select aria-label="Опубликованная версия" value={version} onChange={event => {setLoading(true); setVersion(event.target.value);}}>
+          <option value="">Последняя версия</option>
+          {versions.map(job => <option key={job.id} value={job.id}>№{job.revision} · {job.date_from} — {job.date_to}</option>)}
+        </select></label>
+        {freshness?.asOf ? <span>Данные на {new Date(freshness.asOf).toLocaleString("ru-RU")}</span> : null}
+      </div> : null}
 
       <div className={ratingStyles.sectionTabs}>
         {TABS.map((item) => (
@@ -215,7 +249,7 @@ export function AdminRatingsSection() {
                   type="button"
                   style={{ marginTop: 16 }}
                   onClick={() => setShowRecalc(true)}
-                  disabled={hasActiveJob}
+                  disabled={hasActiveJob && !pendingStart}
                 >
                   Запустить пересчёт
                 </Button></EditOnly>
@@ -223,7 +257,7 @@ export function AdminRatingsSection() {
             </div>
           ) : null}
 
-          {!loading && !error && filtered.length > 0 ? (
+          {!loading && filtered.length > 0 ? (
             <div className={styles.tableWrap}>
               <table className={styles.dataTable}>
                 <thead>
@@ -240,11 +274,11 @@ export function AdminRatingsSection() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.map((row, index) => (
+                  {filtered.map((row) => (
                     <tr key={row.id}>
                       <td>
-                        <span className={`${ratingStyles.placeBadge} ${placeClass(index)}`}>
-                          {index + 1}
+                        <span className={`${ratingStyles.placeBadge} ${placeClass(row.place ?? ratings.indexOf(row) + 1)}`}>
+                          {row.place ?? ratings.indexOf(row) + 1}
                         </span>
                       </td>
                       <td>
@@ -267,6 +301,7 @@ export function AdminRatingsSection() {
                           onClick={() =>
                             setDetails({
                               ratingId: row.id,
+                              version: row.version_id,
                               studentName: row.student_name,
                             })
                           }
@@ -281,12 +316,10 @@ export function AdminRatingsSection() {
             </div>
           ) : null}
         </>
-      ) : (
-        <AdminRatingJobsTab
-          refreshToken={jobsRefreshToken}
-          onActiveChange={setHasActiveJob}
-        />
-      )}
+      ) : null}
+      <div hidden={tab !== "jobs"}>
+        <AdminRatingJobsTab refreshToken={jobsRefreshToken} canEdit={isAdmin} onActiveChange={setHasActiveJob} onCommandsChange={onCommandsChange} onPublished={onPublished} />
+      </div>
 
       {showRecalc ? (
         <AdminRatingRecalcPanel
@@ -295,7 +328,7 @@ export function AdminRatingsSection() {
             setJobsRefreshToken((value) => value + 1);
           }}
           onSubmit={handleStartRecalc}
-          disabled={hasActiveJob}
+          disabled={hasActiveJob && !pendingStart}
         />
       ) : null}
     </div>

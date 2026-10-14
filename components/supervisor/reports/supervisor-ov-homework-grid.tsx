@@ -18,7 +18,7 @@ interface SupervisorOvHomeworkGridProps {
   homeworks: SupervisorOvHomework[];
   students: SupervisorOvHomeworkStudent[];
   headerMode: HomeworkHeaderMode;
-  typeFilter: "all" | "ОВ" | "ДЗНВ";
+  typeFilter: string;
 }
 
 function toneClass(tone: ReturnType<typeof getHomeworkCellView>["tone"]): string {

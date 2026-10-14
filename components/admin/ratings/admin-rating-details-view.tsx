@@ -12,12 +12,14 @@ import { useEffect, useState } from "react";
 
 interface AdminRatingDetailsViewProps {
   ratingId: number;
+  version?: string;
   studentName?: string;
   onBack: () => void;
 }
 
 export function AdminRatingDetailsView({
   ratingId,
+  version,
   studentName,
   onBack,
 }: AdminRatingDetailsViewProps) {
@@ -34,7 +36,7 @@ export function AdminRatingDetailsView({
       setLoading(true);
       setError(null);
       try {
-        const response = await fetchRatingDetails(ratingId);
+        const response = await fetchRatingDetails(ratingId, version);
         if (cancelled) return;
         if (response.status && response.details) {
           setFreshness(response.ratingFreshness ?? null);
@@ -57,7 +59,7 @@ export function AdminRatingDetailsView({
     return () => {
       cancelled = true;
     };
-  }, [ratingId]);
+  }, [ratingId, version]);
 
   if (loading) {
     return <LoadingState label="Загрузка детализации…" variant="panel" />;
@@ -163,7 +165,7 @@ export function AdminRatingDetailsView({
               details.exams.details.map((item, index) => (
                 <article
                   key={`${item.exam_id}-${index}`}
-                  className={`${ratingStyles.detailCard} ${item.score > 0 ? ratingStyles.detailCardSuccess : ratingStyles.detailCardMuted}`}
+                  className={`${ratingStyles.detailCard} ${!item.missing_result ? ratingStyles.detailCardSuccess : ratingStyles.detailCardMuted}`}
                 >
                   <div className={ratingStyles.detailCardHeader}>
                     <h3 className={ratingStyles.detailCardTitle}>{item.exam_name}</h3>

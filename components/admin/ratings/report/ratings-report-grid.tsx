@@ -93,7 +93,7 @@ function sectionClass(kind: RatingsReportColumn["kind"]): string {
   return ratingReportStyles.sectionHeaderSummary;
 }
 
-function scoreCellClass(column: RatingsReportColumn, score: number): string {
+function scoreCellClass(column: RatingsReportColumn, score: number | null): string {
   const base = ratingReportStyles.scoreCell;
   if (column.key === "sum_final") {
     return `${base} ${ratingReportStyles.scoreCellFinal}`;
@@ -104,7 +104,7 @@ function scoreCellClass(column: RatingsReportColumn, score: number): string {
   if (column.kind === "test_direction") {
     return `${base} ${ratingReportStyles.scoreCellDirection}`;
   }
-  if (score > 0) {
+  if (score != null && score > 0) {
     return `${base} ${ratingReportStyles.scoreCellPositive}`;
   }
   return `${base} ${ratingReportStyles.scoreCellZero}`;
@@ -183,7 +183,8 @@ export function RatingsReportGrid({
   ];
   const groupOptions = buildReportGroupFilterOptions(filterOptions?.groups ?? []);
 
-  const fixedColSpan = 4;
+  const showPlace = students.some(student => student.place !== undefined);
+  const fixedColSpan = showPlace ? 5 : 4;
   const colSpan = fixedColSpan + columns.length;
 
   return (
@@ -285,6 +286,7 @@ export function RatingsReportGrid({
                 </button>
               </div>
             </th>
+            {showPlace ? <th rowSpan={2} style={{minWidth:64}}>Место</th> : null}
             {columnGroups.map((group) => (
               <th
                 key={group.key}
@@ -356,11 +358,12 @@ export function RatingsReportGrid({
                         {student.full_name}
                       </span>
                     </td>
+                    {showPlace ? <td style={{textAlign:"center"}}>{student.place ?? "—"}</td> : null}
                     {columns.map((column) => {
                       const cell = valueMap.get(
                         valueMapKey(student.student_id, column.key),
                       );
-                      const score = cell?.score ?? 0;
+                      const score = cell?.score ?? null;
                       return (
                         <td
                           key={column.key}

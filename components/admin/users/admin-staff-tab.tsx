@@ -1,6 +1,6 @@
 "use client";
 
-import { EditOnly } from "@/components/admin/admin-section-access";
+import { CoreCreateRecovery, CoreEditOnly } from "@/components/admin/users/core-access";
 
 import styles from "@/components/admin/tests/admin-tests.module.css";
 import userStyles from "@/components/admin/users/admin-users.module.css";
@@ -14,12 +14,16 @@ import {
   resetAdminStaffPassword,
 } from "@/lib/admin/admin-users-api";
 import type { AdminGroupItem, AdminStaffRole, AdminStaffUser } from "@/lib/admin/admin-users-types";
-import { useCallback, useEffect, useState } from "react";
+import { BFF_DEV } from "@/lib/config";
+import { activateCoreUser, coreFullAdmin } from "@/lib/bff/core-admin";
+import { useAuth } from "@/contexts/AuthContext";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 const ROLES: { id: AdminStaffRole; label: string }[] = [
   { id: "proctor", label: "Прокторы" },
   { id: "examinator", label: "Экзаменаторы" },
   { id: "supervisor", label: "Супервайзеры" },
+  { id: "staff_admin", label: "Администраторы подразделения" },
 ];
 
 function passwordLabel(user: AdminStaffUser): string {
@@ -36,6 +40,8 @@ function passwordLabel(user: AdminStaffUser): string {
 }
 
 export function AdminStaffTab() {
+  const {user: actor}=useAuth();
+  const loadSerial=useRef(0);
   const [role, setRole] = useState<AdminStaffRole>("proctor");
   const [users, setUsers] = useState<AdminStaffUser[]>([]);
   const [groups, setGroups] = useState<AdminGroupItem[]>([]);
@@ -51,6 +57,7 @@ export function AdminStaffTab() {
   } | null>(null);
 
   const load = useCallback(async () => {
+    const serial=++loadSerial.current;
     setLoading(true);
     setError(null);
     try {
@@ -58,27 +65,29 @@ export function AdminStaffTab() {
         fetchAdminStaff(role),
         fetchAdminGroupsList(),
       ]);
+      if(serial!==loadSerial.current)return;
       setUsers(usersData);
       setGroups(groupsData);
     } catch (err) {
+      if(serial!==loadSerial.current)return;
       setUsers([]);
       setError(err instanceof Error ? err.message : "Ошибка загрузки");
     } finally {
-      setLoading(false);
+      if(serial===loadSerial.current)setLoading(false);
     }
   }, [role]);
 
   useEffect(() => {
-    void load();
+    queueMicrotask(()=>{void load();});
   }, [load]);
 
   const handleDelete = async (user: AdminStaffUser) => {
-    if (!window.confirm(`Удалить «${user.full_name}»?`)) {
+    if (!window.confirm(BFF_DEV ? `${user.is_active === false ? "Активировать" : "Заблокировать"} учётную запись «${user.full_name}»? История сохраняется.` : `Удалить «${user.full_name}»?`)) {
       return;
     }
     try {
-      await deleteAdminUser(role, user.id);
-      setUsers((prev) => prev.filter((item) => item.id !== user.id));
+      if(BFF_DEV){await activateCoreUser(user.id,user.is_active===false);await load();}
+      else {await deleteAdminUser(role, user.id);setUsers((prev) => prev.filter((item) => item.id !== user.id));}
     } catch (err) {
       window.alert(err instanceof Error ? err.message : "Ошибка удаления");
     }
@@ -104,7 +113,7 @@ export function AdminStaffTab() {
         login: res.user_data.login,
         password: res.user_data.password,
       });
-      setUsers((prev) =>
+      if (!BFF_DEV) setUsers((prev) =>
         prev.map((item) =>
           item.id === user.id
             ? {
@@ -125,8 +134,9 @@ export function AdminStaffTab() {
 
   return (
     <>
+      <CoreCreateRecovery onRecovered={load} />
       <div className={userStyles.sectionTabs}>
-        {ROLES.map((item) => (
+        {ROLES.filter(r=>r.id!=="staff_admin"||(BFF_DEV&&coreFullAdmin(actor))).map((item) => (
           <button
             key={item.id}
             type="button"
@@ -147,7 +157,7 @@ export function AdminStaffTab() {
         <span className={userStyles.statPill}>
           Всего: <strong>{users.length}</strong>
         </span>
-        <EditOnly><Button
+        <CoreEditOnly fullAdmin><Button
           type="button"
           onClick={() => {
             setPanelMode("add");
@@ -155,12 +165,11 @@ export function AdminStaffTab() {
           }}
         >
           Добавить
-        </Button></EditOnly>
+        </Button></CoreEditOnly>
       </div>
 
       <p className={userStyles.hint}>
-        Логин и пароль показываются при создании и после сброса пароля. Для старых
-        учёток с захешированным паролем используйте «Новый пароль».
+        {BFF_DEV ? "Пароль показывается при создании и сбросе. Сохранённые пароли прочитать нельзя." : "Логин и пароль показываются при создании и после сброса пароля. Для старых учёток с захешированным паролем используйте «Новый пароль»."}
       </p>
 
       {revealedPassword ? (
@@ -184,7 +193,7 @@ export function AdminStaffTab() {
               <tr>
                 <th>ФИО</th>
                 <th>Логин</th>
-                <th>Пароль</th>
+                <th>{BFF_DEV ? "Статус" : "Пароль"}</th>
                 {role === "proctor" ? <th>Группа</th> : null}
                 <th>Действия</th>
               </tr>
@@ -203,7 +212,7 @@ export function AdminStaffTab() {
                   </td>
                   <td>
                     <code className={userStyles.credentialCode}>
-                      {passwordLabel(user)}
+                      {BFF_DEV ? (user.is_active === false ? "Заблокирован" : "Активен") : passwordLabel(user)}
                     </code>
                   </td>
                   {role === "proctor" ? (
@@ -221,7 +230,7 @@ export function AdminStaffTab() {
                   ) : null}
                   <td>
                     <div className={userStyles.tableActions}>
-                      <EditOnly><button
+                      <CoreEditOnly><button
                         type="button"
                         className={styles.actionBtn}
                         onClick={() => {
@@ -230,22 +239,22 @@ export function AdminStaffTab() {
                         }}
                       >
                         Изменить
-                      </button></EditOnly>
-                      <EditOnly><button
+                      </button></CoreEditOnly>
+                      <CoreEditOnly fullAdmin><button
                         type="button"
                         className={styles.actionBtn}
                         disabled={resettingId === user.id}
                         onClick={() => void handleResetPassword(user)}
                       >
                         {resettingId === user.id ? "Сброс…" : "Новый пароль"}
-                      </button></EditOnly>
-                      <EditOnly><button
+                      </button></CoreEditOnly>
+                      <CoreEditOnly fullAdmin><button
                         type="button"
                         className={`${styles.actionBtn} ${styles.actionBtnDanger}`}
                         onClick={() => void handleDelete(user)}
                       >
-                        Удалить
-                      </button></EditOnly>
+                        {BFF_DEV ? (user.is_active === false ? "Активировать" : "Заблокировать") : "Удалить"}
+                      </button></CoreEditOnly>
                     </div>
                   </td>
                 </tr>
