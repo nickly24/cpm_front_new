@@ -27,7 +27,7 @@ describe("BFF adapter contract",()=>{
   expect(value.items[0]).toMatchObject({student_id:21,reviewer_id:9,reviewer_role:"proctor"});expect(domain.mock.calls[0][0]).toBe("/homework/review-queue?account_id=21");
  });
  it("does not turn an unsubmitted manual row into a completed zero score",async()=>{
-  domain.mockResolvedValue({items:[{id:7,name:"A",type_name:"Custom",deadline:"2026-10-20",workspace:{legacy_result:{status:0,result:0},submission:{state:"none"}}}],has_more:false});
+  domain.mockResolvedValue({items:[{homework_id:7,homework_name:"A",homework_type:"Custom",deadline:"2026-10-20",result:null,submission_state:"none"}],pagination:{current_page:1,total_pages:1,total_items:1,items_per_page:12},counts:{all:1,undone:1,in_review:0,revision:0,done:0}});
   expect(await legacyHomework("/api/homeworks/student-with-sessions")).toMatchObject({res:[{homework_id:7,result:null,homework_type:"Custom",submission_state:"none"}]});
  });
  it("preserves zero grade and service upload limits",async()=>{
@@ -71,5 +71,26 @@ describe("BFF adapter contract",()=>{
  it("reports healthy processing only from the complete native worker and storage observation",async()=>{
   domain.mockResolvedValue({rabbitmq:true,outbox_pending:0,jobs:[],recent_jobs:[],processing_ready:true,worker:{state:"ok",received_at:"2026-10-09T10:00:00Z",rabbitmq:true,tools:true,processing:false,fresh_instances:1},storage:{state:"ok",checked_at:"2026-10-09T10:00:00Z"}});
   expect(await filesHomework("/api/monitoring")).toMatchObject({processing_ready:true,warnings:[],delivery:{connected:true,pending:0}});
+ });
+});
+
+describe("student server pagination",()=>{
+ it("forwards a single bounded page with filters, counts and cancellation",async()=>{
+  const controller=new AbortController();
+  const pagination={current_page:2,total_pages:4,total_items:32,items_per_page:8};
+  const counts={all:32,undone:16,in_review:8,revision:2,done:8};
+  domain.mockResolvedValue({items:[{homework_id:9,homework_name:"Page two",homework_type:"Право",deadline:"2026-10-20T00:00:00Z",submission_state:"graded",result:0,has_file:1,has_draft:0}],pagination,counts,has_more:true,next_cursor:999});
+  const value=await legacyHomework("/api/homeworks/student-with-sessions?page=2&limit=8&type=Право&status=done&search=Москва",{signal:controller.signal});
+  expect(domain).toHaveBeenCalledTimes(1);
+  const query=new URL(domain.mock.calls[0][0],"http://local");
+  expect(query.pathname).toBe("/homework/assignments");
+  expect(Object.fromEntries(query.searchParams)).toEqual({page:"2",limit:"8",status:"done",type:"Право",search:"Москва"});
+  expect(domain.mock.calls[0][1].signal).toBe(controller.signal);
+  expect(value).toMatchObject({pagination,counts,res:[{homework_id:9,result:0,has_file:true,has_draft:false}]});
+ });
+ it("does not fall back to collecting all pages when the owner contract is missing",async()=>{
+  domain.mockResolvedValue({items:[],has_more:true,next_cursor:12});
+  await expect(legacyHomework("/api/homeworks/student-with-sessions?page=1")).rejects.toThrow("пагинацию");
+  expect(domain).toHaveBeenCalledTimes(1);
  });
 });

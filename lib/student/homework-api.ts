@@ -1,3 +1,4 @@
+import { HOMEWORK_PAGE_SIZE } from "./homework-types";
 import { apiRequest } from "@/lib/api/client";
 import type {
   HomeworkDeadlineState,
@@ -12,6 +13,9 @@ interface FetchStudentHomeworkParams {
   page?: number;
   limit?: number;
   type?: HomeworkTypeFilter;
+  status?: HomeworkStatusFilter;
+  search?: string;
+  signal?: AbortSignal;
 }
 
 export async function fetchStudentHomework(
@@ -19,15 +23,19 @@ export async function fetchStudentHomework(
 ): Promise<StudentHomeworkResponse> {
   const searchParams = new URLSearchParams({
     page: String(params.page ?? 1),
-    limit: String(params.limit ?? 100),
+    limit: String(params.limit ?? HOMEWORK_PAGE_SIZE),
   });
 
   if (params.type && params.type !== "all") {
     searchParams.set("type", params.type);
   }
 
+  searchParams.set("status", params.status ?? "all");
+  if (params.search?.trim()) searchParams.set("search", params.search.trim());
+
   return apiRequest<StudentHomeworkResponse>(
     `/api/homeworks/student-with-sessions?${searchParams.toString()}`,
+    { signal: params.signal },
   );
 }
 

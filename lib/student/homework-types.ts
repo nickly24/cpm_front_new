@@ -35,6 +35,7 @@ export interface StudentHomeworkResponse {
   status: boolean;
   res: StudentHomeworkItem[];
   pagination: HomeworkPagination | null;
+  counts: Record<HomeworkStatusFilter, number>;
 }
 
 export interface HomeworkSummary {
@@ -62,4 +63,3 @@ export const HOMEWORK_STATUS_OPTIONS: Array<{
 ];
 
 export const HOMEWORK_PAGE_SIZE = 12;
-export const HOMEWORK_FETCH_LIMIT = 100;

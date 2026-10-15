@@ -47,8 +47,11 @@ export async function legacyHomework(path: string, options: RequestInit = {}): P
   const method = options.method || "GET";
   if (p === "/api/get-homeworks") return paginate((await list(q)).map(assignment), q);
   if (p === "/api/homeworks/student-with-sessions") {
-    const rows = (await list(q)).map(h => { const w = h.workspace; return { homework_id: h.id, homework_name: h.name, homework_type: h.type_name, deadline: day(h.deadline), status: label(w), result: w.legacy_result?.status === 1 ? w.legacy_result.result : null, submission_id: w.submission.id, submission_state: w.submission.state, has_file: w.submission.has_file, has_draft: w.submission.has_draft, submitted_at_utc: w.submission.submitted_at_utc, revision_comment: w.submission.revision_comment }; });
-    return paginate(rows, q);
+    const query = new URLSearchParams({ page: q.get("page") || "1", limit: q.get("limit") || "12", status: q.get("status") || "all" });
+    for (const key of ["type", "search"]) if (q.get(key)) query.set(key, q.get(key)!);
+    const data = await hw(`assignments?${query}`, { signal: options.signal });
+    if (!data.pagination || !data.counts) throw new Error("Сервис не вернул пагинацию заданий. Обновите страницу позже.");
+    return { status: true, res: data.items.map((h: Row) => ({ ...h, deadline: day(h.deadline), has_file: Boolean(h.has_file), has_draft: Boolean(h.has_draft), status: label({ submission: { state: h.submission_state }, legacy_result: { status: h.result == null ? 0 : 1 } }) })), pagination: data.pagination, counts: data.counts };
   }
   const match = p.match(/^\/api\/homework\/(\d+)(?:\/(overview|students))?$/);
   if (p === "/api/create-homework" || match && method === "PUT") {

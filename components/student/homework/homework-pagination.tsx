@@ -57,6 +57,8 @@ export function HomeworkPagination({
         ) : (
           <button
             key={page}
+            aria-label={`Страница ${page}`}
+            aria-current={currentPage === page ? "page" : undefined}
             type="button"
             className={`${styles.pageNumber} ${
               currentPage === page ? styles.pageNumberActive : ""
