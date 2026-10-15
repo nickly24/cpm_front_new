@@ -1555,6 +1555,10 @@
   font-size: 14px;
 }
 
+.input[aria-invalid="true"] {
+  border-color: var(--ds-danger);
+}
+
 .pagination {
   display: flex;
   flex-wrap: wrap;

@@ -27,6 +27,7 @@ import {
   testDetailToFormData,
 } from "@/lib/admin/admin-tests-utils";
 import { useEffect, useState } from "react";
+import { testTextAnswerIssue, textAnswerIssue } from "@/lib/admin/admin-test-text-answers";
 
 type FormMode = "create" | "edit" | "view";
 type QuestionEditorMode = "add" | "edit";
@@ -158,6 +159,7 @@ export function AdminTestForm({
 
   const saveQuestion = () => {
     const draft: AdminTestQuestion = { ...currentQuestion };
+    if (textAnswerIssue(draft)) return;
     if (draft.type === "text") {
       draft.answers = [];
     } else {
@@ -210,6 +212,13 @@ export function AdminTestForm({
 
     setError(null);
 
+    const issue = !contentReadOnly && testTextAnswerIssue(testData.questions);
+    if (issue) {
+      setError(issue.message);
+      editQuestion(testData.questions[issue.questionIndex], issue.questionIndex);
+      return;
+    }
+
     if (mode === "edit" && editingTest) {
       setSaveDialogError(null);
       setSaveRecalc(null);
@@ -232,6 +241,8 @@ export function AdminTestForm({
 
   const confirmEditSave = async () => {
     if (!editingTest) return;
+    const issue = !contentReadOnly && testTextAnswerIssue(testData.questions);
+    if (issue) { setSaveDialogError(issue.message); return; }
     setSaving(true);
     setSaveDialogError(null);
     try {
@@ -282,7 +293,7 @@ export function AdminTestForm({
       )}
 
       <div className={embedded ? undefined : styles.fullscreenBody}>
-        {error ? <p className={styles.errorText}>{error}</p> : null}
+        {error ? <p className={styles.errorText} role="alert">{error}</p> : null}
 
         <form
           className={embedded ? styles.formEmbedded : styles.form}
@@ -504,6 +515,7 @@ function QuestionPopup({
   onSave: () => void;
   onClose: () => void;
 }) {
+  const aliasIssue = textAnswerIssue(question);
   const updateAnswer = (
     index: number,
     field: keyof AdminTestAnswer,
@@ -603,9 +615,12 @@ function QuestionPopup({
           <div className={styles.field}>
             <span className={styles.fieldLabel}>Правильные ответы</span>
             {question.correctAnswers.map((answer, index) => (
+              <div key={index} className={styles.answerRow}>
               <input
-                key={index}
                 className={styles.input}
+                aria-label={`Правильный ответ ${index + 1}`}
+                aria-invalid={aliasIssue?.answerIndex === index}
+                aria-describedby={aliasIssue?.answerIndex === index ? "text-answer-error" : undefined}
                 value={answer}
                 onChange={(e) =>
                   onChange({
@@ -616,10 +631,14 @@ function QuestionPopup({
                   })
                 }
               />
+              <button type="button" className={styles.linkBtnDanger} aria-label={`Удалить правильный ответ ${index + 1}`} onClick={() => onChange({ ...question, correctAnswers: question.correctAnswers.filter((_, i) => i !== index) })}>Удалить</button>
+              </div>
             ))}
+            {aliasIssue ? <p id="text-answer-error" className={styles.errorText} role="alert">{aliasIssue.answerIndex === undefined ? "" : `Ответ №${aliasIssue.answerIndex + 1}: `}{aliasIssue.message}</p> : null}
             <button
               type="button"
               className={styles.linkBtn}
+              disabled={question.correctAnswers.length >= 50}
               onClick={() =>
                 onChange({
                   ...question,
@@ -637,7 +656,7 @@ function QuestionPopup({
             type="button"
             onClick={onSave}
             disabled={
-              !question.text ||
+              !question.text || !!aliasIssue ||
               (question.type !== "text" && question.answers.length < 2)
             }
           >

@@ -7,6 +7,7 @@ import type { AdminTestDraft } from "@/lib/admin/admin-test-drafts-types";
 import type { AdminTestUpdateResponse } from "@/lib/admin/admin-tests-api";
 import type { AdminListQuery, AdminTestAttemptsListResponse, AdminTestSessionsListResponse } from "@/lib/admin/admin-tests-monitoring-types";
 import { testDetailToCanvasState, allocateStableQuestionIds, parseAnswerIdFromCanvasId } from "@/lib/admin/admin-test-canvas-adapter";
+import { assertTestTextAnswers } from "@/lib/admin/admin-test-text-answers";
 
 type OwnerQuestion = { question_id: number; type: AdminTestQuestion["type"]; text: string; points: number; answers: {id:string;text:string;is_correct?:boolean}[]; correct_answers?:string[] };
 type OwnerSettings = { published: boolean; start_at: string|null; end_at: string|null; time_limit_minutes:number; passing_score:number|null; answers_visible:boolean };
@@ -86,6 +87,7 @@ export async function testsDetail(id:string):Promise<AdminTestDetail> {
 }
 function rfcDate(value:string) { if(!value)return null;const date=new Date(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value)?`${value}:00+03:00`:value);if(Number.isNaN(date.getTime()))throw new Error("Некорректная дата");return date.toISOString(); }
 export async function testsCreate(p:AdminTestFormData) {
+  assertTestTextAnswers(p.questions);
   const body={title:p.title,description:p.description||"",direction_id:await directionId(p.direction),questions:p.questions.map(ownerQuestion)};
   const scope=operationScope("/tests/catalog",body);
   const t=partialCreations.get(scope)||remember(await createDomain<OwnerTest>("/tests/catalog",body));partialCreations.set(scope,t);
@@ -103,6 +105,7 @@ export async function testsUpdate(id:string,p:AdminTestFormData):Promise<AdminTe
   if(!t.actions.can_edit_metadata && !t.actions.can_edit_settings)throw Object.assign(new Error("Недостаточно прав для изменения теста"),{status:403});
   let rev=p.expectedRevision??t.revision;
   if(t.actions.can_edit_metadata) {
+    assertTestTextAnswers(p.questions);
     const content=await domain<OwnerContent>(`/tests/${id}/content`,json("PUT",{expected_revision:rev,title:p.title,description:p.description||"",direction_id:await directionId(p.direction),questions:p.questions.map(ownerQuestion)}));
     contents.set(id,content);rev=content.revision;tests.set(id,{...t,revision:rev});p.expectedRevision=rev;
   }
@@ -154,6 +157,7 @@ if(publicationRevisions.has(id)) {
 const saved=await toDraft(await domain<OwnerDraft>(`/tests/drafts/${id}`,json("PUT",{expected_revision:prev.revision,...await draftBody(p)})));return {...saved,canvas:p.canvas||saved.canvas};});}
 export async function testsDraftPublish(id:string) {return serializeDraft(id,async()=>{
  const prev=drafts.get(id);if(!prev)throw new Error("Сначала загрузите черновик");
+ assertTestTextAnswers(prev.questions.map(legacyQuestion));
  const sourceRevision=publicationRevisions.get(id)??prev.revision;publicationRevisions.set(id,sourceRevision);
  const published=remember(await domain<OwnerTest>(`/tests/drafts/${id}/publish`,json("POST",{expected_revision:sourceRevision})));
  publicationRevisions.delete(id);return {success:true,testId:published.id};

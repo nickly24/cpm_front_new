@@ -7,6 +7,15 @@ const payload={title:"Тест",direction:"Python",startDate:"",endDate:"",timeL
 const ownerDraft={id:"d".repeat(24),revision:1,title:"Черновик",description:"",direction_id:1,questions:[],layout:[],state:"draft",source_test_id:null,published_test_id:null,created_by:17,updated_by:17,created_at:"2026-10-08T10:00:00Z",updated_at:"2026-10-08T10:00:00Z",lock:null};
 beforeEach(()=>{vi.resetModules();domain.mockReset();});
 describe("administrative tests boundary",()=>{
+ it("rejects a duplicate text alias with question coordinates before any create/content mutation",async()=>{
+  domain.mockResolvedValue(test);
+  const api=await import("./tests-admin");
+  const questions=[{questionId:7,type:"text" as const,text:"Ответ",points:1,answers:[],correctAnswers:["Москва"," МОСКВА "]}];
+  await expect(api.testsCreate({...payload,questions})).rejects.toThrow("Вопрос №1, ответ №2");
+  expect(domain).not.toHaveBeenCalled();
+  await expect(api.testsUpdate(test.id,{...payload,questions})).rejects.toThrow("Вопрос №1, ответ №2");
+  expect(domain.mock.calls.every(c=>!c[1])).toBe(true);
+ });
  it("preserves a pending result as null while preserving a ready zero",async()=>{
   domain.mockImplementation(async(path:string)=>path.startsWith("/core/users")?[]:{items:[{submission_id:"pending",account_id:3,test_id:test.id,calculation_status:"queued",result:null},{submission_id:"zero",account_id:4,test_id:test.id,calculation_status:"ready",result:{score:0}}],total:2});
   const api=await import("./tests-admin");const rows=await api.testsSessions(test.id);
@@ -79,7 +88,7 @@ describe("administrative tests boundary",()=>{
    if(!opts)return attached;
    expect(path).toBe(`/tests/${test.id}/settings`);return {...attached,revision:2};
   });
-  const api=await import("./tests-admin");const result=await api.testsUpdate(test.id,{...payload,direction:"ignored",expectedRevision:1});expect(result.revision).toBe(2);expect(domain.mock.calls.some(c=>String(c[0]).includes("/content"))).toBe(false);
+  const api=await import("./tests-admin");const result=await api.testsUpdate(test.id,{...payload,direction:"ignored",expectedRevision:1,questions:[{questionId:7,type:"text",text:"Ответ",points:1,answers:[],correctAnswers:[""]}]});expect(result.revision).toBe(2);expect(domain.mock.calls.some(c=>String(c[0]).includes("/content"))).toBe(false);
  });
  it("interprets publication response as a hidden TestView",async()=>{
   domain.mockImplementation(async(path:string,opts?:RequestInit)=>{
