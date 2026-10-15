@@ -71,3 +71,23 @@ describe("Cards owner boundary", () => {
     identity.user.division_id = 1001; domain.mockRejectedValue(Object.assign(new Error("CAS"), { status: 409, code: "conflict" })); await expect(cardsRetry(pending)).rejects.toMatchObject({ status: 409 }); expect(cardsPendingCommands()).toEqual([]);
   });
 });
+
+describe("Cards catalog failure is not an empty success", () => {
+ it.each([403,503])("propagates owner status %s", async status => {
+  domain.mockRejectedValue(Object.assign(new Error("dependency_unavailable"),{status,code:"dependency_unavailable"}));
+  const {cardsTrainingTree}=await import("./cards");
+  await expect(cardsTrainingTree()).rejects.toMatchObject({status,code:"dependency_unavailable"});
+ });
+});
+
+describe("server-paginated student Cards adapter",()=>{
+ it("loads directions and one server page without invoking the full tree or exams prefetch",async()=>{
+  domain.mockResolvedValueOnce({directions:[{id:4,name:"Право"}]}).mockResolvedValueOnce({direction_id:4,sections:[{kind:"manual",refId:"5",name:"Ручная тема",stats:{total:1,learned:1,answer_changed:0,unlearned:0,progress_percent:100}}],pagination:{page:2,limit:12,total:25,pages:3,has_next:true,has_prev:true}});
+  const {cardsCatalogDirections,cardsCatalogPage}=await import("./cards");const controller=new AbortController();
+  const directions=await cardsCatalogDirections(controller.signal);expect(directions[0].sections).toEqual([]);
+  const page=await cardsCatalogPage(4,{page:2,limit:12,search:"Право",kind:"manual"},controller.signal);
+  expect(page.pagination.page).toBe(2);expect(page.sections[0].progress_percent).toBe(100);
+  expect(domain.mock.calls[0][0]).toBe("/cards/catalog");expect(domain.mock.calls[1][0]).toBe("/cards/directions/4/sections?page=2&limit=12&search=%D0%9F%D1%80%D0%B0%D0%B2%D0%BE&kind=manual");
+  expect(examTrainingTree).not.toHaveBeenCalled();expect(domain.mock.calls[1][1].signal).toBe(controller.signal);
+ });
+});

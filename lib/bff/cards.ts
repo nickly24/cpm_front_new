@@ -7,6 +7,7 @@ import { examsAllPages, examsDirections, number, record, records, string } from 
 import { canAccessSection } from "@/lib/auth/admin-access";
 
 const labels: Record<string, string> = {
+  dependency_unavailable: "Не удалось загрузить карточки: сервис временно недоступен. Повторите загрузку",
   conflict: "Данные изменились. Обновите список и откройте редактор заново",
   content_changed: "Содержание карточки изменилось. Изучите обновлённый ответ",
   idempotency_conflict: "Ключ сохранения уже использован для другой команды",
@@ -120,8 +121,8 @@ function sectionPath(kind: SectionKind, ref: string): string {
   if (kind === "exam" || (kind === "manual" ? !/^[1-9]\d*$/.test(ref) : !/^[a-f0-9]{24}$/.test(ref))) throw new ApiError("Адрес раздела не найден", 404);
   return `/sections/${kind}/${ref}`;
 }
-export async function cardsStudyView(kind: SectionKind, ref: string): Promise<SectionStudyViewResponse> {
-  const result = await cardsRequest<Omit<SectionStudyViewResponse, "success" | "student_id">>(sectionPath(kind, ref));
+export async function cardsStudyView(kind: SectionKind, ref: string, signal?: AbortSignal): Promise<SectionStudyViewResponse> {
+  const result = await cardsRequest<Omit<SectionStudyViewResponse, "success" | "student_id">>(sectionPath(kind, ref),{signal});
   return { ...result, success: true, student_id: getIdentity()?.user.account_id ?? 0 };
 }
 export async function cardsStudyBatch(kind: SectionKind, ref: string, batch: number, mode?: StudyFilter): Promise<SectionBatchResponse> {
@@ -206,4 +207,16 @@ export async function cardsTransformDraft(themeId: number, cardIds: number[]): P
   const command: CardsCommand = { id: crypto.randomUUID(), path: "/transforms", method: "POST", body, context };
   persist(command);
   return await cardsRecover(command) as { draft_id: string };
+}
+
+/** Lightweight directions; no tree, exam preparation or question prefetch. */
+export async function cardsCatalogDirections(signal?: AbortSignal): Promise<TrainingDirection[]> {
+  const raw=await cardsRequest<{directions:{id:number;name:string}[]}>("/catalog",{signal});
+  return raw.directions.map(d=>({...d,sections:[],total_cards:0,learned_cards:0,progress_percent:0}));
+}
+export async function cardsCatalogPage(directionId:number, params:{page?:number;limit?:number;search?:string;kind?:string;progress?:string}={}, signal?:AbortSignal):Promise<TrainingSectionsResponse> {
+  const query=new URLSearchParams();
+  for(const [key,value] of Object.entries(params)) if(value!==undefined && value!=="")query.set(key,String(value));
+  const raw=await cardsRequest<{direction_id:number;sections:unknown[];pagination:TrainingSectionsResponse["pagination"]}>(`/directions/${directionId}/sections?${query}`,{signal});
+  return {success:true,student_id:getIdentity()?.user.account_id??0,direction_id:raw.direction_id,direction_name:"",sections:raw.sections.map(value=>({...record(value),...node(value)})),pagination:raw.pagination};
 }

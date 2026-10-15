@@ -14,6 +14,7 @@ import { BFF_DEV } from "@/lib/config";
 import { cn } from "@/lib/cn";
 import { examPeriod } from "@/lib/training/exam-training";
 import { ClipboardList, FileText, Search } from "lucide-react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
 interface TrainingSectionsListViewProps {
@@ -37,54 +38,36 @@ export function TrainingSectionsListView({
   error,
   onSelectSection,
 }: TrainingSectionsListViewProps) {
-  const PAGE_SIZE = 6;
-  const [searchTerm, setSearchTerm] = useState("");
-  const [kindFilter, setKindFilter] = useState<SectionKind | "all">("all");
-  const [progressFilter, setProgressFilter] = useState<
-    "all" | "in_progress" | "learned"
-  >("all");
-  const [page, setPage] = useState(1);
-  const [sections, setSections] = useState<TrainingSectionNode[]>([]);
-  const [sectionsLoading, setSectionsLoading] = useState(false);
-  const [sectionsError, setSectionsError] = useState<string | null>(null);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalItems, setTotalItems] = useState(0);
-  useEffect(() => {
-    setPage(1);
-  }, [searchTerm, kindFilter, progressFilter, direction.id]);
-
-  useEffect(() => {
-    let cancelled = false;
-    async function loadSections() {
-      setSectionsLoading(true);
-      setSectionsError(null);
-      try {
-        const response = await fetchTrainingSectionsByDirection(studentId, direction.id, {
-          page,
-          limit: PAGE_SIZE,
-          search: searchTerm,
-          kind: kindFilter,
-          progress: progressFilter,
-        });
-        if (cancelled) return;
-        setSections(response.sections ?? []);
-        setTotalPages(response.pagination?.pages ?? 1);
-        setTotalItems(response.pagination?.total ?? 0);
-      } catch (err) {
-        if (cancelled) return;
-        setSections([]);
-        setTotalPages(1);
-        setTotalItems(0);
-        setSectionsError(err instanceof Error ? err.message : "Ошибка загрузки");
-      } finally {
-        if (!cancelled) setSectionsLoading(false);
-      }
-    }
-    void loadSections();
-    return () => {
-      cancelled = true;
-    };
-  }, [direction.id, kindFilter, page, progressFilter, searchTerm, studentId]);
+  const PAGE_SIZE = 12;
+  const router=useRouter(), pathname=usePathname(), query=useSearchParams();
+  const queryString=query.toString();
+  const searchTerm=query.get("search")??"";
+  const kindFilter=(["manual","test","exam"].includes(query.get("kind")??"")?query.get("kind"):"all") as SectionKind|"all";
+  const progressFilter=(["learned","in_progress"].includes(query.get("progress")??"")?query.get("progress"):"all") as "all"|"in_progress"|"learned";
+  const rawPage=Number(query.get("page")??1), page=Number.isInteger(rawPage)&&rawPage>0?rawPage:1;
+  const update=(values:Record<string,string|null>)=>{
+    const next=new URLSearchParams(queryString);
+    for(const [key,value] of Object.entries(values)){if(value===null||value===""||value==="all")next.delete(key);else next.set(key,value)}
+    router.replace(`${pathname}${next.size?`?${next}`:""}`,{scroll:false});
+  };
+  const setSearchTerm=(value:string)=>update({search:value,page:null});
+  const setKindFilter=(value:SectionKind|"all")=>update({kind:value,page:null});
+  const setProgressFilter=(value:"all"|"in_progress"|"learned")=>update({progress:value,page:null});
+  const setPage=(value:number|((v:number)=>number))=>update({page:String(typeof value==="function"?value(page):value)});
+  const requestKey=`${studentId}:${direction.id}:${queryString}`;
+  const [reload,setReload]=useState(0);
+  const [result,setResult]=useState<{key:string;sections:TrainingSectionNode[];pages:number;total:number;error:string|null}|null>(null);
+  useEffect(()=>{
+    const controller=new AbortController();let active=true;
+    const timer=setTimeout(()=>{
+      fetchTrainingSectionsByDirection(studentId,direction.id,{page,limit:PAGE_SIZE,search:searchTerm,kind:kindFilter,progress:progressFilter},controller.signal).then(response=>{
+        if(active)setResult({key:requestKey,sections:response.sections,pages:response.pagination.pages,total:response.pagination.total,error:null});
+      },err=>{if(active)setResult({key:requestKey,sections:[],pages:1,total:0,error:err instanceof Error?err.message:"Ошибка загрузки"})});
+    },searchTerm?300:0);
+    return()=>{active=false;clearTimeout(timer);controller.abort()};
+  },[studentId,direction.id,page,searchTerm,kindFilter,progressFilter,requestKey,reload]);
+  const current=result?.key===requestKey?result:null;
+  const sections=current?.sections??[],sectionsLoading=!current,sectionsError=current?.error??null,totalPages=current?.pages??1,totalItems=current?.total??0;
 
   if (loading) {
     return <LoadingState label="Загрузка разделов…" variant="panel" />;
@@ -126,7 +109,7 @@ export function TrainingSectionsListView({
         </label>
         <FilterPopover
           activeCount={Number(kindFilter !== "all") + Number(progressFilter !== "all")}
-          onReset={() => { setKindFilter("all"); setProgressFilter("all"); }}
+          onReset={() => update({kind:null,progress:null,page:null})}
         >
           <p className={styles.sectionsPopoverLabel}>Тип</p>
           <div className={styles.sectionsFilterRow}>
@@ -265,7 +248,7 @@ export function TrainingSectionsListView({
         })}
       </div>
 
-      {sectionsError ? <p className={styles.alert}>{sectionsError}</p> : null}
+      {sectionsError ? <div><p className={styles.alert} role="alert">{sectionsError}</p><button onClick={()=>{setResult(null);setReload(v=>v+1)}}>Повторить загрузку</button></div> : null}
       {sectionsLoading ? (
         <LoadingState label="Загрузка разделов…" variant="inline" />
       ) : null}
@@ -289,7 +272,7 @@ export function TrainingSectionsListView({
         </button>
       </div> : null}
 
-      {!sectionsLoading && totalItems === 0 ? (
+      {!sectionsLoading && !sectionsError && totalItems === 0 ? (
         <div className={styles.emptyState}>
           <h2 className={styles.emptyTitle}>Разделы не найдены</h2>
           <p className={styles.emptyText}>

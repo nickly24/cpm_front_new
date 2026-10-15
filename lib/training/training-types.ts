@@ -110,6 +110,7 @@ export interface TrainingSectionsResponse {
 }
 
 export interface SectionStudyViewResponse {
+  direction_id?: number;
   success: boolean;
   student_id: number;
   section_kind: SectionKind;

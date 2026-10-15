@@ -2,12 +2,16 @@
 
 import styles from "@/components/student/training/student-training.module.css";
 import { TrainingFlashcards } from "@/components/student/training/training-flashcards";
+import { PaginatedStudentTraining } from "./student-training-catalog";
 import { StudentExamTraining } from "./exam-training";
 import { CardsCommandRecovery } from "@/components/training/cards-command-recovery";
 import { BFF_DEV } from "@/lib/config";
 import { cardsPercent } from "@/lib/bff/cards";
 import { TrainingSectionDetail } from "@/components/student/training/training-section-detail";
 import { TrainingSectionsListView } from "@/components/student/training/training-topics-view";
+import { LoadingState } from "@/components/ui/loading-state";
+import { Button } from "@/components/ui/button";
+import { trainingError } from "@/lib/training/exam-training";
 import { SectionHeroBanner } from "@/components/student/section-hero-banner";
 import { useAuth } from "@/contexts/AuthContext";
 import type { UserRole } from "@/lib/auth/types";
@@ -93,6 +97,7 @@ export function StudentTrainingSection({
   if (pathSegments[0] === "exam" && /^\d+$/.test(pathSegments[1] ?? "")) {
     return <StudentExamTraining segments={pathSegments} />;
   }
+  if (BFF_DEV) return <><CardsCommandRecovery /><PaginatedStudentTraining role={role} pathSegments={pathSegments} /></>;
   return <><CardsCommandRecovery /><LegacyStudentTrainingSection role={role} pathSegments={pathSegments} /></>;
 }
 
@@ -165,7 +170,7 @@ function LegacyStudentTrainingSection({
       directionsRef.current = [];
       setDirections([]);
       setTreeReady(false);
-      setError(err instanceof Error ? err.message : "Ошибка загрузки");
+      setError(trainingError(err));
     } finally {
       loadInFlightRef.current = false;
       setLoading(false);
@@ -340,6 +345,7 @@ function LegacyStudentTrainingSection({
         subtitle="Выберите раздел и учите карточки в удобном темпе"
       />
 
+      {!selectedDirection && loading ? <LoadingState label="Загрузка разделов…" variant="panel" /> : null}
       {selectedDirection && user?.id ? (
         <TrainingSectionsListView
           directions={directions}
@@ -358,7 +364,7 @@ function LegacyStudentTrainingSection({
           }}
         />
       ) : null}
-      {!selectedDirection && error ? <p className={styles.alert} role="alert">{error}</p> : null}
+      {!selectedDirection && error ? <div><p className={styles.alert} role="alert">{error}</p><Button onClick={() => void loadTree()}>Повторить загрузку</Button></div> : null}
       {!loading && !error && directions.length === 0 ? <p>Пока нет доступных карточек</p> : null}
     </div>
   );
