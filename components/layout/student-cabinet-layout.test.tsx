@@ -55,11 +55,11 @@ it("moves the active pill by route and keeps profile, settings and legacy profil
   }
 });
 
-it("renders seven custom vector services without a separate about-me menu item", () => {
+it("renders eight custom vector services without a separate about-me menu item", () => {
   render(<StudentMenuSection/>);
   const links = within(screen.getByRole("group", { name: "Разделы" })).getAllByRole("link");
-  expect(links.map(link => link.textContent)).toEqual(["Домашние задания", "Тесты", "Экзамены", "Посещаемость", "Карточки", "Расписание", "Запрос на отгул"]);
-  expect(screen.getByRole("group", { name: "Разделы" }).querySelectorAll("svg")).toHaveLength(7);
+  expect(links.map(link => link.textContent)).toEqual(["Домашние задания", "Тесты", "Экзамены", "Посещаемость", "Карточки", "Расписание", "Запрос на отгул", "Установить на iOS"]);
+  expect(screen.getByRole("group", { name: "Разделы" }).querySelectorAll("svg")).toHaveLength(8);
   const ids = [...document.querySelectorAll("[id]")].map(element => element.id);
   expect(new Set(ids).size).toBe(ids.length);
   expect(screen.queryByText("Обо мне")).toBeNull();

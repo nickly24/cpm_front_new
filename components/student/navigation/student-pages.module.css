@@ -127,4 +127,4 @@
   .menuPage .quickActions { padding-top:30px; margin-bottom:40px; }
   .promoCard { min-height:210px; flex-basis:72%; }
 }
-@media(min-width:1440px) { .menuPage .serviceGrid { grid-template-columns:repeat(7,minmax(0,1fr)); gap:18px; } .service { font-size:12px; } .serviceArtwork { width:76px; height:76px; } }
+@media(min-width:1440px) { .menuPage .serviceGrid { grid-template-columns:repeat(8,minmax(0,1fr)); gap:18px; } .service { font-size:12px; } .serviceArtwork { width:76px; height:76px; } }

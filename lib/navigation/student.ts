@@ -15,4 +15,4 @@ export const studentNavigation: RoleNavigation = {
   brand: "CPM Student",
   groups: [{ title: "Меню", items: [...studentServices, { id: "menu", label: "Меню", icon: Menu }] }],
 };
-export const studentAuxiliarySections: Record<string, string> = { profile: "Профиль", performance: "Профиль", settings: "Настройки" };
+export const studentAuxiliarySections: Record<string, string> = { "install-ios": "Установить на iOS", profile: "Профиль", performance: "Профиль", settings: "Настройки" };

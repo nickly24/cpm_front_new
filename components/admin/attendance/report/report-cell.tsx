@@ -23,6 +23,7 @@ interface ReportCellProps {
   interactive: boolean;
   onPointerDown: (event: React.MouseEvent<HTMLButtonElement>) => void;
   onPointerEnter: () => void;
+  disabled?: boolean;
 }
 
 export const ReportCell = memo(function ReportCell({
@@ -32,6 +33,7 @@ export const ReportCell = memo(function ReportCell({
   interactive,
   onPointerDown,
   onPointerEnter,
+  disabled = false,
 }: ReportCellProps) {
   const phase = uiState?.phase ?? "idle";
   const hasEntry = Boolean(entry);
@@ -39,12 +41,14 @@ export const ReportCell = memo(function ReportCell({
     phase === "pending" ? reportStyles.cellPending : paletteClassForEntry(entry);
   const mark =
     hasEntry && entry && phase !== "pending"
-      ? getAttendanceCellMark(entry.type_code)
+      ? entry.snapshot?.mark ?? getAttendanceCellMark(entry.type_code)
       : null;
 
   return (
     <button
       type="button"
+      disabled={disabled}
+      style={entry?.snapshot && phase !== "pending" ? { backgroundColor: entry.snapshot.color, color: "#17212b" } : undefined}
       className={cn(
         reportStyles.cell,
         paletteClass,
@@ -62,6 +66,7 @@ export const ReportCell = memo(function ReportCell({
       }}
       onMouseEnter={() => onPointerEnter()}
       onClick={(event) => {
+        if (event.detail === 0) onPointerDown(event);
         if (tool !== "cursor") {
           event.preventDefault();
         }

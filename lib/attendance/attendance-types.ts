@@ -3,6 +3,9 @@ export interface AttendanceType {
   code: string;
   name_ru: string;
   sort_order: number;
+  /** Attendance-owned display values; absent for the legacy API. */
+  color?: string;
+  mark?: string;
 }
 
 export interface ClassDay {

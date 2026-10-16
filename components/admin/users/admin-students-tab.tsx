@@ -6,6 +6,8 @@ import { AdminListPaginationBar } from "@/components/admin/tests/admin-list-pagi
 import styles from "@/components/admin/tests/admin-tests.module.css";
 import userStyles from "@/components/admin/users/admin-users.module.css";
 import { AdminStudentPanel } from "@/components/admin/users/admin-student-panel";
+import { AdminStudentDivisions } from "@/components/admin/users/admin-student-divisions";
+import { canManageCoreAccess } from "@/lib/bff/core-access";
 import { AdminStudentDeletionManager } from "@/components/admin/users/admin-student-deletion";
 import type { DeletionStudent } from "@/lib/admin/student-deletion";
 import { Button } from "@/components/ui/button";
@@ -34,6 +36,7 @@ const PAGE_SIZE = 15;
 
 export function AdminStudentsTab() {
   const { user } = useAuth();
+  const [distribution, setDistribution] = useState(false);
   const loadSerial=useRef(0);
   const [students, setStudents] = useState<AdminStudent[]>([]);
   const [groups, setGroups] = useState<AdminGroupItem[]>([]);
@@ -137,6 +140,8 @@ export function AdminStudentsTab() {
     }
   };
 
+  if (distribution && BFF_DEV && canManageCoreAccess(user)) return <AdminStudentDivisions onClose={() => { setDistribution(false); void load(); }} />;
+
   if (panelMode) {
     return (
       <AdminStudentPanel
@@ -218,6 +223,7 @@ export function AdminStudentsTab() {
           </label>
         </FilterPopover>
         <div className={styles.toolbarActions}>
+          {BFF_DEV && canManageCoreAccess(user) ? <Button type="button" variant="secondary" onClick={() => setDistribution(true)}>Распределить по подразделениям</Button> : null}
           <CoreEditOnly><Button type="button" onClick={() => setPanelMode("add")}>
             + Добавить ученика
           </Button></CoreEditOnly>

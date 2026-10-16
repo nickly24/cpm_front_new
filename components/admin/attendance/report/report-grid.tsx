@@ -58,6 +58,7 @@ interface ReportGridProps {
     event?: React.MouseEvent<HTMLButtonElement>,
   ) => void;
   onCellPointerEnter: (studentId: number, classDayId: number) => void;
+  disabled?: boolean;
 }
 
 function SortIcon({
@@ -123,6 +124,7 @@ export function ReportGrid({
   filterOptions,
   onCellPointerDown,
   onCellPointerEnter,
+  disabled = false,
 }: ReportGridProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -142,6 +144,8 @@ export function ReportGrid({
       : 0;
 
   const interactiveTool = tool !== "cursor";
+  const snapshotTypes = new Set([...cellMap.values()].filter(entry => entry.snapshot).map(entry => JSON.stringify([entry.type_name, entry.snapshot])));
+  const summaryWidth = snapshotTypes.size ? Math.max(132, snapshotTypes.size * 32 + 12) : undefined;
   const colSpan = 6 + classDays.length;
 
   const classOptions = [
@@ -277,7 +281,7 @@ export function ReportGrid({
             <th className={reportStyles.colSummaryStat} title="Отмечено занятий">
               <div className={reportStyles.summaryHeaderMini}>Σ</div>
             </th>
-            <th className={reportStyles.colSummaryChips} title="Разбивка по типам">
+            <th className={reportStyles.colSummaryChips} style={summaryWidth ? { width: summaryWidth, minWidth: summaryWidth, maxWidth: summaryWidth } : undefined} title="Разбивка по типам">
               <div className={reportStyles.summaryHeaderMini}>Сводка</div>
             </th>
           </tr>
@@ -342,6 +346,7 @@ export function ReportGrid({
                     <td key={day.id} className={reportStyles.colDay}>
                       <ReportCell
                         entry={entry}
+                        disabled={disabled}
                         tool={tool}
                         uiState={ui}
                         interactive={interactiveTool}
@@ -355,7 +360,7 @@ export function ReportGrid({
                     </td>
                   );
                 })}
-                <ReportSummaryCells summary={summary} />
+                <ReportSummaryCells summary={summary} width={summaryWidth} />
               </tr>
             );
               })

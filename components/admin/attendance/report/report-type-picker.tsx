@@ -34,7 +34,7 @@ export function ReportTypePicker({
   const selected = sorted.find((type) => type.id === value) ?? sorted[0];
   const selectedCode = selected?.code ?? "in_person";
   const selectedPalette = getAttendancePalette(selectedCode);
-  const selectedMark = getAttendanceCellMark(selectedCode);
+  const selectedMark = selected?.mark ?? getAttendanceCellMark(selectedCode);
 
   useEffect(() => {
     if (!open) return;
@@ -73,6 +73,7 @@ export function ReportTypePicker({
             reportStyles.typePickerSwatch,
             REPORT_PALETTE_CLASS[selectedPalette],
           )}
+          style={selected?.color ? { backgroundColor: selected.color, color: "#17212b" } : undefined}
         >
           {selectedMark ? (
             <span
@@ -98,7 +99,7 @@ export function ReportTypePicker({
         >
           {sorted.map((type) => {
             const palette = getAttendancePalette(type.code);
-            const mark = getAttendanceCellMark(type.code);
+            const mark = type.mark ?? getAttendanceCellMark(type.code);
             const active = type.id === value;
             return (
               <li key={type.id} role="none">
@@ -120,6 +121,7 @@ export function ReportTypePicker({
                       reportStyles.typePickerSwatch,
                       REPORT_PALETTE_CLASS[palette],
                     )}
+                    style={type.color ? { backgroundColor: type.color, color: "#17212b" } : undefined}
                   >
                     {mark ? (
                       <span

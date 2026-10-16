@@ -1,7 +1,8 @@
 import { useId } from "react";
 
-export type StudentNavIconKind = "homework" | "tests" | "exams" | "attendance" | "train" | "schedule" | "zaps";
+export type StudentNavIconKind = "homework" | "tests" | "exams" | "attendance" | "train" | "schedule" | "zaps" | "install-ios";
 const palette: Record<StudentNavIconKind, [string, string, string]> = {
+  "install-ios": ["#ffc278", "#f17b53", "#e4cbff"],
   homework: ["#b29bff", "#7453e6", "#ffc399"],
   tests: ["#ffac7b", "#f16b53", "#ffe8ae"],
   exams: ["#a08aff", "#6751d6", "#ffbf8f"],
@@ -27,6 +28,7 @@ export function StudentNavIcon({ kind }: { kind: StudentNavIconKind }) {
       <path d="M-9 61C16 24 37 77 61 51C80 31 94 39 101 49V99H-9Z" fill={accent} opacity=".28"/>
       <circle cx="75" cy="10" r="32" fill="white" opacity=".09"/>
       <g filter={`url(#${id}-shadow)`}>
+        {kind === "install-ios" ? <><rect x="27" y="13" width="35" height="62" rx="10" fill={`url(#${id}-paper)`}/><rect x="34" y="17" width="21" height="4" rx="2" fill="#d7c6f1"/><rect x="33" y="28" width="23" height="25" rx="7" fill="#ffad76"/><path d="M44 32V47M38 41L44 47L50 41" stroke="white" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"/><path d="M39 67H50" stroke="#b99adc" strokeWidth="3" strokeLinecap="round"/></> : null}
         {kind === "homework" ? <>
           <path d="M26 19H54L65 30V66A5 5 0 0 1 60 71H26A5 5 0 0 1 21 66V24A5 5 0 0 1 26 19Z" fill={`url(#${id}-paper)`}/><path d="M53 19V28A3 3 0 0 0 56 31H65" fill="#d5c7ff"/>
           <path d="M31 34H43M31 43H48M31 52H43" stroke="#a28be5" strokeWidth="4" strokeLinecap="round"/>

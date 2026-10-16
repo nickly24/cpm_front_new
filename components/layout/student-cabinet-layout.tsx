@@ -33,7 +33,7 @@ export function StudentCabinetLayout({ children }: { children: ReactNode }) {
   // Fixed test overlays must keep the list geometry and scroll position underneath.
   const testOverlay = immersive && section === "tests";
   const viewportMode = immersive && !testOverlay;
-  const auxiliary = ["profile", "performance", "settings"].includes(section);
+  const auxiliary = ["profile", "performance", "settings", "install-ios"].includes(section);
   const activeIndex = Math.max(0, tabs.findIndex(tab => tab.id === section || tab.id === "menu" && !tabs.some(item => item.id === section)));
   const name = studentFirstName(user?.full_name);
   const trainingDetail=section==="train"&&pathname.split("/").filter(Boolean).length>=5;

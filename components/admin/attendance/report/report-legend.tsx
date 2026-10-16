@@ -48,7 +48,7 @@ export function ReportLegend({ types, ribbon = false }: ReportLegendProps) {
       >
         {sorted.map((type) => {
           const palette = getAttendancePalette(type.code);
-          const mark = getAttendanceCellMark(type.code);
+          const mark = type.mark ?? getAttendanceCellMark(type.code);
           return (
             <div
               key={type.id}
@@ -61,6 +61,7 @@ export function ReportLegend({ types, ribbon = false }: ReportLegendProps) {
                   reportStyles.legendMarkSwatch,
                   REPORT_PALETTE_CLASS[palette],
                 )}
+                style={type.color ? { backgroundColor: type.color, color: "#17212b" } : undefined}
               >
                 {mark ? (
                   <span
@@ -93,7 +94,7 @@ export function ReportLegend({ types, ribbon = false }: ReportLegendProps) {
           className={reportStyles.legendHelpPopover}
           role="tooltip"
         >
-          {HELP_CONTENT}
+          {types.some(type => type.color) ? <p>Цвета и обозначения задаются в подразделении. Ячейки сохраняют тип отметки на момент записи. Пустая ячейка — не отмечено, а не прогул.</p> : HELP_CONTENT}
         </div>
       </div>
     </div>

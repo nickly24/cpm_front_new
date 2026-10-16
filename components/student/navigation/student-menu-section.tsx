@@ -48,7 +48,7 @@ export function StudentMenuSection() {
   return <section className={styles.menuPage} aria-label="Все разделы ученика">
     <h1 className={styles.welcome}>Добро пожаловать<br/>в CPM LMS <span className={styles.welcomeWave} aria-hidden="true">👋</span></h1>
     <div className={styles.serviceGrid} role="group" aria-label="Разделы">
-      {studentServices.map(item => <Link key={item.id} href={`/cabinet/student/${item.id}`} className={styles.service}>
+      {[...studentServices,{id:"install-ios" as const,label:"Установить на iOS"}].map(item => <Link key={item.id} href={`/cabinet/student/${item.id}`} className={styles.service}>
         <span className={styles.serviceArtwork}><StudentNavIcon kind={item.id}/></span><span>{item.label}</span>
       </Link>)}
     </div>

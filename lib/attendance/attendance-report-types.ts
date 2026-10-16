@@ -28,6 +28,7 @@ export interface AttendanceReportEntry {
   type_name: string;
   zap_id: number | null;
   zap_date_id: number | null;
+  snapshot?: { color: string; mark: string };
 }
 
 export interface AttendanceReportData {

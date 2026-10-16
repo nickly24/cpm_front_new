@@ -29,9 +29,10 @@ const SUMMARY_SHORT: Record<AttendancePalette, string> = {
 
 interface ReportSummaryCellsProps {
   summary: StudentAttendanceSummary;
+  width?: number;
 }
 
-export function ReportSummaryCells({ summary }: ReportSummaryCellsProps) {
+export function ReportSummaryCells({ summary, width }: ReportSummaryCellsProps) {
   const chips = SUMMARY_ORDER.flatMap((palette) => {
     const count = summary.byPalette[palette];
     if (!count) return [];
@@ -41,6 +42,7 @@ export function ReportSummaryCells({ summary }: ReportSummaryCellsProps) {
   const title = [
     `Отмечено: ${summary.marked} из ${summary.total}`,
     summary.empty > 0 ? `Пусто: ${summary.empty}` : null,
+    ...(summary.snapshots ?? []).map(item => `${item.name}: ${item.count}`),
     ...chips.map((chip) => `${chip.label}: ${chip.count}`),
   ]
     .filter(Boolean)
@@ -59,9 +61,9 @@ export function ReportSummaryCells({ summary }: ReportSummaryCellsProps) {
           </span>
         </div>
       </td>
-      <td className={reportStyles.colSummaryChips} title={title}>
+      <td className={reportStyles.colSummaryChips} style={width ? { width, minWidth: width, maxWidth: width } : undefined} title={title}>
         <div className={reportStyles.summaryChipsRow}>
-          {chips.length > 0 ? (
+          {summary.snapshots?.length ? summary.snapshots.map((item,index) => <span key={index} className={reportStyles.summaryChip} style={{ backgroundColor: item.color, color: "#17212b" }} title={item.name}><span className={reportStyles.summaryChipCount}>{item.count}</span><span className={reportStyles.summaryChipLabel}>{item.mark || "•"}</span></span>) : chips.length > 0 ? (
             chips.map((chip) => (
               <span
                 key={chip.palette}
