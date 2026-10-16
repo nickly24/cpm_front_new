@@ -6,7 +6,7 @@ import { ArrowLeft, ArrowRight, ExternalLink, RefreshCw, ZoomIn, ZoomOut } from 
 import { Spinner } from "@/components/ui/spinner";
 import styles from "./homework-pdf-viewer.module.css";
 
-export function HomeworkPdfViewer({ url, filename = "Домашняя работа.pdf", onRefresh }: { url: string; filename?: string; onRefresh?: () => void }) {
+export function HomeworkPdfViewer({ url, filename = "Домашняя работа.pdf", onRefresh, standalone = false }: { url: string; filename?: string; onRefresh?: () => void; standalone?: boolean }) {
   const [document, setDocument] = useState<PDFDocumentProxy | null>(null);
   const [page, setPage] = useState(1);
   const [renderedPage, setRenderedPage] = useState(0);
@@ -71,7 +71,7 @@ export function HomeworkPdfViewer({ url, filename = "Домашняя работ
     return () => { active = false; render?.cancel(); };
   }, [document, page, width, zoom]);
 
-  return <section className={styles.viewer} aria-label={`Просмотр: ${filename}`}>
+  return <section className={`${styles.viewer} ${standalone ? styles.standalone : ""}`} aria-label={`Просмотр: ${filename}`}>
     <div className={styles.toolbar}>
       <div className={styles.paging}><button type="button" disabled={!document || page <= 1} onClick={() => setPage(p => p - 1)} aria-label="Предыдущая страница"><ArrowLeft size={18} /></button><span aria-live="polite">{document ? `${page} / ${document.numPages}` : "PDF"}</span><button type="button" disabled={!document || page >= document.numPages} onClick={() => setPage(p => p + 1)} aria-label="Следующая страница"><ArrowRight size={18} /></button></div>
       <div className={styles.tools}><button type="button" onClick={() => setZoom(z => Math.max(1, z - 0.25))} disabled={zoom <= 1} aria-label="Уменьшить"><ZoomOut size={18} /></button><button type="button" onClick={() => setZoom(z => Math.min(2.5, z + 0.25))} disabled={zoom >= 2.5} aria-label="Увеличить"><ZoomIn size={18} /></button><a href={url} target="_blank" rel="noreferrer" aria-label="Открыть PDF отдельно"><ExternalLink size={18} /></a></div>

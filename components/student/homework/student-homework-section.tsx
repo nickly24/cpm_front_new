@@ -1,41 +1,40 @@
 "use client";
+import { useMediaQuery } from "@/lib/hooks/use-media-query";
+import { HomeworkDesktopList, HomeworkDesktopToolbar } from "./homework-desktop";
 import { useHomeworkTypes } from "@/lib/bff/use-homework-types";
 import { HomeworkCard } from "./homework-card";
 import { HomeworkPagination } from "./homework-pagination";
 import styles from "./homework.module.css";
-import { FilterPopover } from "@/components/ui/filter-popover";
+import { HomeworkSearchScreen, homeworkStatuses } from "./homework-search-screen";
+import { usePullToRefresh, PullRefreshIndicator } from "../shared/pull-to-refresh";
 import { LoadingState } from "@/components/ui/loading-state";
 import { fetchStudentHomework } from "@/lib/student/homework-api";
-import { HOMEWORK_PAGE_SIZE, type HomeworkStatusFilter, type StudentHomeworkResponse } from "@/lib/student/homework-types";
-import { BookOpen, RefreshCw, Search } from "lucide-react";
-import { Suspense, useCallback, useEffect, useState } from "react";
+import { HOMEWORK_PAGE_SIZE, type StudentHomeworkResponse } from "@/lib/student/homework-types";
+import { BookOpen, Search } from "lucide-react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { HomeworkWorkspaceModal } from "@/components/homework/homework-workspace";
 
-const tabs: { value: HomeworkStatusFilter; label: string }[] = [{ value: "all", label: "Все задания" }, { value: "undone", label: "К сдаче" }, { value: "in_review", label: "На проверке" }, { value: "revision", label: "Доработка" }, { value: "done", label: "Проверено" }];
 export function StudentHomeworkSection() {
   return <Suspense fallback={<LoadingState label="Открываем домашние задания…" variant="block" />}><StudentHomeworkContent /></Suspense>;
 }
-function HomeworkSearch({ value, onCommit }: { value: string; onCommit: (value: string) => void }) {
-  const [text, setText] = useState(value);
-  useEffect(() => {
-    if (text === value) return;
-    const timer = setTimeout(() => onCommit(text.trim()), 300);
-    return () => clearTimeout(timer);
-  }, [text, value, onCommit]);
-  return <label className={styles.search}><Search size={18} /><input type="search" maxLength={200} value={text} onChange={event => setText(event.target.value)} placeholder="Найти задание" aria-label="Найти задание" /></label>;
-}
 function StudentHomeworkContent() {
-  const { names: typeNames, error: typeError } = useHomeworkTypes();
+  const desktop = useMediaQuery("(min-width: 1024px)");
+  const listPosition = useRef<{ id: number; y: number } | null>(null);
+  const previousWork = useRef<number | null>(null);
+  const pendingRestore = useRef<{y:number;refresh:number}|null>(null);
+  const { names: typeNames, error: typeError, reload: reloadTypes } = useHomeworkTypes();
   const params = useSearchParams();
   const pathname = usePathname();
   const router = useRouter();
   const queryString = params.toString();
   const typeFilter = params.get("type") || "all";
-  const statusFilter = tabs.find(tab => tab.value === params.get("status"))?.value || "all";
+  const statusFilter = homeworkStatuses.find(tab => tab.value === params.get("status"))?.value || "all";
   const requestedPage = Number(params.get("page") || 1);
   const currentPage = Number.isInteger(requestedPage) && requestedPage > 0 && requestedPage <= 1000000 ? requestedPage : 1;
   const searchQuery = params.get("search") || "";
+  const scroller = useRef<HTMLDivElement>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
   const [refresh, setRefresh] = useState(0);
   const requestKey = JSON.stringify([currentPage, typeFilter, statusFilter, searchQuery, refresh]);
   const [resource, setResource] = useState<{ key: string; data?: StudentHomeworkResponse; error?: string } | null>(null);
@@ -78,18 +77,49 @@ function StudentHomeworkContent() {
     window.addEventListener("focus", focus);
     return () => { window.removeEventListener("homework-workspace-updated", update); window.removeEventListener("focus", focus); };
   }, []);
-  const open = (id: number) => { const next = new URLSearchParams(queryString); next.set("work", String(id)); router.push(`${pathname}?${next}`, { scroll: false }); };
-  const close = () => { updateQuery({ work: null }); setRefresh(value => value + 1); };
+  const hrefFor = (id: number) => { const next = new URLSearchParams(queryString); next.set("work", String(id)); return `${pathname}?${next}`; };
+  const open = (id: number) => { if (desktop) listPosition.current = { id, y: window.scrollY }; router.push(hrefFor(id), { scroll: false }); };
+  const close = () => {
+    if (desktop && listPosition.current?.id === openHomeworkId) router.back();
+    else { updateQuery({ work: null }); if (!desktop) setRefresh(value => value + 1); }
+  };
+  useEffect(() => {
+    const wasOpen = previousWork.current;
+    previousWork.current = openHomeworkId;
+    if (!desktop) return;
+    if (openHomeworkId) { window.scrollTo({ top: 0, behavior: "instant" }); return; }
+    if (!wasOpen) return;
+    const y = listPosition.current?.y ?? 0;
+    listPosition.current = null;
+    pendingRestore.current = { y, refresh: refresh + 1 };
+    const frame = requestAnimationFrame(() => { setRefresh(value => value + 1); });
+    return () => cancelAnimationFrame(frame);
+  }, [desktop, openHomeworkId, refresh]);
+  useEffect(() => {
+    const restore = pendingRestore.current;
+    if (!desktop || openHomeworkId || !response || !restore || refresh < restore.refresh) return;
+    const frame = requestAnimationFrame(() => { window.scrollTo({ top: restore.y, behavior: "instant" }); pendingRestore.current = null; });
+    return () => cancelAnimationFrame(frame);
+  }, [desktop, openHomeworkId, response, refresh]);
+  const reload = useCallback(() => setRefresh(value => value + 1), [setRefresh]);
+  const pullDistance = usePullToRefresh(scroller, { loading, disabled: desktop || Boolean(searchOpen || openHomeworkId), onRefresh: reload });
+  const applyFilters = (values: { search: string; status: string; type: string }) => {
+    pendingRestore.current = null;
+    updateQuery({ search: values.search.trim(), status: values.status, type: values.type, page: null });
+    if (scroller.current) scroller.current.scrollTop = 0;
+  };
+  if (desktop && openHomeworkId) return <HomeworkWorkspaceModal key={openHomeworkId} homeworkId={openHomeworkId} onClose={close} presentation="page"/>;
   return <div className={styles.page}>
-    <header className={styles.pageHeading}><div><span className={styles.eyebrow}>Учёба · Мои работы</span><h1>Домашние задания</h1><p>Подготовьте работу, отправьте PDF и следите за проверкой.</p></div><button type="button" className={styles.refresh} aria-label="Обновить задания" disabled={loading} onClick={() => setRefresh(value => value + 1)}><RefreshCw size={18} /></button></header>
-    {counts?.revision ? <button type="button" className={styles.revisionBanner} onClick={() => updateQuery({ status: "revision", page: null })}>Есть работы на доработке: {counts.revision}<span>Посмотреть комментарии →</span></button> : null}
-    <div className={styles.tabs} role="group" aria-label="Статус заданий">{tabs.map(tab => <button key={tab.value} type="button" aria-pressed={statusFilter === tab.value} onClick={() => updateQuery({ status: tab.value, page: null })}>{tab.label}<span>{counts?.[tab.value] ?? "—"}</span></button>)}</div>
-    <section className={styles.toolbar}><HomeworkSearch key={searchQuery} value={searchQuery} onCommit={search => updateQuery({ search, page: null })} /><FilterPopover activeCount={Number(typeFilter !== "all")} onReset={() => updateQuery({ type: null, page: null })}><label className={styles.typeFilter}><span>Тип задания</span><select aria-label="Тип задания" value={typeFilter} onChange={event => updateQuery({ type: event.target.value, page: null })}><option value="all">Все типы</option>{typeNames.map(name => <option key={name} value={name}>{name}</option>)}</select></label></FilterPopover></section>
-    {typeError ? <p role="alert">{typeError}</p> : null}
-    {error ? <div className={styles.alert} role="alert">{error}</div> : null}
-    {loading ? <LoadingState label="Загружаем задания…" variant="block" /> : response?.res.length ? <section className={styles.grid} aria-label="Задания">{response.res.map(item => <HomeworkCard key={item.homework_id} item={item} onOpen={() => open(item.homework_id)} />)}</section> : !error ? <div className={styles.empty}><BookOpen size={32} /><h2>Здесь пока нет заданий</h2><p>Попробуйте другой статус или измените поиск.</p></div> : null}
-    {pagination && pagination.total_pages > 1 ? <HomeworkPagination currentPage={pagination.current_page} totalPages={pagination.total_pages} onPageChange={page => updateQuery({ page: String(page) })} /> : null}
-    <p className={styles.resultMeta}>{pagination?.total_items ? `Показано ${response?.res.length} из ${pagination.total_items} · Ближайшие сроки сначала` : ""}</p>
+    {desktop ? <HomeworkDesktopToolbar key={searchQuery} initial={{ search: searchQuery, status: statusFilter, type: typeFilter }} types={typeNames} counts={counts} onApply={applyFilters}/> : <button type="button" className={styles.searchSummary} aria-label="Изменить поиск заданий" onClick={() => setSearchOpen(true)}><Search size={20}/><span><strong>{searchQuery || "Все домашние задания"}</strong><small>{homeworkStatuses.find(item => item.value === statusFilter)?.label} · {typeFilter === "all" ? "Все типы" : typeFilter}</small></span></button>}
+    {typeError ? <p role="alert" className={styles.typeError}>{typeError}{reloadTypes ? <button type="button" onClick={reloadTypes}>Повторить</button> : null}</p> : null}
+    <div ref={scroller} className={styles.feedScroll} role="region" aria-label="Лента домашних заданий" tabIndex={0}>
+      <PullRefreshIndicator distance={pullDistance} loading={loading}/>
+      {error ? <div className={styles.alert} role="alert">{error}<button type="button" onClick={reload}>Повторить</button></div> : null}
+      {loading ? null : response?.res.length ? (desktop ? <HomeworkDesktopList items={response.res} hrefFor={hrefFor} onOpen={open}/> : <section className={styles.grid} aria-label="Задания">{response.res.map(item => <HomeworkCard key={item.homework_id} item={item} onOpen={() => open(item.homework_id)} />)}</section>) : !error ? <div className={styles.empty}><BookOpen size={32} /><h2>Здесь пока нет заданий</h2><p>Попробуйте другой статус или измените поиск.</p></div> : null}
+      {pagination && pagination.total_pages > 1 ? <HomeworkPagination currentPage={pagination.current_page} totalPages={pagination.total_pages} onPageChange={page => { updateQuery({ page: String(page) }); if (desktop) window.scrollTo({ top: 0, behavior: "instant" }); if (scroller.current) scroller.current.scrollTop = 0; }} /> : null}
+      <p className={styles.resultMeta}>{pagination?.total_items ? `Показано ${response?.res.length} из ${pagination.total_items}` : ""}</p>
+    </div>
+    {searchOpen ? <HomeworkSearchScreen initial={{ search: searchQuery, status: statusFilter, type: typeFilter }} types={typeNames} counts={counts} onClose={() => setSearchOpen(false)} onApply={values => { updateQuery({ search: values.search.trim(), status: values.status, type: values.type, page: null }); setSearchOpen(false); if (scroller.current) scroller.current.scrollTop = 0; }}/> : null}
     {openHomeworkId ? <HomeworkWorkspaceModal key={openHomeworkId} homeworkId={openHomeworkId} onClose={close} /> : null}
   </div>;
 }

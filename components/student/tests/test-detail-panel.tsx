@@ -1,5 +1,10 @@
+"use client";
+
+import { useEffect, useRef } from "react";
 import { formatAttemptDeadline } from "@/lib/student/test-attempt-catalog";
 import styles from "@/components/student/tests/tests.module.css";
+import detail from "./test-detail-desktop.module.css";
+import { TestActionArtwork, type TestActionKind } from "./test-action-artwork";
 import {
   formatTestDate,
   formatTestScore,
@@ -10,18 +15,14 @@ import {
 import type { StudentTestItem, TestSession } from "@/lib/student/tests-types";
 import { TESTS_STATUS_LABELS } from "@/lib/student/tests-types";
 import {
-  Brain,
+  ArrowUpRight,
+  ArrowLeft,
   CalendarRange,
   CheckCircle2,
   Clock3,
-  Eye,
   Globe2,
-  Play,
-  RotateCcw,
-  Send,
   Target,
   Timer,
-  X,
 } from "lucide-react";
 
 interface TestDetailPanelProps {
@@ -31,8 +32,12 @@ interface TestDetailPanelProps {
   onResumeTest: (testId: string, attemptId: string) => void;
   onPractice: (testId: string) => void;
   onViewAnswers: (testId: string, sessionId: string) => void;
-  variant?: "inline" | "sheet";
+  variant?: "inline" | "sheet" | "page";
   onClose?: () => void;
+}
+
+function ActionContent({kind,title,hint}:{kind:TestActionKind;title:string;hint:string}) {
+  return <><span className={detail.digital} aria-hidden="true"><svg viewBox="0 0 600 160" fill="none"><g stroke="currentColor" strokeWidth="1.4"><rect x="410" y="24" width="28" height="35" rx="6" transform="rotate(-16 410 24)"/><path d="M505 105h24v24h-24zM516 94h24v24h-24zM470 27v16m-8-8h16M560 57l7 7-7 7-7-7zM397 117v14m-7-7h14"/></g><g fill="currentColor"><circle cx="551" cy="26" r="3"/><circle cx="460" cy="133" r="3"/></g></svg></span><span className={detail.glyph}><TestActionArtwork kind={kind}/></span><span className={detail.copy}><span>{title}</span><small aria-hidden="true">{hint}</small></span><ArrowUpRight className={detail.arrow} size={20} aria-hidden="true"/></>;
 }
 
 export function TestDetailPanel({
@@ -45,6 +50,13 @@ export function TestDetailPanel({
   variant = "inline",
   onClose,
 }: TestDetailPanelProps) {
+  const panelRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (variant !== "sheet") return;
+    const previous = document.activeElement as HTMLElement | null;
+    panelRef.current?.querySelector<HTMLButtonElement>("button")?.focus({ preventScroll: true });
+    return () => previous?.focus({ preventScroll: true });
+  }, [variant]);
   if (!test) {
     if (variant === "sheet") {
       return null;
@@ -62,6 +74,9 @@ export function TestDetailPanel({
   const external = isExternalTest(test);
   const testId = String(test.id);
   const isSheet = variant === "sheet";
+  const isPage = variant === "page";
+  const remainingSeconds = Math.max(0, Math.floor(test.activeAttempt?.remainingSeconds || 0));
+  const remainingLabel = remainingSeconds >= 60 ? `${Math.floor(remainingSeconds / 60)} мин${remainingSeconds % 60 ? ` ${remainingSeconds % 60} сек` : ""}` : `${remainingSeconds} сек`;
   const score = external
     ? getExternalScore(test)
     : session?.score != null
@@ -70,22 +85,39 @@ export function TestDetailPanel({
 
   return (
     <aside
-      className={`${styles.detailPane} ${isSheet ? styles.detailPaneSheet : ""}`.trim()}
+      ref={panelRef}
+      role={isSheet ? "dialog" : undefined}
+      aria-modal={isSheet ? true : undefined}
+      aria-label={isSheet ? "Карточка теста" : undefined}
+      onKeyDown={event => {
+        if (!isSheet) return;
+        if (event.key === "Escape") onClose?.();
+        if (event.key === "Tab") {
+          const buttons = panelRef.current?.querySelectorAll<HTMLButtonElement>('button:not(:disabled), summary');
+          if (!buttons?.length) return;
+          const first = buttons[0], last = buttons[buttons.length - 1];
+          if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+          else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+        }
+      }}
+      className={`${styles.detailPane} ${isSheet ? `${styles.detailPaneSheet} ${detail.sheet}` : isPage ? `${styles.detailPanePage} ${detail.page}` : ""}`.trim()}
     >
+      {isPage ? <button type="button" className={styles.desktopBack} onClick={onClose}><ArrowLeft size={20}/>К списку тестов</button> : null}
       {isSheet ? (
         <div className={styles.mobileSheetTop}>
-          <span className={styles.mobileSheetHandle} aria-hidden />
           <button
             type="button"
             className={styles.mobileSheetClose}
             onClick={onClose}
-            aria-label="Закрыть"
+            aria-label="К списку тестов"
           >
-            <X size={20} />
+            <ArrowLeft size={23} />
           </button>
+          <span className={styles.sheetTitle}>Тест</span><span className={styles.sheetHeaderSpacer} aria-hidden/>
         </div>
       ) : null}
 
+      <div className={`${styles.detailBody} ${detail.body}`}>
       <div className={styles.detailHeader}>
         <div className={styles.detailBadges}>
           <span
@@ -113,11 +145,11 @@ export function TestDetailPanel({
             здесь нельзя — только просмотр результата, если он добавлен.
           </p>
 
-          <div className={styles.infoRow}>
-            <CalendarRange size={16} className={styles.infoRowIcon} />
+          <div className={`${styles.infoRow} ${detail.infoRow}`}>
+            <CalendarRange size={16} className={`${styles.infoRowIcon} ${detail.infoIcon}`} />
             <div className={styles.infoRowText}>
               <span className={styles.infoRowLabel}>Дата</span>
-              <span className={styles.infoRowValue}>
+              <span className={`${styles.infoRowValue} ${detail.infoValue}`}>
                 {formatTestDate(test.date)}
               </span>
             </div>
@@ -134,32 +166,25 @@ export function TestDetailPanel({
         </div>
       ) : (
         <div className={styles.detailBlock}>
-          <div className={styles.infoRow}>
-            <Clock3 size={16} className={styles.infoRowIcon} />
+          <div className={`${styles.infoRow} ${detail.infoRow}`}>
+            <Clock3 size={16} className={`${styles.infoRowIcon} ${detail.infoIcon}`} />
             <div className={styles.infoRowText}>
-              <span className={styles.infoRowLabel}>Лимит времени</span>
-              <span className={styles.infoRowValue}>
+              <span className={styles.infoRowLabel}>На прохождение</span>
+              <span className={`${styles.infoRowValue} ${detail.infoValue}`}>
                 {test.timeLimitMinutes ?? "—"} мин
               </span>
             </div>
           </div>
 
-          <div className={styles.infoRow}>
-            <CalendarRange size={16} className={styles.infoRowIcon} />
+          <div className={`${styles.infoRow} ${detail.infoRow}`}>
+            <CalendarRange size={16} className={`${styles.infoRowIcon} ${detail.infoIcon}`} />
             <div className={styles.infoRowText}>
-              <span className={styles.infoRowLabel}>Период начала теста</span>
-              <span className={styles.infoRowValue}>
+              <span className={styles.infoRowLabel}>Когда можно начать</span>
+              <span className={`${styles.infoRowValue} ${detail.infoValue}`}>
                 {formatTestDate(test.startDate)} — {formatTestDate(test.endDate)}
               </span>
             </div>
           </div>
-
-          {test.activeAttempt ? (
-            <div className={styles.attemptBanner}>
-              <p className={styles.attemptMeta}>Ответить до: {formatAttemptDeadline(test.activeAttempt.expiresAt)}</p>
-              <p className={styles.attemptMeta}>Отправить до: {formatAttemptDeadline(test.activeAttempt.uploadDeadline)}</p>
-            </div>
-          ) : null}
 
           {test.canRequestHelp && test.activeAttempt ? (
             <div className={styles.attemptBannerExpired} role="status">
@@ -174,14 +199,10 @@ export function TestDetailPanel({
 
           {test.canResume && test.activeAttempt ? (
             <div className={styles.attemptBanner}>
-              <p className={styles.attemptTitle}>Незавершённая попытка</p>
-              <p className={styles.attemptMeta}>
-                Ответов: {test.activeAttempt.answeredCount} из{" "}
-                {test.activeAttempt.totalQuestions}
-              </p>
-              <p className={styles.attemptMeta}>
-                Осталось: {Math.max(0, test.activeAttempt.remainingSeconds)} сек
-              </p>
+              <p className={styles.attemptTitle}>Продолжите с того же места</p>
+              <div className={styles.attemptProgressMeta}><span>{test.activeAttempt.answeredCount} из {test.activeAttempt.totalQuestions} ответов</span><span><Clock3 size={14}/>{remainingLabel}</span></div>
+              <progress className={styles.attemptProgress} value={test.activeAttempt.answeredCount} max={Math.max(1, test.activeAttempt.totalQuestions)} aria-label="Прогресс ответов"/>
+              <div className={styles.attemptDeadlines}><p><span>Ответить до</span><strong>{formatAttemptDeadline(test.activeAttempt.expiresAt)}</strong></p><p><span>Отправить до</span><strong>{formatAttemptDeadline(test.activeAttempt.uploadDeadline)}</strong></p></div>
             </div>
           ) : null}
 
@@ -197,6 +218,8 @@ export function TestDetailPanel({
               </p>
             </div>
           ) : null}
+
+          {test.activeAttempt && !test.canResume ? <div className={styles.attemptDeadlines}><p><span>Ответить до</span><strong>{formatAttemptDeadline(test.activeAttempt.expiresAt)}</strong></p><p><span>Отправить до</span><strong>{formatAttemptDeadline(test.activeAttempt.uploadDeadline)}</strong></p></div> : null}
 
           {score != null ? (
             <div className={styles.scoreHero}>
@@ -278,59 +301,55 @@ export function TestDetailPanel({
         </div>
       )}
 
-      <div className={styles.detailActions}>
+      </div>
+      <div className={`${styles.detailActions} ${detail.actions}`}>
         {!external && test.canSubmitExpired && test.activeAttempt ? (
           <button
             type="button"
-            className={`${styles.actionBtn} ${styles.actionBtnPrimary}`}
+            className={`${styles.actionBtn} ${styles.actionBtnPrimary} ${detail.action} ${detail.primary}`}
             onClick={() => onResumeTest(testId, test.activeAttempt!.id)}
           >
-            <Send size={18} />
-            Отправить сохранённые ответы
+            <ActionContent kind="submit" title="Отправить сохранённые ответы" hint="Завершить текущую попытку"/>
           </button>
         ) : null}
 
         {!external && test.canResume && test.activeAttempt ? (
           <button
             type="button"
-            className={`${styles.actionBtn} ${styles.actionBtnPrimary}`}
+            className={`${styles.actionBtn} ${styles.actionBtnPrimary} ${detail.action} ${detail.primary}`}
             onClick={() => onResumeTest(testId, test.activeAttempt!.id)}
           >
-            <RotateCcw size={18} />
-            Продолжить тест
+            <ActionContent kind="resume" title="Продолжить тест" hint="Вернуться к текущей попытке"/>
           </button>
         ) : null}
 
         {!external && test.canStart ? (
           <button
             type="button"
-            className={`${styles.actionBtn} ${styles.actionBtnPrimary}`}
+            className={`${styles.actionBtn} ${styles.actionBtnPrimary} ${detail.action} ${detail.primary}`}
             onClick={() => onStartTest(testId)}
           >
-            <Play size={18} />
-            Пройти тест
+            <ActionContent kind="start" title="Пройти тест" hint="Начать прохождение"/>
           </button>
         ) : null}
 
         {!external && test.canPractice ? (
           <button
             type="button"
-            className={`${styles.actionBtn} ${styles.actionBtnPractice}`}
+            className={`${styles.actionBtn} ${styles.actionBtnPractice} ${detail.action} ${detail.practice}`}
             onClick={() => onPractice(testId)}
           >
-            <Brain size={18} />
-            Тренироваться
+            <ActionContent kind="practice" title="Тренироваться" hint="Закрепить материал"/>
           </button>
         ) : null}
 
         {!external && test.canViewResults && test.isCompleted && session?.id ? (
           <button
             type="button"
-            className={`${styles.actionBtn} ${styles.actionBtnReview}`}
+            className={`${styles.actionBtn} ${styles.actionBtnReview} ${detail.action} ${detail.review}`}
             onClick={() => onViewAnswers(testId, session.id)}
           >
-            <Eye size={18} />
-            Смотреть ответы
+            <ActionContent kind="review" title="Смотреть ответы" hint="Разобрать свои ответы"/>
           </button>
         ) : null}
       </div>

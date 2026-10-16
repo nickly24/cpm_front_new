@@ -2,6 +2,9 @@
 
 import { useContextGuard } from "@/lib/bff/use-context-guard";
 import styles from "./test-attempt.module.css";
+import player from "../test-player.module.css";
+import { QuestionPagination } from "../question-pagination";
+import { useTestViewport } from "../use-test-viewport";
 import { LoadingState } from "@/components/ui/loading-state";
 import {
   checkPracticeAnswer,
@@ -28,7 +31,6 @@ import {
   ArrowLeft,
   ArrowRight,
   CheckCircle2,
-  Clock3,
   Send,
   XCircle,
 } from "lucide-react";
@@ -45,11 +47,12 @@ function feedbackMap(attempt: TestAttempt | null) {
 
 export function PracticeAttemptScreen({
   testId,
-  testTitle,
   resumeAttemptId,
   onExit,
   onCompleted,
 }: TestAttemptScreenProps) {
+  const overlayRef = useTestViewport();
+  const questionRef = useRef<HTMLHeadingElement>(null);
   const [phase, setPhase] = useState<PracticePhase>("loading");
   const [attempt, setAttempt] = useState<TestAttempt | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -206,13 +209,18 @@ export function PracticeAttemptScreen({
     }
   };
 
+  const goToQuestion = (index: number) => {
+    setCurrentIndex(index); setError(null);
+    mainRef.current?.scrollTo({ top: 0 });
+    window.requestAnimationFrame(() => questionRef.current?.focus({ preventScroll: true }));
+  };
+
   const goNext = () => {
     if (currentIndex >= questions.length - 1) {
       void finishPractice();
       return;
     }
-    setCurrentIndex((value) => value + 1);
-    mainRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+    goToQuestion(currentIndex + 1);
   };
 
   const firstUnansweredIndex = questions.findIndex(
@@ -231,7 +239,7 @@ export function PracticeAttemptScreen({
 
   if (phase === "loading") {
     return (
-      <div className={styles.attemptOverlay}>
+      <div className={player.overlay} ref={overlayRef} role="dialog" aria-modal="true" aria-label="Тренировка">
         <div className={styles.attemptCenterState}>
           <LoadingState label="Подготовка тренировки…" variant="compact" />
         </div>
@@ -241,7 +249,7 @@ export function PracticeAttemptScreen({
 
   if (phase === "fatal") {
     return (
-      <div className={styles.attemptOverlay}>
+      <div className={player.overlay} ref={overlayRef} role="dialog" aria-modal="true" aria-label="Тренировка">
         <div className={styles.attemptCenterState}>
           <h2 className={styles.attemptCenterTitle}>Не удалось открыть тренировку</h2>
           <p className={styles.attemptCenterText}>{error}</p>
@@ -255,7 +263,7 @@ export function PracticeAttemptScreen({
 
   if (phase === "done") {
     return (
-      <div className={styles.attemptOverlay}>
+      <div className={player.overlay} ref={overlayRef} role="dialog" aria-modal="true" aria-label="Тренировка">
         <div className={styles.attemptCenterState}>
           <CheckCircle2 size={48} color="#16a34a" />
           <h2 className={styles.attemptCenterTitle}>Тренировка завершена</h2>
@@ -281,7 +289,7 @@ export function PracticeAttemptScreen({
     if (question.type === "text") {
       return (
         <textarea
-          className={styles.attemptTextInput}
+          aria-label="Ваш ответ" rows={3} className={`${styles.attemptTextInput} ${player.input}`}
           value={draft.type === "text" ? draft.textAnswer : ""}
           onChange={(event) => setDraft({ type: "text", textAnswer: event.target.value })}
           disabled={Boolean(currentFeedback) || busy}
@@ -303,7 +311,8 @@ export function PracticeAttemptScreen({
             <button
               key={option.id}
               type="button"
-              className={`${styles.attemptOption} ${selected ? styles.attemptOptionSelected : ""} ${revealedCorrect ? styles.practiceOptionCorrect : ""} ${revealedWrong ? styles.practiceOptionIncorrect : ""}`.trim()}
+              aria-pressed={selected}
+              className={`${styles.attemptOption} ${player.option} ${question.type === "multiple" ? player.multipleOption : ""} ${selected ? styles.attemptOptionSelected : ""} ${revealedCorrect ? styles.practiceOptionCorrect : ""} ${revealedWrong ? styles.practiceOptionIncorrect : ""}`.trim()}
               disabled={Boolean(currentFeedback) || busy}
               onClick={() => {
                 if (question.type === "single") {
@@ -323,39 +332,17 @@ export function PracticeAttemptScreen({
   };
 
   return (
-    <div className={styles.attemptOverlay}>
-      <header className={styles.attemptHeader}>
-        <div className={styles.attemptHeaderLeft}>
-          <button type="button" className={styles.attemptBackBtn} onClick={handleExit}>
-            <ArrowLeft size={16} />
-            <span className={styles.attemptBackBtnLabel}>В систему</span>
-          </button>
-          <div className={styles.attemptTitleWrap}>
-            <span className={styles.attemptEyebrow}>Тренировка</span>
-            <h1 className={styles.attemptTitle}>{testTitle}</h1>
-          </div>
-          <span className={styles.attemptPracticeBadge}>Не засчитывается</span>
-        </div>
-        <div className={styles.attemptHeaderRight}>
-          <span className={styles.practiceNoLimit}><Clock3 size={16} /> Без ограничения времени</span>
-          <span className={styles.attemptProgressMeta}>
-            Проверено {attempt.answeredCount} / {attempt.totalQuestions}
-          </span>
-        </div>
+    <div className={player.overlay} ref={overlayRef} role="dialog" aria-modal="true" aria-label="Тренировка">
+      <header className={player.header}>
+        <button type="button" className={player.iconButton} onClick={handleExit} aria-label="К списку тестов"><ArrowLeft size={20}/></button>
+        <span className={player.timerCenter}>Тренировка</span><span className={player.headerSpacer} aria-hidden/>
       </header>
-
-      {error ? <div className={styles.attemptAlert}>{error}</div> : null}
-
-      <div className={styles.attemptBody}>
-        <main className={styles.attemptMain} ref={mainRef}>
-          <article className={styles.attemptQuestionCard}>
-            <div className={styles.attemptQuestionHead}>
-              <span className={styles.attemptQuestionIndex}>Вопрос {currentIndex + 1} из {questions.length}</span>
-              {currentQuestion.points != null ? (
-                <span className={styles.attemptQuestionPoints}>{currentQuestion.points} б.</span>
-              ) : null}
-            </div>
-            <h2 className={styles.attemptQuestionText}>{currentQuestion.text}</h2>
+      <QuestionPagination pages={questions.map((question, index) => ({ id: question.questionId, status: feedbackByQuestion.has(question.questionId) ? feedbackByQuestion.get(question.questionId)!.isCorrect ? "correct" : "incorrect" : "empty", disabled: !feedbackByQuestion.has(question.questionId) && index > maxAccessibleIndex }))} currentIndex={currentIndex} onSelect={goToQuestion} disabled={busy} summary={`Проверено ${attempt.answeredCount} из ${questions.length}`} />
+      {error ? <p className={player.error} role="alert">{error}</p> : null}
+      <main className={player.main} ref={mainRef} data-test-scroll>
+          <article className={`${styles.attemptQuestionCard} ${player.card}`}>
+            <div className={player.questionType}><span>{currentQuestion.type === "single" ? "Выберите один ответ" : currentQuestion.type === "multiple" ? "Выберите несколько ответов" : "Напишите ответ"}</span></div>
+            <h2 ref={questionRef} tabIndex={-1} className={player.questionText}>{currentQuestion.text}</h2>
             {renderOptions(currentQuestion)}
 
             {currentFeedback ? (
@@ -363,7 +350,7 @@ export function PracticeAttemptScreen({
                 <div className={styles.practiceFeedbackTitle}>
                   {currentFeedback.isCorrect ? <CheckCircle2 size={20} /> : <XCircle size={20} />}
                   {currentFeedback.isCorrect ? "Верно" : "Неверно"}
-                  <span>{currentFeedback.points} б.</span>
+
                 </div>
                 {currentQuestion.type === "text" && currentFeedback.correct.correctAnswers?.length ? (
                   <p>Правильный ответ: {currentFeedback.correct.correctAnswers.join("; ")}</p>
@@ -374,45 +361,13 @@ export function PracticeAttemptScreen({
             ) : null}
           </article>
 
-          <footer className={styles.attemptFooter}>
-            <span className={styles.attemptHint}>
-              {currentFeedback
-                ? "Ответ проверен и сохранён"
-                : "Ответ можно менять до нажатия «Проверить ответ»"}
-            </span>
-            {currentFeedback ? (
-              <button type="button" className={styles.attemptNextBtn} disabled={busy} onClick={goNext}>
-                {currentIndex === questions.length - 1 ? "Завершить тренировку" : "Следующий вопрос"}
-                {currentIndex === questions.length - 1 ? <Send size={16} /> : <ArrowRight size={16} />}
-              </button>
-            ) : (
-              <button type="button" className={styles.attemptNextBtn} disabled={busy || !isDraftValid(draft)} onClick={() => void handleCheck()}>
-                {busy ? "Проверяем…" : "Проверить ответ"}
-                <CheckCircle2 size={16} />
-              </button>
-            )}
-          </footer>
-        </main>
-
-        <section className={styles.attemptQuestionNav}>
-          <div className={styles.attemptQuestionGrid}>
-            {questions.map((question, index) => {
-              const checked = feedbackByQuestion.has(question.questionId);
-              return (
-                <button
-                  key={question.questionId}
-                  type="button"
-                  className={`${styles.attemptQuestionPill} ${index === currentIndex ? styles.attemptQuestionPillCurrent : ""} ${checked ? styles.attemptQuestionPillSynced : ""}`.trim()}
-                  disabled={!checked && index > maxAccessibleIndex}
-                  onClick={() => setCurrentIndex(index)}
-                >
-                  {index + 1}
-                </button>
-              );
-            })}
-          </div>
-        </section>
-      </div>
+      </main>
+      <footer className={player.footer}><div className={player.footerInner}>
+        <div className={player.actions}>
+          <button type="button" className={player.secondary} disabled={busy || currentIndex === 0} onClick={() => goToQuestion(currentIndex - 1)}><ArrowLeft size={17}/>Назад</button>
+          {currentFeedback ? <button type="button" className={player.primary} disabled={busy} onClick={goNext}>{currentIndex === questions.length - 1 ? "Завершить" : "Далее"}{currentIndex === questions.length - 1 ? <Send size={17}/> : <ArrowRight size={17}/>}</button> : <button type="button" className={player.primary} disabled={busy || !isDraftValid(draft)} onClick={() => void handleCheck()}>{busy ? "Проверяем…" : "Проверить ответ"}<CheckCircle2 size={17}/></button>}
+        </div>
+      </div></footer>
     </div>
   );
 }

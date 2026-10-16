@@ -4,7 +4,7 @@ import { canAccessSection } from "@/lib/auth/admin-access";
 import { adminNavigation } from "./admin";
 import { examinatorNavigation } from "./examinator";
 import { proctorNavigation } from "./proctor";
-import { studentNavigation } from "./student";
+import { studentAuxiliarySections, studentNavigation } from "./student";
 import { supervisorNavigation } from "./supervisor";
 import type { RoleNavigation } from "./types";
 
@@ -25,6 +25,7 @@ export function getNavigation(role: UserRole, user?: User | null): RoleNavigatio
 }
 
 export function getDefaultSection(role: UserRole, user?: User | null): string {
+  if (role === "student") return "menu";
   if (BFF_DEV) {
     if (role === "staff_admin" && user) {
       return ["assignments", "tests", "test-results", "exams", "ratings", "users", "schools", "train", "dashboard", "review-queue", "homework-archive", "monitoring", "schedule", "attendance", "zaps", "scan", "organizations", "divisions", "directions"].find(section => canAccessSection(user, section)) ?? "assignments";
@@ -35,12 +36,14 @@ export function getDefaultSection(role: UserRole, user?: User | null): string {
 }
 
 export function isValidSection(role: UserRole, sectionId: string): boolean {
+  if (role === "student" && Object.hasOwn(studentAuxiliarySections, sectionId)) return true;
   return navigationByRole[role].groups.some((group) =>
     group.items.some((item) => item.id === sectionId),
   );
 }
 
 export function getSectionLabel(role: UserRole, sectionId: string): string | null {
+  if (role === "student" && Object.hasOwn(studentAuxiliarySections, sectionId)) return studentAuxiliarySections[sectionId];
   for (const group of navigationByRole[role].groups) {
     const item = group.items.find((entry) => entry.id === sectionId);
     if (item) {

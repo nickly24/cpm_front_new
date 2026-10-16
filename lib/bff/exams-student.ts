@@ -98,7 +98,12 @@ async function studentResults(params: Query, signal?: AbortSignal): Promise<Page
     const detail = adequateExamSummary(item) ? item : { ...item, ...await examDetail(id, signal) }, exam = ownerExam(detail, directions);
     for (const row of completed) results.push(exam.examType === "outside_lms" ? outsideStudent(row, exam) : classicStudent(row, exam));
   }
-  const filtered = results.filter(row => params.grade === undefined || params.grade === "" || (row.examType === "classic" ? row.currentAttempt.grade : row.grade) === Number(params.grade));
+  const search = string(params.search).trim().toLocaleLowerCase("ru");
+  const filtered = results.filter(row =>
+    (params.grade === undefined || params.grade === "" || (row.examType === "classic" ? row.currentAttempt.grade : row.grade) === Number(params.grade)) &&
+    (!params.directionId || String(row.directionId) === String(params.directionId)) &&
+    (!search || `${row.examName ?? ""} ${row.directionName}`.toLocaleLowerCase("ru").includes(search))
+  );
   const date = (row: StudentResult) => row.examDate ?? "";
   if (params.sort !== "direction_asc") filtered.sort((a, b) => (params.sort === "date_asc" ? date(a).localeCompare(date(b)) : date(b).localeCompare(date(a))) || (params.sort === "date_asc" ? a.examId - b.examId : b.examId - a.examId));
   return clientPage(filtered, params);

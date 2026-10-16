@@ -12,6 +12,7 @@ export const ROLE_LABELS: Record<UserRole, string> = {
 };
 
 export function getCabinetPath(role: UserRole, user?: User | null): string {
+  if (role === "student") return "/cabinet/student/menu";
   if (BFF_DEV) return `/cabinet/${role}/${getDefaultSection(role, user)}`;
   return `/cabinet/${role}/${navigationByRole[role].groups[0].items[0].id}`;
 }

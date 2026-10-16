@@ -1,0 +1,39 @@
+.toolbar { display:flex; flex-wrap:wrap; align-items:stretch; gap:12px; margin:0 0 26px; }
+.search { display:flex; flex:1 1 280px; min-width:180px; align-items:center; gap:10px; padding:7px 8px 7px 16px; border:1px solid var(--student-search-border,var(--ds-border)); border-radius:16px; background:var(--ds-surface); color:var(--ds-text-muted); }
+.search > svg { flex-shrink:0; color:var(--ds-accent); }
+.search input { flex:1; min-width:0; width:100%; min-height:40px; border:0; outline:none; background:transparent; color:var(--ds-text); font:inherit; font-size:14px; }
+.search button { min-height:40px; padding:0 18px; border:0; border-radius:11px; background:var(--ds-accent); color:white; font:inherit; font-size:13px; cursor:pointer; }
+.search:focus-within { border-color:var(--ds-accent); box-shadow:0 0 0 3px var(--ds-accent-soft); }
+.filter { display:flex; flex-direction:column; justify-content:center; position:relative; flex:1 1 145px; max-width:220px; min-width:0; padding:8px 14px; border:1px solid var(--student-search-border,var(--ds-border)); border-radius:16px; background:var(--ds-surface); }
+.filter > span { margin-bottom:4px; color:var(--ds-text-muted); font-size:10px; }
+.filter select { appearance:none; width:100%; min-width:0; padding:0 22px 0 0; border:0; outline:none; background:transparent; color:var(--ds-text); font:inherit; font-size:13px; cursor:pointer; }
+.filter > svg { position:absolute; right:13px; top:26px; color:var(--ds-text-muted); pointer-events:none; }
+.filter:focus-within { border-color:var(--ds-accent); }
+.reset { min-height:44px; padding:0 8px; border:0; background:transparent; color:var(--ds-text-secondary); font:inherit; font-size:12px; cursor:pointer; }
+.testsList { --catalog-columns:200px 205px 100px; }
+.examsList { --catalog-columns:130px 155px 110px 80px; }
+.columns,.rowButton { display:grid; grid-template-columns:minmax(0,1fr) var(--catalog-columns); align-items:center; gap:22px; }
+.columns { padding:14px 18px; border-bottom:1px solid var(--ds-border); color:var(--ds-text-muted); font-size:11px; }
+.columns > span:last-child { text-align:right; }
+.row { border-bottom:1px solid var(--ds-border); }
+.rowButton { width:100%; min-height:98px; padding:20px 18px; border:0; border-radius:12px; background:transparent; color:var(--ds-text); font:inherit; text-align:left; cursor:pointer; transition:background .15s; }
+.rowButton:hover { background:color-mix(in srgb,var(--ds-surface) 75%,transparent); }
+.title { min-width:0; }
+.title small { display:block; margin-bottom:7px; color:#a58acb; font-size:11px; }
+.title strong { display:block; font-size:16px; line-height:1.5; font-weight:450; overflow-wrap:anywhere; }
+.title em { display:block; margin-top:7px; color:var(--ds-text-secondary); font-size:12px; line-height:1.5; font-style:normal; }
+.meta { color:var(--ds-text-secondary); font-size:12px; line-height:1.6; }
+.meta small { display:block; margin-top:5px; color:var(--ds-text-muted); font-size:11px; }
+.status { display:flex; align-items:center; gap:9px; color:var(--ds-text-secondary); font-size:12px; line-height:1.5; }
+.statusIcon { display:flex; align-items:center; justify-content:center; flex-shrink:0; width:29px; height:29px; border-radius:50%; background:var(--status-color,#8bc832); color:#fff; }
+.status[data-status="completed"] { --status-color:#29bc78; }
+.status[data-status="running"] { --status-color:#a07af0; }
+.status[data-status="upcoming"],.status[data-status="external"],.status[data-status="checking"] { --status-color:#429cf3; }
+.status[data-status="pending_upload"] { --status-color:#f5a13d; }
+.status[data-status="missed"],.status[data-status="upload_window_closed"],.status[data-status="calculation_failed"] { --status-color:#f3656c; }
+.score { display:flex; justify-content:flex-end; align-items:baseline; gap:5px; color:var(--ds-text-muted); }
+.score strong { font-size:18px; color:var(--ds-text); font-weight:550; }
+.score small { font-size:11px; }
+.rowButton:focus-visible,.toolbar button:focus-visible { outline:2px solid var(--ds-accent); outline-offset:2px; }
+@media(max-width:1199px) { .testsList { --catalog-columns:165px 170px 75px; } .examsList { --catalog-columns:110px 115px 90px 65px; } .columns,.rowButton { gap:14px; padding-inline:12px; } .search { flex-basis:100%; } .filter { max-width:none; } }
+@media(prefers-reduced-motion:reduce) { .rowButton { transition:none; } }

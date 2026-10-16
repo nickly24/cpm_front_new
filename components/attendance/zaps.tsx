@@ -1,5 +1,6 @@
 "use client";
 import Image from "next/image";
+import { StudentZapWorkspace } from "@/components/student/zaps/student-zap-workspace";
 import { useCallback, useEffect, useState, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useContextGuard } from "@/lib/bff/use-context-guard";
@@ -28,6 +29,10 @@ export function AttendanceZapDecision({ status, answer, disabled, onAnswer, onDe
     <div className={styles.actions}><button className={styles.primary} disabled={disabled} onClick={() => onDecision("approved")}>Одобрить отгул</button><button disabled={disabled} onClick={() => onDecision("rejected")}>Отклонить отгул</button></div></>;
 }
 export function AttendanceZaps() {
+    const { user } = useAuth();
+    return user?.role === "student" ? <StudentZapWorkspace /> : <StaffAttendanceZaps />;
+}
+function StaffAttendanceZaps() {
     const { user } = useAuth();
     const loadSequence = useRef(0);
     const divisions = ownDivisions(user);

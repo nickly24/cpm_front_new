@@ -11,8 +11,6 @@ import type { UserRole } from "@/lib/auth/types";
 import type { SectionStudyViewResponse, TrainingDirection, TrainingSectionNode } from "@/lib/training/training-types";
 import { LoadingState } from "@/components/ui/loading-state";
 import { Button } from "@/components/ui/button";
-import { SectionHeroBanner } from "@/components/student/section-hero-banner";
-import { STUDENT_SECTION_BANNERS } from "@/lib/student/section-banners";
 import { TrainingSectionsListView } from "./training-topics-view";
 import { TrainingSectionDetail } from "./training-section-detail";
 import { TrainingFlashcards } from "./training-flashcards";
@@ -74,7 +72,6 @@ function Catalog({role,pathSegments,studentId}:{role:UserRole;pathSegments:strin
  }
  const selected=pathSegments.length?directions?.find(d=>d.name===decodeTrainingSegment(pathSegments[0])):directions?.[0];
  return <div className={styles.page}>
-  <SectionHeroBanner imageSrc={STUDENT_SECTION_BANNERS.train} eyebrow="Обучение" title="Карточки" subtitle="Выберите раздел и учите карточки в удобном темпе"/>
-  {error?<div><p role="alert" className={styles.alert}>{error}</p><Button onClick={()=>{setError(null);setReload(v=>v+1)}}>Повторить загрузку</Button></div>:!directions?<LoadingState label="Загрузка направлений…" variant="panel"/>:selected?<TrainingSectionsListView key={selected.id} directions={directions} direction={selected} selectedDirectionId={selected.id} studentId={studentId} loading={false} error={null} onSelectDirection={id=>{const next=directions.find(d=>d.id===id);if(next)router.push(trainingDirectionPath(role,next))}} onSelectSection={s=>router.push(trainingSectionPath(role,selected,s))}/>:<p>{directions.length?"Направление больше недоступно":"Пока нет доступных направлений"}</p>}
+  {error?<div><p role="alert" className={styles.alert}>{error}</p><Button onClick={()=>{setError(null);setReload(v=>v+1)}}>Повторить загрузку</Button></div>:!directions?<LoadingState label="Загрузка направлений…" variant="panel"/>:selected?<TrainingSectionsListView key={selected.id} directions={directions} direction={selected} selectedDirectionId={selected.id} studentId={studentId} loading={false} error={null} onSelectDirection={(id,filters)=>{const next=directions.find(d=>d.id===id);if(next){const query=new URLSearchParams();for(const [key,value] of Object.entries(filters??{}))if(value&&value!=="all")query.set(key,value);router.push(`${trainingDirectionPath(role,next)}${query.size?`?${query}`:""}`);}}} onSelectSection={s=>router.push(trainingSectionPath(role,selected,s))}/>:<p>{directions.length?"Направление больше недоступно":"Пока нет доступных направлений"}</p>}
  </div>;
 }

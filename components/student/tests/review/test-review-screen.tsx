@@ -2,6 +2,9 @@
 
 import { useContextGuard } from "@/lib/bff/use-context-guard";
 import styles from "@/components/student/tests/review/test-review.module.css";
+import player from "../test-player.module.css";
+import { QuestionPagination } from "../question-pagination";
+import { useTestViewport } from "../use-test-viewport";
 import { LoadingState } from "@/components/ui/loading-state";
 import { ApiError } from "@/lib/api/client";
 import { formatTestDate } from "@/lib/student/tests-api";
@@ -16,11 +19,12 @@ import {
 } from "@/lib/student/test-review-utils";
 import {
   ArrowLeft,
+  ArrowRight,
   CheckCircle2,
   Target,
   XCircle,
 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 interface TestReviewScreenProps {
   sessionId: string;
@@ -35,6 +39,9 @@ export function TestReviewScreen({
   testTitle,
   onExit,
 }: TestReviewScreenProps) {
+  const overlayRef = useTestViewport();
+  const mainRef = useRef<HTMLDivElement>(null);
+  const [currentIndex, setCurrentIndex] = useState(0);
   const [phase, setPhase] = useState<ReviewPhase>("loading");
   const [review, setReview] = useState<TestSessionReview | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -55,6 +62,7 @@ export function TestReviewScreen({
       }
 
       setReview(response.review);
+      setCurrentIndex(0);
       setPhase("ready");
     } catch (err) {
       if (signal?.aborted) return;
@@ -76,16 +84,9 @@ export function TestReviewScreen({
     return () => { window.clearTimeout(timer); controller.abort(); };
   }, [loadReview]);
 
-  useEffect(() => {
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = "";
-    };
-  }, []);
-
   if (phase === "loading") {
     return (
-      <div className={styles.reviewOverlay}>
+      <div className={player.overlay} ref={overlayRef} role="dialog" aria-modal="true" aria-label="Разбор теста">
         <div className={styles.reviewCenterState}>
           <LoadingState label="Загрузка разбора…" variant="compact" />
         </div>
@@ -95,7 +96,7 @@ export function TestReviewScreen({
 
   if (phase === "fatal") {
     return (
-      <div className={styles.reviewOverlay}>
+      <div className={player.overlay} ref={overlayRef} role="dialog" aria-modal="true" aria-label="Разбор теста">
         <div className={styles.reviewCenterState}>
           <h2 className={styles.reviewCenterTitle}>Не удалось открыть разбор</h2>
           <p className={styles.reviewCenterText}>{error}</p>
@@ -121,40 +122,16 @@ export function TestReviewScreen({
   const correctCount = review.items.filter((item) => item.isCorrect).length;
 
   return (
-    <div className={styles.reviewOverlay}>
-      <header className={styles.reviewHeader}>
-        <div className={styles.reviewHeaderLeft}>
-          <button
-            type="button"
-            className={styles.reviewBackBtn}
-            onClick={onExit}
-          >
-            <ArrowLeft size={16} />
-            К списку
-          </button>
-
-          <div className={styles.reviewTitleWrap}>
-            <span className={styles.reviewEyebrow}>Разбор теста</span>
-            <h1 className={styles.reviewTitle}>
-              {review.testTitle || testTitle}
-            </h1>
-          </div>
-        </div>
-
-        <div className={styles.reviewHeaderRight}>
-          {score != null ? (
-            <span className={styles.reviewScoreBadge}>
-              <Target size={16} />
-              {score} баллов
-            </span>
-          ) : null}
-          <span className={styles.reviewScoreBadge}>
-            Верно {correctCount} / {review.items.length}
-          </span>
-        </div>
+    <div className={player.overlay} ref={overlayRef} role="dialog" aria-modal="true" aria-label="Разбор теста">
+      <header className={player.header}>
+        <button type="button" className={player.iconButton} onClick={onExit} aria-label="К списку тестов"><ArrowLeft size={20}/></button>
+        <div className={player.heading}><span className={player.eyebrow}>Разбор теста</span><h1 className={player.title}>{review.testTitle || testTitle}</h1><div className={player.headerMeta}>{score != null ? <span><Target size={12}/> {score} баллов</span> : null}<span>Верно {correctCount} из {review.items.length}</span></div></div>
       </header>
+      {review.items.length ? <QuestionPagination pages={review.items.map(item => ({ id: item.questionId, status: item.isCorrect ? "correct" : "incorrect" }))} currentIndex={currentIndex} onSelect={index => { setCurrentIndex(index); mainRef.current?.scrollTo({ top: 0 }); }} summary={`Верно ${correctCount} из ${review.items.length}`} /> : null}
+      <div className={player.main} ref={mainRef} data-test-scroll>
+      <details className={styles.reviewExplanation}>
+        <summary>О разборе и доступности ответов</summary>
 
-      <div className={styles.reviewNoticeWrap}>
         {review.showCorrectAnswers ? (
           <p className={styles.reviewNotice}>
             Показаны ваши ответы и правильные варианты. Вопросы — в том порядке,
@@ -179,11 +156,10 @@ export function TestReviewScreen({
             .
           </p>
         )}
-      </div>
-
-      <div className={styles.reviewBody}>
+      </details>
         <div className={styles.reviewList}>
-          {review.items.map((item, index) => {
+          {review.items.slice(currentIndex, currentIndex + 1).map((item) => {
+            const index = currentIndex;
             const studentText = getStudentAnswerText(item);
             const correctText = getCorrectAnswerText(item);
             const statusClass = item.isCorrect
@@ -194,7 +170,7 @@ export function TestReviewScreen({
               : styles.reviewAnswerBoxIncorrect;
 
             return (
-              <article key={item.questionId} className={styles.reviewCard}>
+              <article key={item.questionId} className={`${styles.reviewCard} ${player.card}`}>
                 <div className={styles.reviewCardHead}>
                   <span className={styles.reviewQuestionIndex}>
                     Вопрос {index + 1}
@@ -245,6 +221,10 @@ export function TestReviewScreen({
           })}
         </div>
       </div>
+      {review.items.length ? <footer className={player.footer}><div className={player.footerInner}><div className={player.actions}>
+        <button type="button" className={player.secondary} disabled={currentIndex === 0} onClick={() => { setCurrentIndex(index => index - 1); mainRef.current?.scrollTo({ top: 0 }); }}><ArrowLeft size={17}/>Назад</button>
+        <button type="button" className={player.primary} onClick={() => { if (currentIndex === review.items.length - 1) onExit(); else { setCurrentIndex(index => index + 1); mainRef.current?.scrollTo({ top: 0 }); } }}>{currentIndex === review.items.length - 1 ? "К списку тестов" : "Далее"}<ArrowRight size={17}/></button>
+      </div></div></footer> : <p className={player.status}>В этом разборе нет доступных вопросов.</p>}
     </div>
   );
 }

@@ -3,8 +3,6 @@
 import { useState } from "react";
 import { BFF_DEV } from "@/lib/config";
 import type { TrainingSectionNode } from "@/lib/training/training-types";
-import { FilterPopover } from "@/components/ui/filter-popover";
-import { queryString } from "@/lib/exams-v2/api";
 import Link from "next/link";
 import { examTrainingPath } from "@/lib/training/training-routes";
 import { useExamNavigation, useExamResource } from "@/lib/exams-v2/hooks";
@@ -12,18 +10,18 @@ import type {
   AttemptResult,
   AttemptStatus,
   Page,
-  StudentResult,
   StudentResultDetail,
 } from "@/lib/exams-v2/types";
 import {
   formatDate,
   formatScore,
-  GRADES,
   typeLabel,
 } from "@/lib/exams-v2/utils";
-import { Action, Empty, ErrorNotice, Field, Loading, Pager } from "./shared";
+import { Action, ErrorNotice, Loading, Pager } from "./shared";
 import { ExamProtocol } from "./protocol";
 import s from "./exams.module.css";
+import { StudentExamResultList } from "@/components/student/exams/student-exam-result-list";
+import studentStyles from "@/components/student/exams/student-exam-results.module.css";
 
 export function PendingRetakeNotice({ active, status, compact = false }: { active?: boolean; status?: AttemptStatus | null; compact?: boolean }) {
   if (!active || status === "completed") return null;
@@ -144,160 +142,25 @@ function AvailableExamTraining() {
   const [page, setPage] = useState(1);
   const resource = useExamResource<Page<TrainingSectionNode>>(BFF_DEV ? `/api/student/exams/training?page=${page}&limit=12` : null);
   if (!BFF_DEV) return null;
-  return <section className={s.panel} aria-label="Доступная подготовка к экзаменам">
-    <h2>Подготовка к экзаменам</h2>
+  return <section className={studentStyles.trainingList} aria-label="Доступная подготовка к экзаменам">
     <ErrorNotice error={resource.error} reload={resource.reload} />
     {resource.loading && <Loading />}
-    <div className={s.grid}>{resource.data?.items.map(exam => <article className={s.item} key={exam.refId}>
+    <div>{resource.data?.items.map(exam => <article className={studentStyles.trainingRow} key={exam.refId}>
       <h3>{exam.name}</h3><p>{exam.learned_cards} из {exam.total_cards} карточек выучено</p>
       <Link className={s.button} href={examTrainingPath("student", exam.exam_id!)}>Подготовка по карточкам</Link>
     </article>)}</div>
     {resource.data?.items.length === 0 ? <p className={s.muted}>Здесь появятся экзамены с открытой подготовкой.</p> : null}
-    <Pager pagination={resource.data?.pagination} onPage={setPage} />
+    {resource.data && resource.data.pagination.totalPages > 1 ? <Pager pagination={resource.data.pagination} onPage={setPage} /> : null}
   </section>;
 }
 export function StudentExamResults() {
   const nav = useExamNavigation();
   const examId = nav.id("examId");
-  const type = nav.params?.get("type") ?? "all",
-    grade = nav.params?.get("grade") ?? "",
-    sort = nav.params?.get("sort") ?? "date_desc";
-  const page = nav.id("page") ?? 1;
-  const resource = useExamResource<Page<StudentResult>>(
-    nav.initialized && !examId
-      ? `/api/student/exams/results${queryString({ page, limit: 20, type, grade, sort })}`
-      : null,
-  );
   if (!nav.initialized) return <Loading />;
-  if (examId)
-    return (
-      <Detail
-        key={examId}
-        examId={examId}
-        attemptId={nav.id("attemptId")}
-        select={(id) => nav.navigate({ attemptId: id })}
-        back={() => nav.navigate({ examId: null, attemptId: null })}
-      />
-    );
-  return (
-    <div className={s.page}>
-      <div className={s.header}>
-        <div>
-          <h1>Результаты экзаменов</h1>
-          <p className={s.subtitle}>Опубликованные оценки и история сдач</p>
-        </div>
-        <Action disabled={resource.loading} onClick={resource.reload}>
-          Обновить
-        </Action>
-      </div>
-      <AvailableExamTraining />
-      <div className={s.toolbar}>
-        <p className={s.toolbarSummary}>{resource.data ? `Результатов: ${resource.data.pagination.total}` : "История ваших экзаменов"}</p>
-        <FilterPopover
-          activeCount={[type !== "all", grade, sort !== "date_desc"].filter(Boolean).length}
-          onReset={() => nav.navigate({ type: null, grade: null, sort: null, page: null })}
-        >
-          <div className={s.filterGrid}>
-            <Field label="Тип экзамена">
-              <select
-                className={s.select}
-                value={type}
-                onChange={(e) => nav.navigate({ type: e.target.value, page: null })}
-              >
-                <option value="all">Все экзамены</option>
-                <option value="classic">Классические</option>
-                <option value="outside_lms">Вне системы LMS</option>
-              </select>
-            </Field>
-            <Field label="Оценка">
-              <select
-                className={s.select}
-                value={grade}
-                onChange={(e) =>
-                  nav.navigate({ grade: e.target.value || null, page: null })
-                }
-              >
-                <option value="">Любая</option>
-                {GRADES.map((g) => (
-                  <option key={g} value={g}>
-                    {g}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <Field label="Порядок">
-              <select
-                className={s.select}
-                value={sort}
-                onChange={(e) => nav.navigate({ sort: e.target.value, page: null })}
-              >
-                <option value="date_desc">Сначала новые</option>
-                <option value="date_asc">Сначала старые</option>
-                <option value="direction_asc">По направлению</option>
-              </select>
-            </Field>
-          </div>
-        </FilterPopover>
-      </div>
-      <ErrorNotice error={resource.error} reload={resource.reload} />
-      {resource.loading && <Loading />}
-      <div className={s.grid}>
-        {resource.data?.items.map((result) => {
-          const classic = result.examType === "classic";
-          const gradeValue = classic
-            ? result.currentAttempt.grade
-            : result.grade;
-          return (
-            <article key={result.examId} className={`${s.panel} ${s.examCard}`}>
-              <div className={s.header}>
-                <h2>{result.examName || result.directionName}</h2>
-                <strong className={s.score}>{gradeValue} / 5</strong>
-              </div>
-              {result.examName ? <p className={s.muted}>{result.directionName}</p> : null}
-              <span className={s.badge}>{typeLabel(result.examType)}</span>
-              <p className={s.muted}>
-                {formatDate(result.examDate !== undefined ? result.examDate : classic ? result.startAt : result.date)}
-              </p>
-              {classic ? (
-                <>
-                  <PendingRetakeNotice active={result.hasActiveRetake} status={result.retakeStatus} compact />
-                  <p>
-                    Баллы: {formatScore(result.currentAttempt.roundedTotal)} /{" "}
-                    {formatScore(result.currentAttempt.maxScore)}
-                  </p>
-                  {result.currentAttempt.attemptNo === 2 && (
-                    <span className={s.badge}>Текущий результат пересдачи</span>
-                  )}
-                  {result.currentAttempt.hasAppeal && (
-                    <span className={s.badge}>После апелляции</span>
-                  )}
-                </>
-              ) : (
-                <>
-                  <p>Баллы: {formatScore(result.points)}</p>
-                  <p className={s.muted}>
-                    {result.examinator ?? "Экзаменатор не указан"}
-                  </p>
-                </>
-              )}
-              <Action className={s.cardAction} onClick={() => nav.navigate({ examId: result.examId })}>
-                Подробности
-              </Action>
-            </article>
-          );
-        })}
-      </div>
-      {resource.data?.items.length === 0 && (
-        <Empty>
-          {type !== "all" || grade
-            ? "По выбранным фильтрам результатов нет."
-            : "Здесь появятся результаты завершённых экзаменов."}
-        </Empty>
-      )}
-      <Pager
-        pagination={resource.data?.pagination}
-        onPage={(value) => nav.navigate({ page: value })}
-      />
+  return <div className={studentStyles.section}>
+    <div className={studentStyles.listHost} hidden={Boolean(examId)} inert={Boolean(examId)}>
+      <StudentExamResultList nav={nav} active={!examId} training={<AvailableExamTraining />} />
     </div>
-  );
+    {examId ? <div className={studentStyles.detailScroll}><Detail key={examId} examId={examId} attemptId={nav.id("attemptId")} select={id => nav.navigate({ attemptId: id })} back={() => nav.navigate({ examId: null, attemptId: null })} /></div> : null}
+  </div>;
 }

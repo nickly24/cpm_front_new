@@ -1,0 +1,14 @@
+"use client";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { ArrowLeft, X } from "lucide-react";
+import { BATCH_SIZE_PRESETS, STUDY_FILTER_LABELS, type StudyFilter, type StudySettings } from "@/lib/training/training-types";
+import styles from "./training-workspace.module.css";
+export function TrainingWorkspaceDialog({title,subtitle,children,onClose,full=false,closeLabel}:{title:string;closeLabel?:string;subtitle?:string;children:ReactNode;onClose:()=>void;full?:boolean}) {
+ const ref=useRef<HTMLDialogElement>(null);
+ useEffect(()=>{const node=ref.current,previous=document.body.style.overflow,focus=document.activeElement as HTMLElement|null;document.body.style.overflow="hidden";node?.showModal();return()=>{node?.close();document.body.style.overflow=previous;if(focus?.isConnected)focus.focus({preventScroll:true});};},[]);
+ return <dialog ref={ref} className={`${styles.dialog} ${full?styles.reviewDialog:styles.settingsDialog}`} aria-label={title} onCancel={event=>{event.preventDefault();onClose();}}><header className={styles.dialogHeader}><button type="button" className={styles.round} aria-label={closeLabel??(full?"Закрыть просмотр карточек":"Закрыть настройки")} onClick={onClose}>{full?<ArrowLeft size={22}/>:<X size={22}/>}</button><div><h2>{title}</h2>{subtitle?<p>{subtitle}</p>:null}</div></header>{children}</dialog>;
+}
+export function TrainingSettingsPanel({settings,busy,error,onClose,onSave}:{settings:StudySettings;busy:boolean;error:string|null;onClose:()=>void;onSave:(size:number,mode:StudyFilter)=>Promise<boolean>}) {
+ const [size,setSize]=useState(settings.batch_size),[mode,setMode]=useState(settings.study_mode);
+ return <TrainingWorkspaceDialog title="Настройки обучения" onClose={onClose}><form className={styles.settingsForm} onSubmit={event=>{event.preventDefault();void onSave(size,mode).then(saved=>{if(saved)onClose();});}}><div className={styles.dialogBody}><fieldset disabled={busy}><legend>Размер набора</legend><div className={styles.sizeChoices}>{BATCH_SIZE_PRESETS.map(value=><button type="button" aria-pressed={size===value} key={value} onClick={()=>setSize(value)}>{value}<small>карточек</small></button>)}</div></fieldset><fieldset disabled={busy}><legend>Какие карточки учить</legend><div className={styles.modeChoices}>{(Object.keys(STUDY_FILTER_LABELS) as StudyFilter[]).map(value=><button type="button" aria-pressed={mode===value} key={value} onClick={()=>setMode(value)}><span>{value==="all"?"Все карточки":STUDY_FILTER_LABELS[value]}</span><i aria-hidden="true"/></button>)}</div></fieldset>{error?<p className={styles.error} role="alert">{error}</p>:null}</div><footer className={styles.dialogFooter}><button className={styles.primary} type="submit" disabled={busy}>{busy?"Сохраняем…":"Сохранить настройки"}</button></footer></form></TrainingWorkspaceDialog>;
+}

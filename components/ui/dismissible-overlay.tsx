@@ -8,29 +8,29 @@ import {
   type ReactNode,
 } from "react";
 
-type BackdropDismissHandlers = {
-  onPointerDown: (event: ReactPointerEvent<HTMLDivElement>) => void;
-  onPointerUp: (event: ReactPointerEvent<HTMLDivElement>) => void;
+type BackdropDismissHandlers<T extends HTMLElement> = {
+  onPointerDown: (event: ReactPointerEvent<T>) => void;
+  onPointerUp: (event: ReactPointerEvent<T>) => void;
 };
 
 /**
  * Закрытие по клику на backdrop только если жест начался И закончился на overlay.
  * Иначе выделение текста с mouseup вне карточки даёт click на overlay и ложно закрывает попап.
  */
-export function useBackdropDismiss(
+export function useBackdropDismiss<T extends HTMLElement = HTMLDivElement>(
   onDismiss?: (() => void) | null,
-): BackdropDismissHandlers {
+): BackdropDismissHandlers<T> {
   const startedOnBackdropRef = useRef(false);
 
   const onPointerDown = useCallback(
-    (event: ReactPointerEvent<HTMLDivElement>) => {
+    (event: ReactPointerEvent<T>) => {
       startedOnBackdropRef.current = event.target === event.currentTarget;
     },
     [],
   );
 
   const onPointerUp = useCallback(
-    (event: ReactPointerEvent<HTMLDivElement>) => {
+    (event: ReactPointerEvent<T>) => {
       const startedOnBackdrop = startedOnBackdropRef.current;
       startedOnBackdropRef.current = false;
       if (!onDismiss) return;

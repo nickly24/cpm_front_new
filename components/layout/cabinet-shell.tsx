@@ -3,6 +3,7 @@
 import { RequireAuth } from "@/components/RequireAuth";
 import { Header } from "@/components/layout/header";
 import { Sidebar } from "@/components/layout/sidebar";
+import { StudentCabinetLayout } from "@/components/layout/student-cabinet-layout";
 import {
   CabinetChromeProvider,
   useCabinetChrome,
@@ -43,6 +44,16 @@ export function CabinetShell({ role, children }: CabinetShellProps) {
 }
 
 function CabinetLayout({
+  role,
+  children,
+}: {
+  role: UserRole;
+  children: ReactNode;
+}) {
+  return role === "student" ? <StudentCabinetLayout>{children}</StudentCabinetLayout> : <StaffCabinetLayout role={role}>{children}</StaffCabinetLayout>;
+}
+
+function StaffCabinetLayout({
   role,
   children,
 }: {

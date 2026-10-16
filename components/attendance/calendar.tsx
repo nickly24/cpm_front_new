@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState, useRef } from "react";
+import { StudentCalendar } from "@/components/student/schedule/student-calendar";
 import { useAuth } from "@/contexts/AuthContext";
 import { useContextGuard } from "@/lib/bff/use-context-guard";
 import { attendanceError, command, groupOverlaps, ownDivisions, permitted, readAttendance, type AvailableCalendar, type Event, type Lesson, type Schedule } from "@/lib/bff/attendance";
@@ -34,6 +35,10 @@ interface References {
 }
 const blank = (division: number, date: string): Lesson => ({ id: 0, division_id: division, date, start_time: "09:00", end_time: "10:00", lesson_name: "", teacher_name: "", location: "", classroom: "", color: "#23884c", is_changed: false, is_in_person: true, is_for_all: true, is_public: true, school_id: null, target_group_ids: [], teacher_account_id: null, room_resource_id: null });
 export function AttendanceCalendar() {
+    const { user } = useAuth();
+    return user?.role === "student" ? <StudentCalendar /> : <StaffAttendanceCalendar />;
+}
+function StaffAttendanceCalendar() {
     const { user } = useAuth();
     const organizationID = user?.organization_id ?? 0;
     const loadSequence = useRef(0);

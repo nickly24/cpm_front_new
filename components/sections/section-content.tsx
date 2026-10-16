@@ -26,6 +26,8 @@ import { StudentAttendanceSection } from "@/components/student/attendance/studen
 import { StudentZapsSection } from "@/components/student/zaps/student-zaps-section";
 import { StudentTrainingSection } from "@/components/student/training/student-training-section";
 import { StudentHomeworkSection } from "@/components/student/homework/student-homework-section";
+import { StudentMenuSection } from "@/components/student/navigation/student-menu-section";
+import { StudentSettingsSection } from "@/components/student/navigation/student-settings-section";
 import { StudentPerformanceSection } from "@/components/student/performance/student-performance-section";
 import { StudentScheduleSection } from "@/components/student/schedule/student-schedule-section";
 import { StudentTestsSection } from "@/components/student/tests/student-tests-section";
@@ -59,7 +61,7 @@ export function SectionContent(props: SectionContentProps) {
     || props.section === "test-results" && isAdminCabinet(props.role)
     || props.section === "exams" && (isAdminCabinet(props.role) || props.role === "student" || props.role === "examinator")
     || props.section === "ratings" && (isAdminCabinet(props.role) || props.role === "supervisor" || props.role === "proctor")
-    || props.section === "performance" && props.role === "student"
+    || ["performance", "profile", "menu", "settings"].includes(props.section) && props.role === "student"
     || props.section === "train" && props.role === "student"
     || ["users", "schools", "dashboard", "train", "access", "upload", "organizations", "divisions", "directions"].includes(props.section) && isAdminCabinet(props.role)
     || props.section === "students" && props.role === "proctor"
@@ -73,8 +75,7 @@ export function SectionContent(props: SectionContentProps) {
 
 function SectionBody(props: SectionContentProps) {
   const pendingExternalTests = BFF_DEV && !BFF_EXTERNAL_TESTS_DEV
-    && (["tests", "test-results"].includes(props.section) && (props.role === "admin" || props.role === "student")
-      || props.section === "performance" && props.role === "student");
+    && ["tests", "test-results"].includes(props.section) && (props.role === "admin" || props.role === "student");
   return <>
     {pendingExternalTests && <div className="ds-card" role="status"><p>Тесты вне системы пока недоступны. В этом разделе отображаются тесты, пройденные в системе.</p></div>}
     <ConnectedSectionBody {...props} />
@@ -86,7 +87,9 @@ function ConnectedSectionBody({
   section,
   trainPathSegments = [],
 }: SectionContentProps) {
-  if (role === "student" && section === "performance") {
+  if (role === "student" && section === "menu") return <StudentMenuSection />;
+  if (role === "student" && section === "settings") return <StudentSettingsSection />;
+  if (role === "student" && ["performance", "profile"].includes(section)) {
     return <StudentPerformanceSection />;
   }
 

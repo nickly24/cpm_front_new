@@ -367,6 +367,7 @@
   box-shadow: -18px 0 36px rgba(16, 24, 40, 0.16);
   transform: translateX(105%);
   transition: transform 0.18s ease;
+  overflow-y: auto;
 }
 
 .attemptQueueDrawerOpen {
@@ -909,6 +910,8 @@
   gap: 16px;
   padding: 24px;
   text-align: center;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .attemptSpinner {
@@ -1013,6 +1016,8 @@
   border: 1px solid var(--ds-border);
   background: var(--ds-surface);
   box-shadow: var(--ds-shadow-lg);
+  max-height: calc(100dvh - 40px);
+  overflow-y: auto;
 }
 
 .submitDialogIconWrap {

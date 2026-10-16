@@ -1,1 +1,19 @@
 .context{position:relative;min-width:0;flex:1;max-width:560px}.context label{display:flex;flex-direction:column;gap:3px;min-width:0}.context label>span{font-size:11px;color:var(--ds-text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.context select{max-width:100%;width:100%;padding:6px 25px 6px 0;border:0;background:transparent;color:var(--ds-text);font:inherit;font-size:14px;font-weight:650;cursor:pointer}.context p{position:absolute;top:100%;left:0;z-index:100;width:min(480px,80vw);padding:14px;border:1px solid var(--ds-border);border-radius:10px;background:var(--ds-surface);color:var(--ds-text);box-shadow:0 4px 20px #0002;font-size:13px}.context option,.context optgroup{background:var(--ds-surface);color:var(--ds-text)}
+.menuContext { min-width: 0; }
+.contextButton { display: flex; width: 100%; min-height: 68px; align-items: center; gap: 12px; padding: 12px; border: 1px solid color-mix(in srgb, var(--ds-accent) 25%, var(--ds-border)); border-radius: 16px; background: var(--ds-accent-soft); color: var(--ds-text); text-align: left; cursor: pointer; }
+.contextIcon { display: flex; flex: 0 0 36px; width: 36px; height: 36px; align-items: center; justify-content: center; border-radius: 10px; background: var(--ds-surface); color: var(--ds-accent); }
+.contextText { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 3px; overflow-wrap: anywhere; }
+.contextText small { color: var(--ds-text-muted); font-size: 11px; }
+.contextText strong { font-size: 14px; line-height: 1.4; font-weight: 650; }
+.chevron, .chevronOpen { flex-shrink: 0; transition: transform .15s ease; color: var(--ds-text-secondary); }
+.chevronOpen { transform: rotate(180deg); }
+.contextChoices { display: flex; flex-direction: column; gap: 4px; padding: 8px; margin-top: 8px; max-height: min(280px, 35dvh); overflow-y: auto; overscroll-behavior: contain; border: 1px solid var(--ds-border); border-radius: 14px; background: var(--ds-surface-muted); }
+.contextChoice { display: flex; width: 100%; min-height: 44px; align-items: center; justify-content: space-between; gap: 8px; padding: 10px; border: 0; border-radius: 10px; background: transparent; color: var(--ds-text); text-align: left; font-size: 13px; line-height: 1.4; cursor: pointer; }
+.contextChoice span { min-width: 0; overflow-wrap: anywhere; }
+.contextChoice svg { flex-shrink: 0; }
+.contextChoice[aria-pressed="true"] { background: var(--ds-accent-soft); color: var(--ds-accent); font-weight: 650; }
+.contextError { margin: 10px 0 0; padding: 12px; border-radius: 12px; background: var(--ds-danger-bg); color: var(--ds-danger); font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
+.menuContext button:disabled { opacity: .6; cursor: wait; }
+.menuContext button:focus-visible { outline: 2px solid var(--ds-accent); outline-offset: 3px; }
+.spinner { animation: contextSpin 1s linear infinite; }
+@keyframes contextSpin { to { transform: rotate(360deg); } }

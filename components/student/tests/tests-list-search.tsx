@@ -6,6 +6,7 @@ interface TestsListSearchProps {
   onChange: (value: string) => void;
   disabled?: boolean;
   resultCount: number;
+  label?: string;
 }
 
 export function TestsListSearch({
@@ -13,20 +14,22 @@ export function TestsListSearch({
   onChange,
   disabled = false,
   resultCount,
+  label = "Поиск теста",
 }: TestsListSearchProps) {
   return (
     <div className={styles.listHeader}>
       <label className={styles.listSearchField}>
-        <span className={styles.fieldLabel}>Поиск в направлении</span>
+        <span className={styles.fieldLabel}>{label}</span>
         <span className={styles.searchWrap}>
           <Search size={15} className={styles.searchIcon} />
           <input
             type="search"
             value={value}
             onChange={(event) => onChange(event.target.value)}
-            placeholder="Название теста..."
+            placeholder="Найти тест по названию"
             className={styles.searchInput}
             disabled={disabled}
+            aria-label={label}
           />
         </span>
       </label>

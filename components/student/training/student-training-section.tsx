@@ -12,7 +12,6 @@ import { TrainingSectionsListView } from "@/components/student/training/training
 import { LoadingState } from "@/components/ui/loading-state";
 import { Button } from "@/components/ui/button";
 import { trainingError } from "@/lib/training/exam-training";
-import { SectionHeroBanner } from "@/components/student/section-hero-banner";
 import { useAuth } from "@/contexts/AuthContext";
 import type { UserRole } from "@/lib/auth/types";
 import { fetchTrainingTree } from "@/lib/training/training-api";
@@ -23,7 +22,6 @@ import {
   trainingSectionPath,
   trainingStudyPath,
 } from "@/lib/training/training-routes";
-import { STUDENT_SECTION_BANNERS } from "@/lib/student/section-banners";
 import type {
   StudyFilter,
   TrainingDirection,
@@ -338,12 +336,6 @@ function LegacyStudentTrainingSection({
 
   return (
     <div className={styles.page}>
-      <SectionHeroBanner
-        imageSrc={STUDENT_SECTION_BANNERS.train}
-        eyebrow="Обучение"
-        title="Карточки"
-        subtitle="Выберите раздел и учите карточки в удобном темпе"
-      />
 
       {!selectedDirection && loading ? <LoadingState label="Загрузка разделов…" variant="panel" /> : null}
       {selectedDirection && user?.id ? (
@@ -351,10 +343,10 @@ function LegacyStudentTrainingSection({
           directions={directions}
           direction={selectedDirection}
           selectedDirectionId={selectedDirection.id}
-          onSelectDirection={(directionId) => {
+          onSelectDirection={(directionId, filters) => {
             const next = directions.find((item) => item.id === directionId);
             if (!next) return;
-            navigateToCatalog(next);
+            if(filters){const query=new URLSearchParams();for(const [key,value] of Object.entries(filters))if(value&&value!=="all")query.set(key,value);router.push(`${trainingDirectionPath(role,next)}${query.size?`?${query}`:""}`);}else navigateToCatalog(next);
           }}
           studentId={user.id}
           loading={loading}

@@ -1,0 +1,58 @@
+.digital,.arrow,.copy small { display:none; }
+.glyph { display:inline-flex; flex-shrink:0; width:24px; height:24px; }
+.glyph svg { width:100%; height:100%; }
+.copy { display:contents; }
+@media(min-width:1024px) {
+  .page { display:grid; grid-template-columns:minmax(260px,.9fr) minmax(0,1.3fr); gap:32px 64px; max-width:1120px; }
+  .page > button { grid-column:1/-1; margin:0; padding:0 0 26px; width:100%; justify-content:flex-start; border-radius:0; border-bottom:1px solid var(--ds-border); background:transparent; font-size:13px; font-weight:400; color:var(--ds-text-secondary); }
+  .page > button:hover { color:var(--ds-accent); }
+  .page .body { gap:26px; min-width:0; padding-top:10px; }
+  .page .body h2 { font-size:30px; font-weight:450; line-height:1.35; }
+  .page .body .infoRow { padding:18px 0; border-radius:0; border-bottom:1px solid var(--ds-border); background:transparent; }
+  .page .body .infoIcon { background:transparent; padding:4px; color:var(--ds-text-muted); }
+  .page .body .infoValue { font-weight:450; }
+  .page .actions { margin:0; padding:10px 0 0; gap:18px; align-self:start; }
+  .page .actions .action { --effect:#a17ae7; position:relative; isolation:isolate; overflow:hidden; display:flex; justify-content:flex-start; min-height:146px; gap:22px; padding:30px; border:1px solid var(--ds-border); border-radius:25px; background:var(--ds-surface); color:var(--ds-text); text-align:left; user-select:none; transition:border-color .3s,box-shadow .3s,transform .35s; }
+  .page .actions .primary { --effect:#f59465; }
+  .page .action::before { content:""; position:absolute; inset:0; z-index:-1; background:radial-gradient(ellipse at 100% 0%,color-mix(in srgb,var(--effect) 16%,transparent),transparent 65%),radial-gradient(ellipse at 0% 100%,color-mix(in srgb,var(--effect) 10%,transparent),transparent 60%); opacity:0; transition:opacity .4s; pointer-events:none; }
+  .page .action .glyph { display:grid; place-items:center; width:72px; height:72px; flex-shrink:0; border-radius:0; background:transparent; filter:drop-shadow(0 8px 12px #9168d41a); transform:rotate(-5deg); transition:transform .45s cubic-bezier(.2,.8,.2,1); }
+  .page .primary .glyph { filter:drop-shadow(0 8px 12px #f78f641a); }
+  .page .glyph svg { width:100%; height:100%; }
+  .page .copy { display:flex; flex:1; min-width:0; flex-direction:column; gap:8px; position:relative; }
+  .page .copy > span { font-size:19px; font-weight:500; line-height:1.4; overflow-wrap:anywhere; }
+  .page .copy small { display:block; color:var(--ds-text-muted); font-size:12px; font-weight:400; line-height:1.6; }
+  .page .arrow { display:block; flex-shrink:0; color:var(--ds-text-muted); transition:transform .35s,color .35s; }
+  .page .digital { display:block; position:absolute; inset:0; z-index:-1; color:var(--effect); opacity:0; transform:translateY(12px) scale(.94); transition:opacity .4s,transform .55s cubic-bezier(.2,.8,.2,1); pointer-events:none; }
+  .page .digital svg { width:100%; height:100%; }
+  .page .actions .action:is(:hover,:focus-visible) { border-color:var(--effect); background:var(--ds-surface); color:var(--ds-text); box-shadow:0 0 0 3px color-mix(in srgb,var(--effect) 8%,transparent),0 14px 36px color-mix(in srgb,var(--effect) 9%,transparent); transform:translateY(-2px); outline:none; }
+  .page .action:is(:hover,:focus-visible)::before,.page .action:is(:hover,:focus-visible) .digital { opacity:1; }
+  .page .action:is(:hover,:focus-visible) .digital { transform:translateY(0) scale(1); }
+  .page .action:is(:hover,:focus-visible) .glyph { transform:rotate(3deg) translateY(-3px); }
+  .page .action:is(:hover,:focus-visible) .arrow { color:var(--effect); transform:translate(2px,-2px); }
+}
+@media(min-width:1024px) and (max-width:1199px) {
+  .page { gap:28px 36px; }
+  .page .actions .action { padding:24px; gap:16px; }
+  .page .copy > span { font-size:17px; }
+}
+@media(prefers-reduced-motion:reduce) {
+  .page .actions .action,.page .action::before,.page .digital,.page .action .glyph,.page .arrow { transition:none; }
+  .page .actions .action:is(:hover,:focus-visible),.page .action:is(:hover,:focus-visible) .glyph,.page .action:is(:hover,:focus-visible) .arrow { transform:none; }
+}
+
+@media(max-width:1023px) {
+  .sheet .actions { gap:10px; }
+  .sheet .actions .action { display:flex; justify-content:flex-start; gap:14px; min-height:78px; padding:13px 16px; border:1px solid var(--ds-border); border-radius:21px; background:var(--ds-surface); color:var(--ds-text); text-align:left; -webkit-tap-highlight-color:transparent; transition:transform .16s,background .16s; }
+  .sheet .action .glyph { width:46px; height:46px; transform:rotate(-4deg); }
+  .sheet .action .copy { display:flex; flex:1; min-width:0; flex-direction:column; gap:4px; }
+  .sheet .copy > span { font-size:14px; font-weight:500; line-height:1.4; }
+  .sheet .copy small { display:block; font-size:11px; font-weight:400; line-height:1.4; color:var(--ds-text-muted); }
+  .sheet .arrow { display:block; width:18px; height:18px; flex-shrink:0; color:var(--ds-text-muted); }
+  .sheet .actions .primary { border-color:color-mix(in srgb,#f39a73 25%,var(--ds-border)); }
+  .sheet .actions .action:active { transform:scale(.985); background:var(--ds-surface-hover); }
+  .sheet .action:focus-visible { outline:2px solid #a17ae7; outline-offset:2px; }
+}
+@media(prefers-reduced-motion:reduce) {
+  .sheet .actions .action { transition:none; }
+  .sheet .actions .action:active { transform:none; }
+}

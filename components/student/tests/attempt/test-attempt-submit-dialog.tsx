@@ -3,6 +3,7 @@
 import styles from "@/components/student/tests/attempt/test-attempt.module.css";
 import { DismissibleOverlay } from "@/components/ui/dismissible-overlay";
 import { AlertCircle, Send } from "lucide-react";
+import { useEffect, useRef } from "react";
 
 export type SubmitDialogMode = "confirm" | "error";
 
@@ -29,6 +30,12 @@ export function TestAttemptSubmitDialog({
   onConfirm,
   onRetry,
 }: TestAttemptSubmitDialogProps) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const previous = document.activeElement as HTMLElement | null;
+    dialogRef.current?.querySelector<HTMLButtonElement>("button:not(:disabled)")?.focus();
+    return () => previous?.focus({ preventScroll: true });
+  }, []);
   const isConfirm = mode === "confirm";
 
   const title = isConfirm
@@ -56,11 +63,15 @@ export function TestAttemptSubmitDialog({
       disabled={loading}
     >
       <div
+        ref={dialogRef}
+        data-test-modal
         className={styles.submitDialog}
         role="dialog"
         aria-modal="true"
         aria-labelledby="submit-dialog-title"
+        aria-describedby="submit-dialog-description"
         onClick={(event) => event.stopPropagation()}
+        onKeyDown={event => { if (event.key === "Escape" && !loading) { event.stopPropagation(); onCancel(); } }}
       >
         {isConfirm ? null : (
           <div className={styles.submitDialogIconWrap}>
@@ -71,7 +82,7 @@ export function TestAttemptSubmitDialog({
         <h2 id="submit-dialog-title" className={styles.submitDialogTitle}>
           {title}
         </h2>
-        <p className={styles.submitDialogText}>{description}</p>
+        <p id="submit-dialog-description" className={styles.submitDialogText}>{description}</p>
 
         <div className={styles.submitDialogActions}>
           <button

@@ -1,23 +1,27 @@
 "use client";
 
+import { useCabinetChrome } from "@/contexts/cabinet-chrome-context";
+import { usePullToRefresh, PullRefreshIndicator } from "../shared/pull-to-refresh";
 import { BFF_DEV } from "@/lib/config";
 import { TestAttemptScreen } from "@/components/student/tests/attempt/test-attempt-screen";
 import { TestReviewScreen } from "@/components/student/tests/review/test-review-screen";
-import { TestsListSearch } from "@/components/student/tests/tests-list-search";
+import { TestsSearchScreen, type TestsSearchValues } from "./tests-search-screen";
+import { ArrowLeft, Search } from "lucide-react";
 import { TestDetailPanel } from "@/components/student/tests/test-detail-panel";
+import { TestsDesktopList } from "./tests-desktop-list";
+import { DesktopCatalogToolbar } from "../shared/desktop-catalog-toolbar";
+import { TESTS_STATUS_FILTER_OPTIONS } from "./tests-filter-options";
 import { TestsListItem } from "@/components/student/tests/tests-list-item";
+import { TestsFeedEnd } from "./tests-feed-end";
+import { useTestsFeed } from "./use-tests-feed";
 import { TestsPagination } from "@/components/student/tests/tests-pagination";
-import { TestsToolbar } from "@/components/student/tests/tests-toolbar";
-import { SectionHeroBanner } from "@/components/student/section-hero-banner";
 import styles from "@/components/student/tests/tests.module.css";
 import { LoadingState } from "@/components/ui/loading-state";
-import { STUDENT_SECTION_BANNERS } from "@/lib/student/section-banners";
 import {
   buildSessionMap,
   fetchDirections,
   fetchStudentAvailableTests,
   fetchTestsWithSessions,
-  filterTestsByDate,
   filterTestsBySearch,
   filterTestsByStatus,
   getTestId,
@@ -25,31 +29,27 @@ import {
 } from "@/lib/student/tests-api";
 import type {
   Direction,
-  StudentTestItem,
-  TestSession,
-  TestsDateFilter,
-  TestsPagination as TestsPaginationMeta,
   TestStatusFilter,
 } from "@/lib/student/tests-types";
+import { TESTS_STATUS_LABELS } from "@/lib/student/tests-types";
 import { useMediaQuery } from "@/lib/hooks/use-media-query";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { mergeLocalAttempt } from "@/lib/student/test-attempt-catalog";
 import { listV2Bundles } from "@/lib/student/test-attempt-v2-store";
 
 type TestsViewMode = "overview" | "catalog";
 
 export function StudentTestsSection() {
+  const feedScroll = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLElement>(null);
+  const { setImmersive } = useCabinetChrome();
+  const returnPosition = useRef<number | null>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
   const [viewMode, setViewMode] = useState<TestsViewMode>("overview");
   const [directions, setDirections] = useState<Direction[]>([]);
   const [directionName, setDirectionName] = useState("");
-  const [tests, setTests] = useState<StudentTestItem[]>([]);
-  const [sessions, setSessions] = useState<TestSession[]>([]);
-  const [pagination, setPagination] = useState<TestsPaginationMeta | null>(
-    null,
-  );
   const [page, setPage] = useState(1);
   const [loadingDirections, setLoadingDirections] = useState(false);
-  const [loadingTests, setLoadingTests] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<TestStatusFilter>("all");
   const [searchTerm, setSearchTerm] = useState("");
@@ -58,10 +58,6 @@ export function StudentTestsSection() {
     const timer = window.setTimeout(() => setSearchQuery(searchTerm), 250);
     return () => window.clearTimeout(timer);
   }, [searchTerm]);
-  const [dateFilter, setDateFilter] = useState<TestsDateFilter>({
-    startDate: "",
-    endDate: "",
-  });
   const [selectedTestId, setSelectedTestId] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
   const [attemptLaunch, setAttemptLaunch] = useState<{
@@ -76,7 +72,15 @@ export function StudentTestsSection() {
     testTitle: string;
   } | null>(null);
   const [mobileSheetOpen, setMobileSheetOpen] = useState(false);
+  const desktop = useMediaQuery("(min-width: 1024px)");
+  const [desktopDetailOpen, setDesktopDetailOpen] = useState(false);
   const isMobileLayout = useMediaQuery("(max-width: 768px)");
+  const fullScreen = Boolean(attemptLaunch || reviewLaunch || mobileSheetOpen && isMobileLayout);
+  useEffect(() => {
+    if (!fullScreen) return;
+    setImmersive(true);
+    return () => setImmersive(false);
+  }, [fullScreen, setImmersive]);
 
   useEffect(() => {
     if (viewMode !== "catalog") {
@@ -124,80 +128,48 @@ export function StudentTestsSection() {
     };
   }, [viewMode]);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    const controller = new AbortController();
-    async function loadTests() {
-      if (viewMode === "catalog" && !directionName) {
-        return;
-      }
-
-      setLoadingTests(true);
-      setError(null);
-
-      try {
-        const response =
-          viewMode === "overview"
-            ? await fetchStudentAvailableTests(page, undefined, { signal: controller.signal, search: searchQuery, status: statusFilter, dates: dateFilter })
-            : await fetchTestsWithSessions(directionName, page, undefined, { signal: controller.signal, search: searchQuery, status: statusFilter, dates: dateFilter });
-
-        if (cancelled) {
-          return;
-        }
-
-        let loadedTests = Array.isArray(response.tests) ? response.tests : [];
-        const localBundles = await listV2Bundles().catch(() => []);
-        const byTest = new Map(localBundles.map((bundle) => [bundle.testId, bundle]));
-        loadedTests = loadedTests.map((test) => {
-          const local = byTest.get(String(test.id));
-          // Local delivery state must not reopen access revoked by the owner.
-          if (!local || (BFF_DEV && (test.activeAttempt?.id !== local.attemptId || (!test.canResume && !test.canSubmitExpired && !test.canRequestHelp)))) return test;
-          return mergeLocalAttempt(test, local);
-        });
-        if (viewMode === "overview" && !BFF_DEV) {
-          const loadedIds = new Set(loadedTests.map((test) => String(test.id)));
-          for (const local of localBundles) {
-            if (loadedIds.has(local.testId) || local.localStatus === "uploaded") continue;
-            loadedTests.push(mergeLocalAttempt({ id: local.testId, title: local.testTitle, status: "running" }, local));
-          }
-        }
-        if (cancelled) return;
-        setTests(loadedTests);
-        setSessions(Array.isArray(response.sessions) ? response.sessions : []);
-        setPagination(response.pagination ?? null);
-      } catch (err) {
-        if (!cancelled) {
-          setTests([]);
-          setSessions([]);
-          setPagination(null);
-          setError(
-            err instanceof Error ? err.message : "Не удалось загрузить тесты",
-          );
-        }
-      } finally {
-        if (!cancelled) {
-          setLoadingTests(false);
-        }
+  const loadPage = useCallback(async (requestedPage: number, signal: AbortSignal) => {
+    const limit = desktop ? 12 : isMobileLayout ? 6 : undefined;
+    const filters = { signal, search: searchQuery, status: statusFilter };
+    const response = viewMode === "overview"
+      ? await fetchStudentAvailableTests(requestedPage, limit, filters)
+      : await fetchTestsWithSessions(directionName, requestedPage, limit, filters);
+    signal.throwIfAborted();
+    let loadedTests = Array.isArray(response.tests) ? response.tests : [];
+    const localBundles = await listV2Bundles().catch(() => []);
+    signal.throwIfAborted();
+    const byTest = new Map(localBundles.map(bundle => [bundle.testId, bundle]));
+    loadedTests = loadedTests.map(test => {
+      const local = byTest.get(String(test.id));
+      // Local delivery state must not reopen access revoked by the owner.
+      if (!local || (BFF_DEV && (test.activeAttempt?.id !== local.attemptId || (!test.canResume && !test.canSubmitExpired && !test.canRequestHelp)))) return test;
+      return mergeLocalAttempt(test, local);
+    });
+    if (viewMode === "overview" && !BFF_DEV && requestedPage === 1) {
+      const ids = new Set(loadedTests.map(test => String(test.id)));
+      for (const local of localBundles) {
+        if (!ids.has(local.testId) && local.localStatus !== "uploaded") loadedTests.push(mergeLocalAttempt({ id: local.testId, title: local.testTitle, status: "running" }, local));
       }
     }
+    if (!isMobileLayout && response.pagination?.total_pages && requestedPage > response.pagination.total_pages) setPage(response.pagination.total_pages);
+    return { ...response, tests: loadedTests, sessions: Array.isArray(response.sessions) ? response.sessions : [] };
+  }, [viewMode, directionName, isMobileLayout, desktop, searchQuery, statusFilter]);
+  const { tests, sessions, pagination, loading: loadingTests, error: testsError, hasNext, loadNext, retry, refreshChecking } = useTestsFeed({
+    queryKey: JSON.stringify([desktop ? "desktop" : "compact", viewMode, viewMode === "catalog" ? directionName : "", searchQuery, statusFilter]),
+    mobile: isMobileLayout, page, enabled: viewMode === "overview" || Boolean(directionName), revision: reloadToken, loadPage,
+  });
 
-    void loadTests();
-
-    return () => {
-      cancelled = true;
-      controller.abort();
-    };
-  }, [viewMode, directionName, page, reloadToken, searchQuery, statusFilter, dateFilter]);
+  const refreshFeed = useCallback(() => setReloadToken(value => value + 1), []);
+  const pullDistance = usePullToRefresh(feedScroll, { loading: loadingTests, disabled: desktop || Boolean(searchOpen || mobileSheetOpen || attemptLaunch || reviewLaunch), onRefresh: refreshFeed });
 
   const awaitingCalculation = tests.some(test => test.status === "checking");
   useEffect(() => {
-    if (!BFF_DEV || !awaitingCalculation || attemptLaunch) return;
+    if (!BFF_DEV || !awaitingCalculation || attemptLaunch || reviewLaunch || mobileSheetOpen) return;
     const timer = window.setInterval(() => {
-      if (document.visibilityState === "visible") setReloadToken(value => value + 1);
+      if (document.visibilityState === "visible") refreshChecking();
     }, 5000);
     return () => window.clearInterval(timer);
-  }, [awaitingCalculation, attemptLaunch]);
+  }, [awaitingCalculation, attemptLaunch, reviewLaunch, mobileSheetOpen, refreshChecking]);
 
   const sessionMap = useMemo(() => buildSessionMap(sessions), [sessions]);
 
@@ -205,16 +177,15 @@ export function StudentTestsSection() {
     if (BFF_DEV) return tests;
     let result = filterTestsByStatus(tests, statusFilter);
     result = filterTestsBySearch(result, searchTerm);
-    result = filterTestsByDate(result, dateFilter);
     return result;
-  }, [tests, statusFilter, searchTerm, dateFilter]);
+  }, [tests, statusFilter, searchTerm]);
 
   const effectiveSelectedTestId = filteredTests.some(test => getTestId(test) === selectedTestId)
     ? selectedTestId : filteredTests[0] ? getTestId(filteredTests[0]) : null;
 
   const resetFilters = useCallback(() => {
     setStatusFilter("all"); setSearchTerm(""); setSearchQuery("");
-    setDateFilter({ startDate: "", endDate: "" }); setSelectedTestId(null); setPage(1);
+    setSelectedTestId(null); setPage(1);
   }, []);
 
   const selectedTest = useMemo(
@@ -254,14 +225,29 @@ export function StudentTestsSection() {
     setMobileSheetOpen(false);
   }, []);
 
+  useEffect(() => {
+    if (desktopDetailOpen || mobileSheetOpen || attemptLaunch || reviewLaunch || returnPosition.current === null) return;
+    const top = returnPosition.current;
+    returnPosition.current = null;
+    if (!desktop && feedScroll.current) feedScroll.current.scrollTop = top; else window.scrollTo({ top, behavior: "instant" });
+    // Repeat after overflow/focus cleanup so the browser cannot anchor us to the overlay.
+    const frame = window.requestAnimationFrame?.(() => { if (!desktop && feedScroll.current) feedScroll.current.scrollTop = top; else window.scrollTo({ top, behavior: "instant" }); });
+    return () => { if (frame !== undefined) window.cancelAnimationFrame(frame); };
+  }, [desktop, desktopDetailOpen, mobileSheetOpen, attemptLaunch, reviewLaunch]);
+
   const handleSelectTest = useCallback(
     (testId: string) => {
       setSelectedTestId(testId);
-      if (isMobileLayout) {
+      if (desktop) {
+        returnPosition.current = window.scrollY;
+        setDesktopDetailOpen(true);
+        window.scrollTo({ top: 0, behavior: "instant" });
+      } else if (isMobileLayout) {
+        returnPosition.current = desktop ? window.scrollY : (feedScroll.current?.scrollTop ?? window.scrollY);
         setMobileSheetOpen(true);
       }
     },
-    [isMobileLayout],
+    [desktop, isMobileLayout],
   );
 
   const handleStartTest = useCallback(
@@ -271,6 +257,7 @@ export function StudentTestsSection() {
         return;
       }
 
+      if (returnPosition.current === null) returnPosition.current = desktop ? window.scrollY : (feedScroll.current?.scrollTop ?? window.scrollY);
       setMobileSheetOpen(false);
       setAttemptLaunch({
         testId,
@@ -278,7 +265,7 @@ export function StudentTestsSection() {
         timeLimitMinutes: test.timeLimitMinutes,
       });
     },
-    [tests],
+    [desktop, tests],
   );
 
   const handleResumeTest = useCallback(
@@ -288,6 +275,7 @@ export function StudentTestsSection() {
         return;
       }
 
+      if (returnPosition.current === null) returnPosition.current = desktop ? window.scrollY : (feedScroll.current?.scrollTop ?? window.scrollY);
       setMobileSheetOpen(false);
       setAttemptLaunch({
         testId,
@@ -296,7 +284,7 @@ export function StudentTestsSection() {
         resumeAttemptId: attemptId,
       });
     },
-    [tests],
+    [desktop, tests],
   );
 
   const handlePractice = useCallback(
@@ -306,6 +294,7 @@ export function StudentTestsSection() {
         return;
       }
 
+      if (returnPosition.current === null) returnPosition.current = desktop ? window.scrollY : (feedScroll.current?.scrollTop ?? window.scrollY);
       setMobileSheetOpen(false);
       setAttemptLaunch({
         testId,
@@ -314,7 +303,7 @@ export function StudentTestsSection() {
         isPractice: true,
       });
     },
-    [tests],
+    [desktop, tests],
   );
 
   const handleViewAnswers = useCallback(
@@ -324,21 +313,22 @@ export function StudentTestsSection() {
         return;
       }
 
+      if (returnPosition.current === null) returnPosition.current = desktop ? window.scrollY : (feedScroll.current?.scrollTop ?? window.scrollY);
       setMobileSheetOpen(false);
       setReviewLaunch({
         sessionId,
         testTitle: getTestTitle(test),
       });
     },
-    [tests],
+    [desktop, tests],
   );
 
   const openCatalog = useCallback(() => {
-    resetFilters(); setViewMode("catalog");
+    setDesktopDetailOpen(false); resetFilters(); setViewMode("catalog");
   }, [resetFilters]);
 
   const backToOverview = useCallback(() => {
-    resetFilters(); setViewMode("overview");
+    setDesktopDetailOpen(false); resetFilters(); setViewMode("overview");
     setDirectionName("");
     setDirections([]);
   }, [resetFilters]);
@@ -346,47 +336,11 @@ export function StudentTestsSection() {
   const handlePageChange = useCallback((nextPage: number) => {
     setPage(nextPage);
     setSelectedTestId(null);
-  }, []);
+    setMobileSheetOpen(false);
+    if (desktop) window.scrollTo({ top: 0, behavior: "instant" }); else listRef.current?.scrollIntoView({ block: "start", behavior: "instant" });
+  }, [desktop]);
 
   const isOverview = viewMode === "overview";
-  const heroTitle = isOverview ? "Доступные тесты" : "Все тесты";
-  const heroSubtitle = isOverview
-    ? "Выберите тест, чтобы начать или продолжить выполнение."
-    : "Найдите нужный тест по направлению, статусу или дате.";
-
-  if (viewMode === "catalog" && loadingDirections) {
-    return (
-      <div className={styles.page}>
-        <LoadingState label="Загрузка направлений…" variant="block" />
-      </div>
-    );
-  }
-
-  if (viewMode === "catalog" && directions.length === 0) {
-    return (
-      <div className={styles.page}>
-        <SectionHeroBanner
-          imageSrc={STUDENT_SECTION_BANNERS.tests}
-          eyebrow="Тесты"
-          title="Тесты"
-        />
-        <div className={styles.empty}>
-          <h2 className={styles.emptyTitle}>Направления не найдены</h2>
-          <p className={styles.emptyText}>
-            Нет доступных направлений для загрузки тестов.
-          </p>
-          <button
-            type="button"
-            className={styles.backToOverviewBtn}
-            onClick={backToOverview}
-          >
-            К доступным тестам
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <>
       {reviewLaunch ? (
@@ -414,68 +368,51 @@ export function StudentTestsSection() {
         />
       ) : null}
 
-      <div className={styles.page}>
-        <SectionHeroBanner
-          imageSrc={STUDENT_SECTION_BANNERS.tests}
-          eyebrow="Тесты"
-          title={heroTitle}
-          subtitle={heroSubtitle}
-        />
+      {searchOpen ? <TestsSearchScreen initial={{ query: searchTerm, direction: directionName, status: statusFilter }} directions={directions} titles={[...new Set(tests.map(getTestTitle))]} loading={loadingDirections} onClose={() => setSearchOpen(false)} onApply={(values: TestsSearchValues) => { setSearchTerm(values.query); setSearchQuery(values.query); setDirectionName(values.direction); setStatusFilter(values.status); setPage(1); setSelectedTestId(null); setSearchOpen(false); }}/> : null}
+      <div className={styles.page} data-desktop-detail={desktop && desktopDetailOpen ? "true" : undefined} inert={Boolean(attemptLaunch || reviewLaunch)}>
+        {desktop ? !desktopDetailOpen ? <>
+          <nav className={styles.desktopTabs} aria-label="Каталог тестов"><button type="button" aria-current={isOverview ? "page" : undefined} onClick={backToOverview}>Доступные</button><button type="button" aria-current={!isOverview ? "page" : undefined} onClick={openCatalog}>Все тесты</button></nav>
+          {!isOverview ? <DesktopCatalogToolbar key={searchQuery} search={searchQuery} searchLabel="Найти тест" fields={[
+            {key:"direction",label:"Направление",value:directionName,options:directions.map(item=>({value:item.name,label:item.name}))},
+            {key:"status",label:"Статус теста",value:statusFilter,options:TESTS_STATUS_FILTER_OPTIONS.map(item=>({value:item.value,label:item.label}))}
+          ]} onApply={values=>{setSearchTerm(values.search);setSearchQuery(values.search);setDirectionName(values.direction);setStatusFilter(values.status as typeof statusFilter);setPage(1);setSelectedTestId(null);}} onReset={()=>{resetFilters();setDirectionName(directions[0]?.name??"");}}/> : null}
+        </> : null : isOverview ? <nav className={styles.viewTabs} aria-label="Каталог тестов">
+          <button type="button" aria-current="page" onClick={() => {}}>Доступные</button>
+          <button type="button" onClick={openCatalog}>Все тесты</button>
+        </nav> : <div className={styles.catalogSearchBar}>
+          <button type="button" className={styles.catalogBack} onClick={backToOverview} aria-label="К доступным тестам"><ArrowLeft size={23}/></button>
+          <button type="button" className={styles.catalogSearch} onClick={() => setSearchOpen(true)} aria-label="Изменить поиск тестов"><Search size={19}/><span><strong>{searchTerm || "Все тесты"}</strong><small>{directionName || "Все направления"} · {statusFilter === "all" ? "Все статусы" : TESTS_STATUS_LABELS[statusFilter]}</small></span></button>
+        </div>}
 
-        {viewMode === "catalog" ? (
-          <div className={styles.catalogNav}>
-            <button
-              type="button"
-              className={styles.backToOverviewBtn}
-              onClick={backToOverview}
-            >
-              ← Доступные тесты
-            </button>
-          </div>
-        ) : null}
+        {error || testsError ? <div className={styles.alert} role="alert">{error || testsError}{!isMobileLayout && testsError ? <button type="button" onClick={retry}>Повторить загрузку</button> : null}</div> : null}
+        {loadingDirections ? <LoadingState label="Загрузка направлений…" variant="inline" /> : null}
+        {!isOverview && !loadingDirections && !directions.length && !error ? <p className={styles.listEmptyText}>Направления не найдены</p> : null}
 
-        {error ? <div className={styles.alert}>{error}</div> : null}
-
-        {viewMode === "catalog" ? (
-          <TestsToolbar
-            directions={directions}
-            directionName={directionName}
-            onDirectionChange={(value) => { resetFilters(); setDirectionName(value); }}
-            statusFilter={statusFilter}
-            onStatusFilterChange={(value) => { setStatusFilter(value); setPage(1); }}
-            dateFilter={dateFilter}
-            onDateFilterChange={(value) => { setDateFilter(value); setPage(1); }}
-          />
-        ) : null}
-
-        {loadingTests ? (
+        {!isMobileLayout && loadingTests ? (
           <LoadingState label="Загрузка тестов…" variant="inline" />
         ) : null}
 
         <div className={styles.layout}>
-          <section className={styles.listPane}>
-            {viewMode === "catalog" ? (
-              <TestsListSearch
-                value={searchTerm}
-                onChange={(value) => { setSearchTerm(value); setPage(1); }}
-                disabled={!directionName || loadingTests}
-                resultCount={filteredTests.length}
-              />
-            ) : null}
+          <section className={styles.listPane} hidden={desktop && desktopDetailOpen} ref={listRef} aria-label="Список тестов" aria-busy={loadingTests}>
+            {!isMobileLayout && !desktop ? <TestsPagination pagination={pagination} onPageChange={handlePageChange} disabled={loadingTests} /> : null}
 
+
+            <div ref={feedScroll} className={styles.feedScroll} role="region" aria-label="Лента тестов" tabIndex={0}>
+
+            <PullRefreshIndicator distance={pullDistance} loading={loadingTests && filteredTests.length > 0 && pullDistance > 0}/>
             {filteredTests.length > 0 ? (
-              <div className={styles.list}>
+              desktop ? <TestsDesktopList tests={filteredTests} sessions={sessionMap} onSelect={handleSelectTest}/> : <div className={styles.list} data-layout={isOverview ? "cards" : "rows"}>
                 {filteredTests.map((test) => (
                   <TestsListItem
                     key={getTestId(test)}
                     test={test}
-                    selected={getTestId(test) === effectiveSelectedTestId}
+                    selected={(!isMobileLayout || mobileSheetOpen) && getTestId(test) === effectiveSelectedTestId}
                     onSelect={handleSelectTest}
-                    showDirection={isOverview}
+                    showDirection
                   />
                 ))}
               </div>
-            ) : !loadingTests ? (
+            ) : !loadingTests && !loadingDirections && (isOverview || directionName) ? (
               <div className={styles.listEmpty}>
                 <p className={styles.listEmptyTitle}>
                   {isOverview
@@ -490,30 +427,15 @@ export function StudentTestsSection() {
               </div>
             ) : null}
 
-            <TestsPagination
-              pagination={pagination}
-              onPageChange={handlePageChange}
-              disabled={loadingTests}
-            />
+            {isMobileLayout ? <TestsFeedEnd hasNext={hasNext} loading={loadingTests} error={testsError} paused={Boolean(searchOpen || mobileSheetOpen || attemptLaunch || reviewLaunch)} count={filteredTests.length} onLoad={loadNext} onRetry={retry} /> : desktop && pagination && pagination.total_pages <= 1 ? <p className={styles.desktopCount}>Тестов: {pagination.total_items}</p> : <TestsPagination pagination={pagination} onPageChange={handlePageChange} disabled={loadingTests} />}
 
-            {isOverview ? (
-              <div className={styles.viewAllBlock}>
-                <button
-                  type="button"
-                  className={styles.viewAllBtn}
-                  onClick={openCatalog}
-                >
-                  Смотреть все тесты
-                </button>
-                <p className={styles.viewAllHint}>
-                  Направления и полный каталог с фильтрами
-                </p>
-              </div>
-            ) : null}
+            </div>
           </section>
 
-          {!isMobileLayout ? (
+          {!isMobileLayout && (!desktop || desktopDetailOpen) ? (
             <TestDetailPanel
+              variant={desktop ? "page" : "inline"}
+              onClose={() => setDesktopDetailOpen(false)}
               test={selectedTest}
               session={selectedSession}
               onStartTest={handleStartTest}

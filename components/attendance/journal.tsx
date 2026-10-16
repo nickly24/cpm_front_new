@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useState, useRef } from "react";
 import Image from "next/image";
+import { StudentMonthlyAttendance } from "@/components/student/attendance/student-monthly-attendance";
 import QRCode from "qrcode";
 import { useAuth } from "@/contexts/AuthContext";
 import { useContextGuard } from "@/lib/bff/use-context-guard";
@@ -22,7 +23,11 @@ export function displayedJournal(journal: Journal | null, scan: boolean, loadedD
         entries: journal.entries.filter(entry => entry.class_day_id === loadedDay),
     };
 }
-export function AttendanceJournal({ scan = false }: {
+export function AttendanceJournal({ scan = false }: { scan?: boolean }) {
+    const { user } = useAuth();
+    return user?.role === "student" && !scan ? <StudentMonthlyAttendance /> : <StaffAttendanceJournal scan={scan} />;
+}
+function StaffAttendanceJournal({ scan = false }: {
     scan?: boolean;
 }) {
     const { user } = useAuth();

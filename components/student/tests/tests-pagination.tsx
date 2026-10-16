@@ -15,7 +15,7 @@ export function TestsPagination({
   onPageChange,
   disabled = false,
 }: TestsPaginationProps) {
-  if (!pagination || pagination.total_pages <= 1) {
+  if (!pagination || pagination.total_items === 0) {
     return null;
   }
 
@@ -33,11 +33,12 @@ export function TestsPagination({
         aria-label="Предыдущая страница"
       >
         <ChevronLeft size={16} />
+        <span>Назад</span>
       </button>
 
       <span className={styles.paginationMeta}>
-        {current_page} из {total_pages}
-        <span className={styles.paginationTotal}> · {total_items} тестов</span>
+        <strong>{current_page} / {total_pages}</strong>
+        <span className={styles.paginationTotal}>{total_items} тестов</span>
       </span>
 
       <button
@@ -47,6 +48,7 @@ export function TestsPagination({
         onClick={() => onPageChange(current_page + 1)}
         aria-label="Следующая страница"
       >
+        <span>Далее</span>
         <ChevronRight size={16} />
       </button>
     </nav>

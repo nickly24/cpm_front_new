@@ -5,6 +5,9 @@ import { formatAttemptDeadline } from "@/lib/student/test-attempt-catalog";
 import { BFF_DEV } from "@/lib/config";
 import { useContextGuard } from "@/lib/bff/use-context-guard";
 import styles from "./test-attempt.module.css";
+import player from "../test-player.module.css";
+import { QuestionPagination } from "../question-pagination";
+import { useTestViewport } from "../use-test-viewport";
 import { TestAttemptSubmitDialog } from "./test-attempt-submit-dialog";
 import { LoadingState } from "@/components/ui/loading-state";
 import {
@@ -28,7 +31,7 @@ import {
   createEmptyDraft, draftFromStoredAnswer, formatRemainingSeconds,
   isDraftValid, toggleMultipleAnswer,
 } from "@/lib/student/test-attempt-utils";
-import { AlertCircle, ArrowLeft, CheckCircle2, Cloud, Send, X } from "lucide-react";
+import { AlertCircle, ArrowLeft, ArrowRight, CheckCircle2, Clock3, Send, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 export interface OfficialAttemptProps {
@@ -43,6 +46,11 @@ export interface OfficialAttemptProps {
 type Phase = "confirm" | "loading" | "active" | "sealed" | "uploading" | "done" | "fatal";
 
 export function OfficialTestAttemptScreen(props: OfficialAttemptProps) {
+  const overlayRef = useTestViewport();
+  const mainRef = useRef<HTMLElement>(null);
+  const questionRef = useRef<HTMLHeadingElement>(null);
+  const navigatingRef = useRef(false);
+  const [navigating, setNavigating] = useState(false);
   const [phase, setPhase] = useState<Phase>(props.resumeAttemptId ? "loading" : "confirm");
   const [bundle, setBundle] = useState<AttemptV2Bundle | null>(null);
   const [draft, setDraft] = useState<AnswerDraft | null>(null);
@@ -316,7 +324,8 @@ export function OfficialTestAttemptScreen(props: OfficialAttemptProps) {
   }, [applyBundle, bundle, clockBlocked]);
 
   const handleNext = async () => {
-    if (clockBlocked || !bundle || !currentQuestion || !draft || !isDraftValid(draft)) return;
+    if (navigatingRef.current || clockBlocked || !bundle || !currentQuestion || !draft || !isDraftValid(draft)) return;
+    navigatingRef.current = true; setNavigating(true);
     try {
       if (textSaveTimer.current) {
         window.clearTimeout(textSaveTimer.current);
@@ -326,8 +335,35 @@ export function OfficialTestAttemptScreen(props: OfficialAttemptProps) {
       await saveDraft(bundle.attemptId, currentQuestion.questionId, draft);
       const nextQuestion = questions[currentIndex + 1];
       const next = await commitDraft(bundle.attemptId, currentQuestion.questionId, nextQuestion?.questionId);
+      const nextQuestionView = next.questions.find(question => question.questionId === next.currentQuestionId);
+      if (nextQuestionView) {
+        const restored = next.draftsByQuestion[String(nextQuestionView.questionId)] ?? createEmptyDraft(nextQuestionView);
+        draftRef.current = restored; draftDirty.current = false; setDraft(restored);
+      }
       setBundle(next); setViewQuestionId(next.currentQuestionId); scheduleOfficialSync(bundle.attemptId, setBundle);
+      mainRef.current?.scrollTo({ top: 0 });
+      questionRef.current?.focus({ preventScroll: true });
     } catch { setError("Не удалось зафиксировать ответ на устройстве."); }
+    finally { navigatingRef.current = false; setNavigating(false); }
+  };
+
+  const navigateQuestion = async (index: number) => {
+    const question = questions[index];
+    if (!question || !bundle || navigatingRef.current || (!isSealed && !bundle.committedByQuestion[String(question.questionId)] && question.questionId !== bundle.currentQuestionId)) return;
+    navigatingRef.current = true; setNavigating(true);
+    try {
+      if (textSaveTimer.current) window.clearTimeout(textSaveTimer.current);
+      textSaveTimer.current = null;
+      await draftWriteChain.current.catch(() => undefined);
+      const latest = await persistCurrentDraft() ?? bundle;
+      const answer = latest.committedByQuestion[String(question.questionId)];
+      const restored = answer ? draftFromStoredAnswer(answer) : latest.draftsByQuestion[String(question.questionId)] ?? createEmptyDraft(question);
+      draftRef.current = restored; draftDirty.current = false; setDraft(restored);
+      setViewQuestionId(question.questionId); setError(null);
+      mainRef.current?.scrollTo({ top: 0 });
+      questionRef.current?.focus({ preventScroll: true });
+    } catch { setError("Не удалось сохранить черновик. Повторите переход."); }
+    finally { navigatingRef.current = false; setNavigating(false); }
   };
 
   const requestFinish = async () => {
@@ -395,14 +431,14 @@ export function OfficialTestAttemptScreen(props: OfficialAttemptProps) {
     if (window.confirm("Выйти в систему? Таймер не остановится, текущий выбор останется изменяемым черновиком.")) props.onExit();
   };
 
-  if (phase === "confirm") return <div className={styles.attemptOverlay}><div className={styles.attemptCenterState}>
+  if (phase === "confirm") return <div className={player.overlay} ref={overlayRef} role="dialog" aria-modal="true" aria-label="Прохождение теста"><div className={styles.attemptCenterState}>
     <h2 className={styles.attemptCenterTitle}>Начать тест?</h2>
     <p className={styles.attemptCenterText}>{props.testTitle}{props.timeLimitMinutes ? ` · ${props.timeLimitMinutes} мин.` : ""}<br/>Тест будет загружен на устройство. После старта таймер не останавливается, всё время считается по Москве.</p>
     <div className={styles.submitDialogActions}><button className={styles.submitDialogBtnSecondary} onClick={props.onExit}>Отмена</button><button className={styles.submitDialogBtnPrimary} onClick={() => void handleConfirmedStart()}>Начать тест</button></div>
   </div></div>;
-  if (phase === "loading" || phase === "uploading") return <div className={styles.attemptOverlay}><div className={styles.attemptCenterState}><LoadingState label={phase === "loading" ? "Подготовка теста…" : "Отправка ответов…"} variant="compact" /></div></div>;
-  if (phase === "fatal") return <div className={styles.attemptOverlay}><div className={styles.attemptCenterState}><AlertCircle size={42}/><h2 className={styles.attemptCenterTitle}>Не удалось открыть тест</h2><p className={styles.attemptCenterText}>{error}</p><button className={styles.attemptBackBtn} onClick={() => void initializeFromAttempt(props.resumeAttemptId)} >Повторить</button><button className={styles.attemptBackBtn} onClick={props.onExit}>В систему</button></div></div>;
-  if (phase === "done") return <div className={styles.attemptOverlay}><div className={styles.attemptCenterState}><CheckCircle2 size={48} color="#16a34a"/><h2 className={styles.attemptCenterTitle}>{BFF_DEV ? "Ответы приняты" : "Тест сдан"}</h2>{!BFF_DEV && score != null ? <p className={styles.attemptScoreValue}>{score}</p> : null}<p className={styles.attemptCenterText}>{BFF_DEV ? "Тест отправлен в очередь на проверку. Статус и результат появятся в карточке теста после проверки." : "Результат принят сервером."}</p><button className={styles.attemptSubmitBtn} onClick={props.onCompleted}>В систему</button></div></div>;
+  if (phase === "loading" || phase === "uploading") return <div className={player.overlay} ref={overlayRef} role="dialog" aria-modal="true" aria-label="Прохождение теста"><div className={styles.attemptCenterState}><LoadingState label={phase === "loading" ? "Подготовка теста…" : "Отправка ответов…"} variant="compact" /></div></div>;
+  if (phase === "fatal") return <div className={player.overlay} ref={overlayRef} role="dialog" aria-modal="true" aria-label="Прохождение теста"><div className={styles.attemptCenterState}><AlertCircle size={42}/><h2 className={styles.attemptCenterTitle}>Не удалось открыть тест</h2><p className={styles.attemptCenterText}>{error}</p><button className={styles.attemptBackBtn} onClick={() => void initializeFromAttempt(props.resumeAttemptId)} >Повторить</button><button className={styles.attemptBackBtn} onClick={props.onExit}>В систему</button></div></div>;
+  if (phase === "done") return <div className={player.overlay} ref={overlayRef} role="dialog" aria-modal="true" aria-label="Прохождение теста"><div className={styles.attemptCenterState}><CheckCircle2 size={48} color="#16a34a"/><h2 className={styles.attemptCenterTitle}>{BFF_DEV ? "Ответы приняты" : "Тест сдан"}</h2>{!BFF_DEV && score != null ? <p className={styles.attemptScoreValue}>{score}</p> : null}<p className={styles.attemptCenterText}>{BFF_DEV ? "Тест отправлен в очередь на проверку. Статус и результат появятся в карточке теста после проверки." : "Результат принят сервером."}</p><button className={styles.attemptSubmitBtn} onClick={props.onCompleted}>В систему</button></div></div>;
   if (!bundle || !currentQuestion || !draft) return null;
 
   const committed = Boolean(bundle.committedByQuestion[String(currentQuestion.questionId)]);
@@ -422,40 +458,33 @@ export function OfficialTestAttemptScreen(props: OfficialAttemptProps) {
   const activeCommitted = Boolean(bundle.committedByQuestion[String(bundle.currentQuestionId)]);
   const unanswered = Math.max(0, questions.length - committedCount - (!activeCommitted && currentEditableDraft && isDraftValid(currentEditableDraft) ? 1 : 0));
 
-  return <div className={styles.attemptOverlay}>
+  return <div className={player.overlay} ref={overlayRef} role="dialog" aria-modal="true" aria-label="Прохождение теста">
     {dialog ? <TestAttemptSubmitDialog mode={dialog} isPractice={false} timeExpired={isSealed} loading={false} errorDescription={error} descriptionOverride={dialog === "confirm" ? `Будет зафиксировано ответов: ${questions.length - unanswered} из ${questions.length}. Пропущено: ${unanswered}. После завершения изменить ответы нельзя.` : null} onCancel={() => setDialog(null)} onConfirm={() => void confirmFinish()} onRetry={() => void upload()} /> : null}
-    <header className={`${styles.attemptHeader} ${styles.officialAttemptHeader}`.trim()}>
-      <button className={styles.attemptBackBtn} onClick={() => void exit()}><ArrowLeft size={16}/><span className={styles.attemptBackBtnLabel}>В систему</span></button>
-      <div className={styles.officialAttemptHeaderMain}>
-        <strong className={styles.officialAttemptTitle}>{props.testTitle}</strong>
-        <div className={styles.officialAttemptTimeRow}>
-          <div className={styles.attemptTimer}>{formatRemainingSeconds(remainingSeconds)}</div>
-          <small>{isSealed ? "Отправить до" : "Ответить до"} {formatAttemptDeadline(isSealed ? bundle.time.uploadDeadlineEpochMs : bundle.time.answerDeadlineEpochMs)}</small>
-        </div>
-      </div>
-      <div className={styles.officialAttemptHeaderActions}>
-        {!isSealed ? <button className={`${styles.attemptBackBtn} ${styles.officialAttemptFinish}`.trim()} onClick={requestFinish}>Завершить</button> : null}
-        <button className={styles.attemptQueueMenuBtn} onClick={() => setQueueOpen(true)} aria-label="Состояние сохранения"><Cloud size={16}/></button>
-      </div>
+    <header className={player.header}>
+      <button type="button" className={player.iconButton} onClick={() => void exit()} aria-label="К списку тестов" title="К списку тестов"><ArrowLeft size={20}/></button>
+      <span className={`${player.timer} ${player.timerCenter} ${remainingSeconds <= 60 ? player.timerWarning : ""}`} aria-label="Осталось времени"><Clock3 size={17}/>{formatRemainingSeconds(remainingSeconds)}</span>
+      {!isSealed ? <button type="button" className={player.iconButton} onClick={() => void requestFinish()} disabled={navigating} aria-label="Завершить тест" title="Завершить тест"><Send size={18}/></button> : null}
+      {isSealed ? <span className={player.headerSpacer} aria-hidden/> : null}
     </header>
-    <main className={styles.attemptMain}>
-      <section className={styles.attemptQuestionCard}><div className={styles.attemptQuestionMeta}>Вопрос {currentIndex + 1} из {questions.length}</div><h2 className={styles.attemptQuestionText}>{currentQuestion.text}</h2>
-        {currentQuestion.type === "text" ? <textarea className={styles.attemptTextInput} value={draft.type === "text" ? draft.textAnswer : ""} disabled={clockBlocked || committed || isSealed} onChange={(e) => changeDraft({ type: "text", textAnswer: e.target.value }, false)} onBlur={() => void persistCurrentDraft()} placeholder="Введите ответ..."/> : <div className={styles.attemptOptions}>{(currentQuestion.answers ?? []).map((option) => {
+    <QuestionPagination pages={questions.map(q => ({ id: q.questionId, status: bundle.committedByQuestion[String(q.questionId)] ? "answered" : "empty", disabled: !isSealed && !bundle.committedByQuestion[String(q.questionId)] && q.questionId !== bundle.currentQuestionId }))} currentIndex={currentIndex} onSelect={navigateQuestion} disabled={navigating} summary={`Зафиксировано ${committedCount} из ${questions.length}`} />
+    {error ? <p className={player.error} role="alert">{error}</p> : null}
+    <main className={player.main} ref={mainRef} data-test-scroll>
+      <section className={`${styles.attemptQuestionCard} ${player.card}`} aria-labelledby="official-question-title">
+        <div className={player.questionType}><span>{currentQuestion.type === "single" ? "Выберите один ответ" : currentQuestion.type === "multiple" ? "Выберите несколько ответов" : "Напишите ответ"}</span></div>
+        <h2 id="official-question-title" ref={questionRef} tabIndex={-1} className={player.questionText}>{currentQuestion.text}</h2>
+        {currentQuestion.type === "text" ? <textarea aria-label="Ваш ответ" rows={3} className={`${styles.attemptTextInput} ${player.input}`} value={draft.type === "text" ? draft.textAnswer : ""} disabled={navigating || clockBlocked || committed || isSealed} onChange={(e) => changeDraft({ type: "text", textAnswer: e.target.value }, false)} onBlur={() => void persistCurrentDraft()} placeholder="Введите ответ…"/> : <div className={styles.attemptOptions} role="group" aria-label="Варианты ответа">{(currentQuestion.answers ?? []).map((option) => {
           const selected = currentQuestion.type === "single" ? draft.type === "single" && draft.selectedAnswer === option.id : draft.type === "multiple" && draft.selectedAnswers.includes(option.id);
-          return <button key={option.id} disabled={clockBlocked || committed || isSealed} className={`${styles.attemptOption} ${selected ? styles.attemptOptionSelected : ""}`.trim()} onClick={() => changeDraft(currentQuestion.type === "single" ? { type: "single", selectedAnswer: option.id } : toggleMultipleAnswer(draft as Extract<AnswerDraft,{type:"multiple"}>, option.id), true)}><span className={styles.attemptOptionMarker}/><span>{option.text}</span></button>;
+          return <button type="button" key={option.id} aria-pressed={selected} disabled={navigating || clockBlocked || committed || isSealed} className={`${styles.attemptOption} ${player.option} ${currentQuestion.type === "multiple" ? player.multipleOption : ""} ${selected ? styles.attemptOptionSelected : ""}`.trim()} onClick={() => changeDraft(currentQuestion.type === "single" ? { type: "single", selectedAnswer: option.id } : toggleMultipleAnswer(draft as Extract<AnswerDraft,{type:"multiple"}>, option.id), true)}><span className={styles.attemptOptionMarker} aria-hidden/><span>{option.text}</span></button>;
         })}</div>}
-        <p className={styles.attemptQuestionStatus}>{clockBlocked ? "Системное время изменилось. Новые ответы заблокированы до сверки с сервером." : committed ? "Ответ зафиксирован — изменить нельзя" : isSealed ? "Попытка завершена" : "Ответ можно менять до нажатия «Далее»"}</p>
-        {!isSealed ? <button className={styles.attemptNextBtn} disabled={clockBlocked || !isDraftValid(draft) || committed} onClick={() => isLast ? requestFinish() : void handleNext()}>{isLast ? "Завершить тест" : "Далее"}</button> : uploadWindowClosed ? <button className={`${styles.attemptSubmitBtn} ${styles.attemptExpiredSubmitBtn}`.trim()} onClick={() => setQueueOpen(true)}>Требуется помощь администратора</button> : <button className={`${styles.attemptSubmitBtn} ${styles.attemptExpiredSubmitBtn}`.trim()} onClick={() => void upload()}><Send size={16}/>Отправить сохранённые ответы</button>}
-      </section>
-      <section className={`${styles.attemptQuestionNav} ${styles.officialAttemptNav}`.trim()}>
-        <span className={styles.officialAttemptNavTitle}>Навигация по вопросам</span>
-        <div className={styles.attemptQuestionGrid}>{questions.map((q, index) => {
-          const ready = Boolean(bundle.committedByQuestion[String(q.questionId)]);
-          const accessible = ready || q.questionId === bundle.currentQuestionId;
-          return <button key={q.questionId} disabled={!accessible} className={`${styles.attemptQuestionPill} ${index === currentIndex ? styles.attemptQuestionPillCurrent : ""} ${ready ? styles.attemptQuestionPillSynced : ""}`.trim()} onClick={() => { if (accessible) setViewQuestionId(q.questionId); }}>{index + 1}</button>;
-        })}</div>
       </section>
     </main>
+    <footer className={player.footer}><div className={player.footerInner}>
+      {clockBlocked ? <p className={player.error} role="alert">Системное время изменилось. Подключитесь к сети для сверки.</p> : null}
+      <div className={player.actions}>
+        <button type="button" className={player.secondary} disabled={navigating || currentIndex === 0} onClick={() => void navigateQuestion(currentIndex - 1)}><ArrowLeft size={17}/>Назад</button>
+        {!isSealed ? <button type="button" className={player.primary} disabled={navigating || (!committed && (clockBlocked || !isDraftValid(draft)))} onClick={() => committed && !isLast ? void navigateQuestion(currentIndex + 1) : isLast ? void requestFinish() : void handleNext()}>{navigating ? "Сохраняем…" : isLast ? "Завершить тест" : "Далее"}{isLast ? <Send size={17}/> : <ArrowRight size={17}/>}</button> : uploadWindowClosed ? <button type="button" className={player.primary} onClick={() => setQueueOpen(true)}>Получить помощь</button> : <button type="button" className={player.primary} onClick={() => void upload()}><Send size={17}/>Отправить ответы</button>}
+      </div>
+    </div></footer>
     {queueOpen ? <button type="button" className={styles.attemptQueueBackdrop} onClick={() => setQueueOpen(false)} aria-label="Закрыть состояние сохранения"/> : null}
     {queueOpen ? <aside className={`${styles.attemptQueueDrawer} ${styles.attemptQueueDrawerOpen}`.trim()}>
       <div className={styles.attemptQueueDrawerHead}>

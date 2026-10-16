@@ -1,0 +1,5 @@
+.indicator { display:flex; flex-shrink:0; align-items:center; justify-content:center; overflow:hidden; color:var(--ds-accent); }
+.indicator svg { display:block; transition:transform .15s; }
+.spinner { animation:pullSpin .8s linear infinite; }
+@keyframes pullSpin { to { transform:rotate(360deg); } }
+@media(prefers-reduced-motion:reduce) { .indicator svg { transition:none; } .spinner { animation-duration:2s; } }

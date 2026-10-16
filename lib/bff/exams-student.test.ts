@@ -15,6 +15,15 @@ function defaultOwner(path: string) {
 }
 beforeEach(() => { vi.resetModules(); domain.mockReset(); identity.user.role = "student"; identity.user.division_id = 1001; identity.context_revision = "cabinet1"; domain.mockImplementation(defaultOwner); });
 describe("student exam boundary", () => {
+  it("filters by direction and case-insensitive title before slicing result pages", async () => {
+    const catalog = [15,16,17].map(id=>({...exam,id,name:id===15?"Алгебра":"Итоговый экзамен",direction_id:id===17?2:1,exam_date:"2026-10-09",start_at:null,end_at:null}));
+    domain.mockImplementation((path:string)=>path.startsWith("/exams?")?{items:catalog,total:3}:path.includes("/results?")?{items:[{...completed,exam_date:"2026-10-09"}],total:1}:defaultOwner(path));
+    const {examsStudentGet}=await import("./exams-student");
+    const result=await examsStudentGet("/api/student/exams/results",{directionId:"1",search:"ИТОГОВЫЙ",grade:"0",limit:1,page:1}) as {items:{examId:number}[];pagination:{total:number}};
+    expect(result.items.map(item=>item.examId)).toEqual([16]);expect(result.pagination.total).toBe(1);
+    expect(domain.mock.calls.every(call=>!String(call[0]).includes("search=")&&!String(call[0]).includes("directionId="))).toBe(true);
+  });
+
   it.each(["not_started", "pending_ready", "in_progress"])("keeps the completed zero during a %s retake without publishing its private state", async status => {
     const summary = { ...exam, exam_date: "2026-10-09", start_at: "2026-10-08T21:00:00Z", end_at: "2026-10-09T15:00:00Z" };
     const published = { ...completed, attempt_no: 1, exam_date: summary.exam_date, has_active_retake: true, retake_status: status };

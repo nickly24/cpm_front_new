@@ -177,6 +177,17 @@
   gap: 12px;
 }
 
+.reviewExplanation {
+  width: 100%;
+  max-width: 820px;
+  margin: 0 auto 12px;
+  color: var(--ds-text-secondary);
+  font-size: 12px;
+}
+.reviewExplanation summary { min-height: 44px; padding: 12px 0; cursor: pointer; }
+.reviewExplanation .reviewNotice { margin-bottom: 12px; }
+.reviewQuestionText, .reviewAnswerBox, .reviewCorrectBox { overflow-wrap: anywhere; white-space: pre-wrap; }
+
 .reviewSectionTitle {
   margin: 0 0 6px;
   font-size: 12px;

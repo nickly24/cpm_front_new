@@ -1,0 +1,86 @@
+.page { width: 100%; max-width: 960px; margin: 0 auto; display: flex; flex-direction: column; gap: 24px; color: var(--ds-text); }
+.headerActions { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.listHeading { display: flex; align-items: center; gap: 10px; }
+.listHeading h1 { margin: 0; font-size: 20px; font-weight: 600; letter-spacing: -.4px; }
+.listHeading > span { display: grid; place-items: center; min-width: 26px; height: 26px; padding: 0 7px; border-radius: 9px; background: var(--ds-surface); font-size: 13px; color: var(--ds-text-muted); }
+.primaryAction { min-height: 50px; border-radius: 17px; background: var(--ds-accent); border-color: transparent; color: #fff; gap: 9px; }
+.primaryAction:hover:not(:disabled) { background: var(--ds-accent-hover); }
+.emptyState { display: flex; align-items: center; flex-direction: column; padding: 44px 22px; text-align: center; }
+.emptyArtwork { width: 100px; height: 100px; margin-bottom: 24px; }
+.emptyArtwork svg { width: 100%; height: 100%; }
+.emptyTitle { margin: 0 0 10px; font-size: 20px; font-weight: 600; }
+.emptyText { max-width: 310px; margin: 0; color: var(--ds-text-secondary); font-size: 15px; line-height: 1.6; }
+.zapsList { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+.zapCard { display: flex; flex-direction: column; gap: 18px; min-width: 0; padding: 22px; border: 0; border-radius: 24px; background: var(--ds-surface); color: var(--ds-text); font: inherit; text-align: left; cursor: pointer; transition: transform .18s ease, background .18s ease; }
+.zapCard:hover { background: color-mix(in srgb, var(--ds-surface) 94%, #9d7ce8); }
+.zapCard:active { transform: scale(.99); }
+.zapCardHeader { display: flex; align-items: center; flex-wrap: wrap; justify-content: space-between; gap: 10px; }
+.zapCardId { font-size: 13px; font-weight: 500; color: color-mix(in srgb, #9d7ce8 65%, var(--ds-text-secondary)); }
+.zapCardText { margin: 0; font-size: 17px; font-weight: 550; line-height: 1.5; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.zapCardAnswer { display: flex; flex-direction: column; gap: 5px; margin: 0; padding: 13px 15px; border-radius: 14px; background: var(--ds-surface-muted); font-size: 14px; line-height: 1.5; color: var(--ds-text-secondary); overflow-wrap: anywhere; }
+.zapCardAnswer strong { font-weight: 500; font-size: 12px; color: var(--ds-text-muted); }
+.zapCardFooter { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: auto; color: var(--ds-text-muted); }
+.zapCardMeta { display: flex; align-items: center; gap: 7px; font-size: 12px; }
+.zapCardMeta svg { flex-shrink: 0; color: #9d7ce8; }
+.badge { display: inline-flex; align-items: center; gap: 6px; width: fit-content; max-width: 100%; padding: 7px 10px; border-radius: 10px; font-size: 12px; font-weight: 550; }
+.badge svg { flex-shrink: 0; }
+.badgeSuccess { color: var(--ds-success); background: color-mix(in srgb, var(--ds-success) 12%, transparent); }
+.badgeWarning { color: color-mix(in srgb, #9d7ce8 76%, var(--ds-text)); background: color-mix(in srgb, #9d7ce8 13%, transparent); }
+.badgeDanger { color: var(--ds-danger); background: color-mix(in srgb, var(--ds-danger) 12%, transparent); }
+.badgeMuted { color: var(--ds-text-secondary); background: var(--ds-surface-muted); }
+.formPage { width: 100%; max-width: 680px; margin: 0 auto; }
+.screenHeader { display: flex; align-items: center; gap: 14px; margin-bottom: 8px; }
+.screenHeader h1 { margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -.5px; }
+.backButton { display: grid; place-items: center; width: 44px; height: 44px; flex-shrink: 0; border: 0; border-radius: 50%; background: var(--ds-surface); color: var(--ds-text); cursor: pointer; }
+.formDescription { margin: 16px 0 24px; color: var(--ds-text-secondary); font-size: 14px; line-height: 1.6; }
+.form { display: flex; flex-direction: column; gap: 24px; }
+.field { display: flex; min-width: 0; flex-direction: column; gap: 10px; }
+.fieldLabel { font-size: 14px; font-weight: 550; color: var(--ds-text); }
+.textarea, .input { box-sizing: border-box; min-width: 0; max-width: 100%; width: 100%; padding: 14px; border: 1px solid transparent; border-radius: 17px; background: var(--ds-surface); color: var(--ds-text); font: inherit; font-size: 16px; }
+.textarea { min-height: 124px; resize: vertical; line-height: 1.5; }
+.textarea::placeholder { color: var(--ds-text-muted); }
+.input { min-height: 50px; }
+.input::-webkit-date-and-time-value { text-align: left; }
+.helpText { margin: 0; font-size: 12px; line-height: 1.5; color: var(--ds-text-muted); }
+.datePickerRow { display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr) auto; align-items: end; }
+.selectedDates { display: flex; flex-wrap: wrap; gap: 8px; }
+.dateTag { display: inline-flex; align-items: center; gap: 3px; padding: 0 0 0 12px; border-radius: 12px; background: color-mix(in srgb, #9d7ce8 12%, var(--ds-surface)); font-size: 13px; }
+.dateTagRemove { display: grid; place-items: center; width: 44px; height: 44px; border: 0; background: transparent; color: var(--ds-text-secondary); cursor: pointer; }
+.attachmentPicker { display: flex; align-items: center; gap: 14px; padding: 19px; border-radius: 20px; background: var(--ds-surface); color: #9d7ce8; cursor: pointer; }
+.attachmentPicker > span { display: flex; flex-direction: column; gap: 5px; }
+.attachmentPicker strong { color: var(--ds-text); font-size: 15px; font-weight: 550; }
+.attachmentPicker small { color: var(--ds-text-muted); font-size: 12px; }
+.fileInput { width: 100%; font-size: 13px; color: var(--ds-text-secondary); }
+.previewGrid, .imagesGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 12px; }
+.previewItem { min-width: 0; padding: 10px; border-radius: 18px; background: var(--ds-surface); }
+.previewItem > button { width: 100%; margin-top: 8px; min-height: 44px; }
+.previewImage, .image { display: block; width: 100%; height: 140px; object-fit: cover; border-radius: 12px; }
+.formActions > button { width: 100%; }
+.alert { padding: 16px; margin: 0; border-radius: 17px; background: color-mix(in srgb, var(--ds-danger) 10%, transparent); color: var(--ds-danger); font-size: 14px; overflow-wrap: anywhere; }
+.alert > p { margin: 0 0 12px; }
+.panel { display: flex; flex-direction: column; gap: 24px; padding: 24px; border: 0; border-radius: 24px; background: var(--ds-surface); }
+.detailSection { display: flex; flex-direction: column; gap: 8px; }
+.detailLabel { margin: 0 0 8px; color: var(--ds-text-muted); font-size: 13px; font-weight: 500; }
+.detailText { margin: 0; font-size: 16px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
+.imageWrap { overflow: hidden; border-radius: 16px; background: var(--ds-surface-muted); }
+.page button:focus-visible, .page input:focus-visible, .page textarea:focus-visible { outline: 2px solid var(--ds-accent); outline-offset: 3px; }
+.page button:disabled { opacity: .5; cursor: default; }
+@media (max-width: 760px) {
+  .page { gap: 20px; }
+  .headerActions { align-items: stretch; flex-direction: column; gap: 18px; }
+  .headerActions .primaryAction { width: 100%; }
+  .zapsList { grid-template-columns: 1fr; gap: 16px; }
+  .zapCard { padding: 20px; }
+  .screenHeader h1 { font-size: 20px; }
+  .panel { padding: 20px; }
+}
+@media (max-width: 359px) {
+  .datePickerRow { grid-template-columns: minmax(0, 1fr); }
+}
+@media (prefers-reduced-motion: reduce) { .zapCard { transition: none; } }
+.dateDetail { display: flex; flex-direction: column; gap: 5px; padding: 14px 0; border-bottom: 1px solid var(--ds-border); font-size: 14px; }
+.dateDetail small { color: var(--ds-text-muted); font-size: 12px; }
+.formPage { gap: 0; }
+.formPage .formDescription { margin: 12px 0 24px; }
+.fileInput { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.field:has(.fileInput:focus-visible) .attachmentPicker { outline: 2px solid var(--ds-accent); outline-offset: 3px; }

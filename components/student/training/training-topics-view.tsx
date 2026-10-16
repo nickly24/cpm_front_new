@@ -1,7 +1,9 @@
 "use client";
 
 import styles from "@/components/student/training/student-training.module.css";
-import { FilterPopover } from "@/components/ui/filter-popover";
+import { DesktopCatalogToolbar } from "../shared/desktop-catalog-toolbar";
+import { useMediaQuery } from "@/lib/hooks/use-media-query";
+import { TrainingCatalogSearch, trainingKinds, trainingProgress, type TrainingSearchValues } from "./training-catalog-search";
 import { LoadingState } from "@/components/ui/loading-state";
 import { fetchTrainingSectionsByDirection } from "@/lib/training/training-api";
 import type {
@@ -13,7 +15,7 @@ import { calcProgressPercent, getProgressLabel } from "@/lib/training/training-u
 import { BFF_DEV } from "@/lib/config";
 import { cn } from "@/lib/cn";
 import { examPeriod } from "@/lib/training/exam-training";
-import { ClipboardList, FileText, Search } from "lucide-react";
+import { ClipboardList, FileText, Search, ChevronRight } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -21,7 +23,7 @@ interface TrainingSectionsListViewProps {
   directions: TrainingDirection[];
   direction: TrainingDirection;
   selectedDirectionId: number;
-  onSelectDirection: (directionId: number) => void;
+  onSelectDirection: (directionId: number, filters?:Record<string,string|null>) => void;
   studentId: number;
   loading: boolean;
   error: string | null;
@@ -39,6 +41,8 @@ export function TrainingSectionsListView({
   onSelectSection,
 }: TrainingSectionsListViewProps) {
   const PAGE_SIZE = 12;
+  const desktop=useMediaQuery("(min-width: 1024px)");
+  const [searchOpen,setSearchOpen]=useState(false);
   const router=useRouter(), pathname=usePathname(), query=useSearchParams();
   const queryString=query.toString();
   const searchTerm=query.get("search")??"";
@@ -50,9 +54,6 @@ export function TrainingSectionsListView({
     for(const [key,value] of Object.entries(values)){if(value===null||value===""||value==="all")next.delete(key);else next.set(key,value)}
     router.replace(`${pathname}${next.size?`?${next}`:""}`,{scroll:false});
   };
-  const setSearchTerm=(value:string)=>update({search:value,page:null});
-  const setKindFilter=(value:SectionKind|"all")=>update({kind:value,page:null});
-  const setProgressFilter=(value:"all"|"in_progress"|"learned")=>update({progress:value,page:null});
   const setPage=(value:number|((v:number)=>number))=>update({page:String(typeof value==="function"?value(page):value)});
   const requestKey=`${studentId}:${direction.id}:${queryString}`;
   const [reload,setReload]=useState(0);
@@ -69,6 +70,13 @@ export function TrainingSectionsListView({
   const current=result?.key===requestKey?result:null;
   const sections=current?.sections??[],sectionsLoading=!current,sectionsError=current?.error??null,totalPages=current?.pages??1,totalItems=current?.total??0;
 
+  const apply=(values:TrainingSearchValues)=>{
+    const filters={search:values.search.trim(),kind:values.kind,progress:values.progress,page:null};
+    if(Number(values.direction)!==selectedDirectionId)onSelectDirection(Number(values.direction),filters);
+    else update(filters);
+    setSearchOpen(false);
+  };
+
   if (loading) {
     return <LoadingState label="Загрузка разделов…" variant="panel" />;
   }
@@ -79,83 +87,12 @@ export function TrainingSectionsListView({
 
   return (
     <div className={styles.sectionsCatalog}>
-      <div className={styles.sectionsDirections} role="group" aria-label="Направление">
-        {directions.map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            className={cn(
-              styles.sectionsFilterChip,
-              selectedDirectionId === item.id && styles.sectionsFilterChipActive,
-            )}
-            aria-pressed={selectedDirectionId === item.id}
-            onClick={() => onSelectDirection(item.id)}
-          >
-            {item.name}
-          </button>
-        ))}
-      </div>
-
-      <div className={styles.sectionsCatalogHeader}>
-        <label className={styles.sectionsSearch}>
-          <Search size={18} aria-hidden />
-          <input
-            type="search"
-            value={searchTerm}
-            onChange={(event) => setSearchTerm(event.target.value)}
-            placeholder="Найти раздел"
-            aria-label="Найти раздел"
-          />
-        </label>
-        <FilterPopover
-          activeCount={Number(kindFilter !== "all") + Number(progressFilter !== "all")}
-          onReset={() => update({kind:null,progress:null,page:null})}
-        >
-          <p className={styles.sectionsPopoverLabel}>Тип</p>
-          <div className={styles.sectionsFilterRow}>
-            {([
-              ["all", "Все"],
-              ["manual", "Только карточки"],
-              ["test", "Только тесты"],
-              ["exam", "Из экзаменов"],
-            ] as const).map(([value, label]) => (
-              <button
-                key={value}
-                type="button"
-                className={cn(
-                  styles.sectionsFilterChip,
-                  kindFilter === value && styles.sectionsFilterChipActive,
-                )}
-                aria-pressed={kindFilter === value}
-                onClick={() => setKindFilter(value)}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-          <p className={styles.sectionsPopoverLabel}>Прогресс</p>
-          <div className={styles.sectionsFilterRow}>
-            {([
-              ["all", "Все"],
-              ["in_progress", "Есть что учить"],
-              ["learned", "Полностью выучено"],
-            ] as const).map(([value, label]) => (
-              <button
-                key={value}
-                type="button"
-                className={cn(
-                  styles.sectionsFilterChip,
-                  progressFilter === value && styles.sectionsFilterChipActive,
-                )}
-                aria-pressed={progressFilter === value}
-                onClick={() => setProgressFilter(value)}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        </FilterPopover>
-      </div>
+      {desktop?<DesktopCatalogToolbar key={requestKey} search={searchTerm} searchLabel="Найти раздел" fields={[
+        {key:"direction",label:"Направление",value:String(selectedDirectionId),options:directions.map(item=>({value:String(item.id),label:item.name}))},
+        {key:"kind",label:"Тип раздела",value:kindFilter,options:trainingKinds},
+        {key:"progress",label:"Прогресс",value:progressFilter,options:trainingProgress},
+      ]} onApply={values=>apply({search:values.search,direction:values.direction,kind:values.kind,progress:values.progress})} onReset={()=>update({search:null,kind:null,progress:null,page:null})}/>:<button className={styles.searchSummary} type="button" aria-label="Изменить поиск карточек" onClick={()=>setSearchOpen(true)}><Search size={20}/><span><strong>{searchTerm||"Все разделы карточек"}</strong><small>{direction.name} · {trainingKinds.find(item=>item.value===kindFilter)?.label} · {trainingProgress.find(item=>item.value===progressFilter)?.label}</small></span><ChevronRight size={18}/></button>}
+      {searchOpen?<TrainingCatalogSearch initial={{search:searchTerm,direction:String(selectedDirectionId),kind:kindFilter,progress:progressFilter}} directions={directions} onClose={()=>setSearchOpen(false)} onApply={apply}/>:null}
 
       <div className={styles.sectionsList}>
         {sections.map((section) => {
@@ -253,23 +190,23 @@ export function TrainingSectionsListView({
         <LoadingState label="Загрузка разделов…" variant="inline" />
       ) : null}
       {totalItems > 0 ? <div className={styles.sectionsPagination}>
-        <button
+        {totalPages>1?<button
           type="button"
           disabled={page <= 1}
           onClick={() => setPage((value) => Math.max(1, value - 1))}
         >
           Назад
-        </button>
+        </button>:null}
         <span>
-          {page} / {totalPages} · Разделов: {totalItems}
+          {totalPages>1?`${page} / ${totalPages} · `:""}Разделов: {totalItems}
         </span>
-        <button
+        {totalPages>1?<button
           type="button"
           disabled={page >= totalPages}
           onClick={() => setPage((value) => Math.min(totalPages, value + 1))}
         >
           Далее
-        </button>
+        </button>:null}
       </div> : null}
 
       {!sectionsLoading && !sectionsError && totalItems === 0 ? (

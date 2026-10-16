@@ -106,6 +106,15 @@
   --sch-tone-6-soft: rgba(184, 106, 82, 0.12);
 }
 
+/* Warm neutral surfaces only within the student light theme. */
+:root:not(.dark):has(.cabinet-layout[data-section]) {
+  --ds-bg: #fffefa;
+  --ds-surface: #ffffff;
+  --ds-surface-muted: #fff4eb;
+  --ds-surface-hover: #fff0e5;
+  --student-search-border: #f8ece4;
+}
+
 html.dark {
   color-scheme: dark;
 
