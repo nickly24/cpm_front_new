@@ -98,6 +98,13 @@ export function AdminRatingsSection() {
 
   const filtered = ratings;
 
+  useEffect(() => {
+    if (!hasActiveJob && jobsRefreshToken > 0) {
+      const timer = window.setTimeout(() => { void loadRatings(); void loadVersions(); }, 0);
+      return () => window.clearTimeout(timer);
+    }
+  }, [hasActiveJob, jobsRefreshToken, loadRatings, loadVersions]);
+
   const handleStartRecalc = async (payload: {
     date_from: string;
     date_to: string;
