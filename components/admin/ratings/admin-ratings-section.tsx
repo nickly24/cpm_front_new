@@ -7,7 +7,7 @@ import { EditOnly } from "@/components/admin/admin-section-access";
 
 import { AdminRatingDetailsView } from "@/components/admin/ratings/admin-rating-details-view";
 import { RatingFreshnessNotice } from "@/components/exams-v2/rating-freshness";
-import type { RatingFreshness } from "@/lib/ratings/freshness";
+import { useAdminRatingFeed } from "@/lib/ratings/use-admin-rating-feed";
 import { AdminRatingJobsTab } from "@/components/admin/ratings/admin-rating-jobs-tab";
 import { AdminRatingRecalcPanel } from "@/components/admin/ratings/admin-rating-recalc-panel";
 import { RatingsReportWorkspace } from "@/components/admin/ratings/report/ratings-report-workspace";
@@ -18,16 +18,15 @@ import { LoadingState } from "@/components/ui/loading-state";
 import { canAccessSection } from "@/lib/auth/admin-access";
 import { useAuth } from "@/contexts/AuthContext";
 import {
-  fetchAdminRatings,
   fetchRatingVersions,
   pendingRatingCommand,
   startRatingRecalc,
 } from "@/lib/admin/admin-ratings-api";
-import type { AdminRatingRow, AdminRatingsTab, RatingRecalcJob } from "@/lib/admin/admin-ratings-types";
+import type { AdminRatingsTab, RatingRecalcJob } from "@/lib/admin/admin-ratings-types";
 import { useDebouncedValue } from "@/lib/hooks/use-debounced-value";
 import { useCabinetChrome } from "@/contexts/cabinet-chrome-context";
 import { Calculator, RefreshCw, TableProperties } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 const TABS: { id: AdminRatingsTab; label: string }[] = [
   { id: "ratings", label: "Рейтинг" },
@@ -48,10 +47,6 @@ export function AdminRatingsSection() {
     : canAccessSection(user, "ratings", "edit");
 
   const [tab, setTab] = useState<AdminRatingsTab>("ratings");
-  const [ratings, setRatings] = useState<AdminRatingRow[]>([]);
-  const [freshness, setFreshness] = useState<RatingFreshness | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebouncedValue(search, 300);
   const [showRecalc, setShowRecalc] = useState(false);
@@ -77,28 +72,19 @@ export function AdminRatingsSection() {
     return () => setImmersive(false);
   }, [showReport, setImmersive]);
 
-  const requestSerial = useRef(0);
-  const loadRatings = useCallback(async () => {
-    const request = ++requestSerial.current;
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await fetchAdminRatings(version || undefined);
-      if (request !== requestSerial.current) return;
-      setFreshness(response.ratingFreshness ?? null);
-      if (response.status) {
-        setRatings(response.ratings ?? []);
-      } else {
-        setRatings([]);
-        setError("Не удалось загрузить рейтинг");
-      }
-    } catch (err) {
-      if (request !== requestSerial.current) return;
-      setError(err instanceof Error ? err.message : "Ошибка загрузки рейтинга");
-    } finally {
-      if (request === requestSerial.current) setLoading(false);
-    }
-  }, [version]);
+  const scope = `${user?.account_id}:${user?.organization_id}:${user?.division_id}`;
+  const feed = useAdminRatingFeed(scope, version, debouncedSearch.trim());
+  const { rows: ratings, freshness, loading, error, reload: loadRatings, loadingMore, moreError, total, loadMore } = feed;
+  const loadMoreSentinel = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const target = loadMoreSentinel.current;
+    if (!target || details || showReport || tab !== "ratings" || loading || loadingMore || moreError || ratings.length >= total || typeof IntersectionObserver === "undefined") return;
+    const observer = new IntersectionObserver(entries => {
+      if (entries.some(entry => entry.isIntersecting)) void loadMore();
+    }, { rootMargin: "300px" });
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [details, showReport, tab, loading, loadingMore, moreError, total, loadMore, ratings.length]);
   const loadVersions = useCallback(async () => {
     if (!BFF_DEV) return;
     try { setVersions(await fetchRatingVersions()); } catch { /* Table requests surface access and transport failures. */ }
@@ -106,31 +92,11 @@ export function AdminRatingsSection() {
   const onPublished = useCallback(() => { void loadRatings(); void loadVersions(); }, [loadRatings, loadVersions]);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => {void loadVersions(); void loadRatings();}, 0);
+    const timer = window.setTimeout(() => {void loadVersions();}, 0);
     return () => window.clearTimeout(timer);
-  }, [loadRatings, loadVersions]);
+  }, [loadVersions]);
 
-  const filtered = useMemo(() => {
-    const query = debouncedSearch.trim().toLowerCase();
-    if (!query) {
-      return ratings;
-    }
-    return ratings.filter((row) => {
-      return (
-        row.student_name.toLowerCase().includes(query) ||
-        String(row.student_id).includes(query) ||
-        (row.group_name ?? "").toLowerCase().includes(query) ||
-        (row.student_class ?? "").toLowerCase().includes(query)
-      );
-    });
-  }, [ratings, debouncedSearch]);
-
-  useEffect(() => {
-    if (!hasActiveJob && jobsRefreshToken > 0) {
-      const timer = window.setTimeout(() => { void loadRatings(); void loadVersions(); }, 0);
-      return () => window.clearTimeout(timer);
-    }
-  }, [hasActiveJob, jobsRefreshToken, loadRatings, loadVersions]);
+  const filtered = ratings;
 
   const handleStartRecalc = async (payload: {
     date_from: string;
@@ -149,7 +115,7 @@ export function AdminRatingsSection() {
   };
 
   if (showReport) {
-    return <RatingsReportWorkspace version={version || freshness?.versionId} onBack={() => setShowReport(false)} />;
+    return <RatingsReportWorkspace version={version || feed.publication?.version_id} onBack={() => setShowReport(false)} />;
   }
 
   if (details) {
@@ -199,14 +165,15 @@ export function AdminRatingsSection() {
         </div>
       </header>
 
+      {feed.checking ? <p role="status" className={ratingStyles.pageSubtitle}>Проверяем актуальность источников…</p> : null}
       <RatingFreshnessNotice value={freshness ? { ...freshness, activeJobId: hasActiveJob ? "active" : null } : null} />
       {BFF_DEV && version ? <p className={ratingStyles.pageSubtitle}>Показана сохранённая публикация. Новые исходные данные не меняют её оценки.</p> : null}
       {BFF_DEV ? <div className={styles.filters}>
-        <label>Опубликованная версия <select aria-label="Опубликованная версия" value={version} onChange={event => {setLoading(true); setVersion(event.target.value);}}>
+        <label>Опубликованная версия <select aria-label="Опубликованная версия" value={version} onChange={event => setVersion(event.target.value)}>
           <option value="">Последняя версия</option>
           {versions.map(job => <option key={job.id} value={job.id}>№{job.revision} · {job.date_from} — {job.date_to}</option>)}
         </select></label>
-        {freshness?.asOf ? <span>Данные на {new Date(freshness.asOf).toLocaleString("ru-RU")}</span> : null}
+        {feed.publication?.as_of ? <span>Данные на {new Date(feed.publication.as_of).toLocaleString("ru-RU")}</span> : null}
       </div> : null}
 
       <div className={ratingStyles.sectionTabs}>
@@ -315,6 +282,13 @@ export function AdminRatingsSection() {
               </table>
             </div>
           ) : null}
+          {!loading && !error && ratings.length > 0 ? <div ref={loadMoreSentinel} style={{ padding: "16px 0" }}>
+            <p className={ratingStyles.pageSubtitle}>Показано {ratings.length} из {total}</p>
+            {moreError ? <p role="alert" className={styles.errorText}>{moreError}</p> : null}
+            {ratings.length < total ? <Button type="button" variant="ghost" disabled={loadingMore} onClick={() => void loadMore()}>
+              {loadingMore ? "Загружаем следующие строки…" : moreError ? "Повторить загрузку" : "Показать ещё"}
+            </Button> : null}
+          </div> : null}
         </>
       ) : null}
       <div hidden={tab !== "jobs"}>

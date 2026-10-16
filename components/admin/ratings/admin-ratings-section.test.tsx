@@ -1,0 +1,23 @@
+// @vitest-environment jsdom
+import React from "react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach,beforeEach,expect,it,vi } from "vitest";
+const {page,check,chrome,observe} = vi.hoisted(()=>({page:vi.fn(),check:vi.fn(),chrome:vi.fn(),observe:{callback:()=>{}}}));
+vi.mock("@/lib/config",()=>({BFF_DEV:true}));
+vi.mock("@/contexts/AuthContext",()=>({useAuth:()=>({user:{account_id:9,organization_id:11,division_id:17,role:"admin",organization_admin:true}})}));
+vi.mock("@/contexts/cabinet-chrome-context",()=>({useCabinetChrome:()=>({setImmersive:chrome})}));
+vi.mock("@/lib/bff/use-context-guard",()=>({useContextGuard:()=>{}}));
+vi.mock("@/lib/bff/ratings-shared",()=>({hasPendingRatingCommands:()=>false}));
+vi.mock("@/components/admin/admin-section-access",()=>({EditOnly:({children}:{children:React.ReactNode})=><>{children}</>}));
+vi.mock("@/components/admin/ratings/admin-rating-jobs-tab",()=>({AdminRatingJobsTab:()=>null}));
+vi.mock("@/components/admin/ratings/admin-rating-details-view",()=>({AdminRatingDetailsView:()=>null}));
+vi.mock("@/components/admin/ratings/report/ratings-report-workspace",()=>({RatingsReportWorkspace:({version}:{version:string})=><div>Отчёт версии {version}</div>}));
+vi.mock("@/lib/admin/admin-ratings-api",()=>({fetchAdminRatingPage:page,fetchAdminRatingFreshness:check,fetchRatingVersions:async()=>[],pendingRatingCommand:()=>null,startRatingRecalc:vi.fn()}));
+import {AdminRatingsSection} from "./admin-ratings-section";
+const id="12345678-abcd-4321-abcd-123456789abc";const publication={version_id:id,revision:4,as_of:"2026-10-16T12:00:00Z",date_from:"2026-10-01",date_to:"2026-10-16"};
+const rows=(start:number,n=50)=>Array.from({length:n},(_,i)=>({id:start+i+1,student_id:start+i+1,place:start+i+1,version_id:id,student_name:`Ученик ${start+i+1}`,student_class:"11",group_name:"А",homework:0,exams:0,tests:0,final:100-start-i}));
+beforeEach(()=>{page.mockReset();check.mockReset();check.mockReturnValue(new Promise(()=>{}));page.mockImplementation(async({offset,q})=>({publication,total:q?1:150,ratings:q?[{...rows(349,1)[0],student_name:"Финиш"}]:rows(offset)}));vi.stubGlobal("IntersectionObserver",class{constructor(callback:IntersectionObserverCallback){observe.callback=()=>callback([{isIntersecting:true} as IntersectionObserverEntry],{} as IntersectionObserver);}observe(){}disconnect(){}});});
+afterEach(()=>{cleanup();vi.unstubAllGlobals();});
+it("requests one page on mount and appends after intersection, retaining the first rows",async()=>{render(<AdminRatingsSection/>);await screen.findByText("Показано 50 из 150");expect(page).toHaveBeenCalledTimes(1);expect(screen.getAllByRole("row")).toHaveLength(51);act(()=>{observe.callback();observe.callback();});await screen.findByText("Показано 100 из 150");expect(page).toHaveBeenCalledTimes(2);expect(page.mock.calls[1][0]).toMatchObject({version:id,offset:50,limit:50});expect(screen.getByText("Ученик 1")).toBeTruthy();expect(screen.getAllByRole("row")).toHaveLength(101);});
+it("searches the full published ranking through the server and preserves the global place",async()=>{render(<AdminRatingsSection/>);await screen.findByText("Показано 50 из 150");fireEvent.change(screen.getByPlaceholderText("Поиск по имени, группе, классу…"),{target:{value:"Финиш"}});await screen.findByText("Финиш");expect(page.mock.calls.at(-1)![0]).toMatchObject({q:"Финиш",offset:0,limit:50});expect(screen.getByText("350")).toBeTruthy();expect(screen.queryByText("Ученик 1")).toBeNull();});
+it("keeps the report pinned while source freshness is still pending",async()=>{render(<AdminRatingsSection/>);await screen.findByText("Показано 50 из 150");fireEvent.click(screen.getByRole("button",{name:/^Отчёт$/}));await waitFor(()=>expect(screen.getByText(`Отчёт версии ${id}`)).toBeTruthy());expect(page).toHaveBeenCalledTimes(1);});

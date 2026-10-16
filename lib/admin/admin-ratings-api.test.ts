@@ -44,3 +44,12 @@ describe("ratings API mode boundary",()=>{
   await expect(cancelRatingRecalcJob(id)).rejects.toMatchObject({status:409});expect(domainMock.mock.calls[0]).toEqual([`/ratings/jobs/${id}/cancel`,{method:"POST",body:"{}"}]);
  });
 });
+
+describe("progressive table API",()=>{
+ it("fetches just a summary page and keeps the publication",async()=>{
+  const {fetchAdminRatingPage}=await import("./admin-ratings-api");domainMock.mockResolvedValue({ratings:[row],total:416,publication:{version_id:id,revision:4,as_of:job.as_of,date_from:job.date_from,date_to:job.date_to}});const data=await fetchAdminRatingPage({version:id,q:"Ирина",limit:50,offset:50},new AbortController().signal);expect(data.ratings[0]).toMatchObject({student_id:9,place:6,final:0});expect(domainMock.mock.calls[0][0]).toBe(`/ratings/table?version=${id}&q=${encodeURIComponent("Ирина")}&limit=50&offset=50`);expect(domainMock).toHaveBeenCalledTimes(1);
+ });
+ it.each(["scope","version","duplicate"])("rejects %s drift",async defect=>{
+  const {fetchAdminRatingPage}=await import("./admin-ratings-api");const r=structuredClone(row);const data={ratings:[r],total:416,publication:{version_id:id,revision:4,as_of:job.as_of,date_from:job.date_from,date_to:job.date_to}};if(defect==="scope")r.rating.division_id=99;if(defect==="version")r.rating.job_id="other";if(defect==="duplicate")data.ratings.push(r);domainMock.mockResolvedValue(data);await expect(fetchAdminRatingPage({limit:50,offset:0},new AbortController().signal)).rejects.toThrow();
+ });
+});

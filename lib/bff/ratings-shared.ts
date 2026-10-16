@@ -41,6 +41,9 @@ export interface PublishedRating {
   };
   place: number;
 }
+export type PublishedRatingSummary = Omit<PublishedRating, "rating"> & { rating: Omit<PublishedRating["rating"], "homework" | "exams" | "tests"> & {
+  homework: { rating: number }; exams: { rating: number }; tests: { rating: number };
+} };
 export interface RatingsPublishedResponse { ratings: PublishedRating[]; total: number; freshness: RatingsSourceFreshness }
 export interface RatingsOwnResponse { rating: PublishedRating | null; freshness: RatingsSourceFreshness }
 export interface RatingsOwnerJob {
@@ -103,13 +106,13 @@ export function mapRatingFreshness(v: RatingsSourceFreshness): RatingFreshness {
     activeJobId: null, versionId: v.version_id, calculatedRevision: v.revision, asOf: v.as_of,
     examsMode: v.exams_mode, externalTestsMode: v.external_tests_mode };
 }
-function verifyPublished(row: PublishedRating) {
+function verifyPublished(row: PublishedRatingSummary) {
   if (!Number.isSafeInteger(row.profile.account_id) || row.profile.account_id < 1 || row.rating.account_id !== row.profile.account_id ||
     row.rating.status !== "ready" || !Number.isSafeInteger(row.place) || row.place < 1 ||
     ![row.rating.final_rating, row.rating.homework.rating, row.rating.exams.rating, row.rating.tests.rating].every(Number.isFinite))
     throw new Error("Сервис вернул некорректную опубликованную версию рейтинга");
 }
-export function mapRatingRow(row: PublishedRating): AdminRatingRow {
+export function mapRatingRow(row: PublishedRatingSummary): AdminRatingRow {
   verifyPublished(row);
   const { profile: p, rating: r } = row;
   return { id: p.account_id, student_id: p.account_id, place: row.place, version_id: r.job_id,
