@@ -21,6 +21,7 @@ it("offers actual subdivisions and Excel files with hidden defaults and dates",a
  expect((screen.getByLabelText("Опубликовать") as HTMLSelectElement).value).toBe("false");expect((screen.getByLabelText("Показывать ответы") as HTMLSelectElement).value).toBe("false");
  expect((screen.getByLabelText("Начало") as HTMLInputElement).value).not.toBe("");expect((screen.getByLabelText("Окончание") as HTMLInputElement).value.slice(0,4)).toBe(String(new Date().getFullYear()+5));
  expect((division as HTMLSelectElement).disabled).toBe(true);
+ fireEvent.click(screen.getByRole("button",{name:"Убрать файл"}));expect((division as HTMLSelectElement).disabled).toBe(false);expect(screen.queryByLabelText("Опубликовать")).toBeNull();
 });
 it("changes the authenticated context before selecting a source file",async()=>{
  render(<AdminUploadsBffWorkspace/>);const division=await screen.findByLabelText("Подразделение для теста");

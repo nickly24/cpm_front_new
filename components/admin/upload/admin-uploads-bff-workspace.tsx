@@ -200,7 +200,7 @@ function Workspace() {
     await open(next); await refresh();
   });
   const selectedType = session ? catalog?.types.find(t => t.type === session.type) : undefined;
-  const close = () => { if (dirty && !window.confirm("Неотправленные изменения будут потеряны. Закрыть предпросмотр?")) return; setSession(null); setDirty(false); };
+  const close = () => { if (dirty && !window.confirm("Неотправленные изменения будут потеряны. Закрыть предпросмотр?")) return; setSession(null); setDirty(false); setFile(null); if (input.current) input.current.value = ""; };
 
   const showJob = (job: UploadJob) => { restoredSelection.current = true; setSelectedJob(job); setSession(null); setDirty(false); setTab("journal"); };
   const prepareJobIntent = (action: "recover" | "revoke" | "retry", job: UploadJob) => { void perform(async () => setIntent({ action, job, session: await uploadSession(job.session_id) })); };
@@ -274,7 +274,7 @@ function Workspace() {
             {type.type === "tests.external-results" && <label className={s.metaField}>Внешний тест<select value={target} disabled={disabled || !type.create} onChange={e => setTarget(e.target.value)}><option value="">Выберите внешний тест</option>{targets.map(value => <option key={value.id} value={value.id}>{value.name}</option>)}</select></label>}
             {type.type.startsWith("exams.") && <label className={s.metaField}>Экзамен<select value={target} disabled={disabled || !type.create} onChange={e => setTarget(e.target.value)}><option value="">Выберите экзамен</option>{targets.map(exam => <option key={exam.id} value={exam.id}>{exam.name} · {exam.id}</option>)}</select></label>}
             <label className={s.metaField}>Файл<input ref={input} type="file" accept={type.formats.map(ext => `.${ext}`).join(",")} disabled={disabled || !type.create || !!targetError} onChange={e => setFile(e.target.files?.[0] ?? null)} /></label>
-            {file && <p>{file.name} · {Math.ceil(file.size / 1024)} КиБ</p>}<Button disabled={disabled || !type.create || !file || !!targetError} onClick={() => { void upload(); }}>Подготовить предпросмотр</Button>
+            {file && <p>{file.name} · {Math.ceil(file.size / 1024)} КиБ</p>}{file && <Button variant="ghost" disabled={disabled} onClick={() => { setFile(null); if (input.current) input.current.value = ""; }}>Убрать файл</Button>}<Button disabled={disabled || !type.create || !file || !!targetError} onClick={() => { void upload(); }}>Подготовить предпросмотр</Button>
           </>}
         </section>}
       </>)}
