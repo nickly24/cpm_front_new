@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { bffBlobRequest, bffRequest } from "./client";
 afterEach(() => vi.unstubAllGlobals());
@@ -56,4 +57,21 @@ describe("local BFF boundary", () => {
     await expect(bffRequest("/tests/attempts/attempt/finalize", { method: "POST", body: "{}" })).rejects.toMatchObject({ status: 429, code: "overloaded", retryAfterMs: 120_000 });
     expect(fetcher).toHaveBeenCalledTimes(1);
   });
+});
+
+
+describe("domain authentication errors", () => {
+ it("preserves a live cookie when the owner rejects its own credential", async () => {
+  vi.stubGlobal("navigator", {});
+  const expired = vi.fn(); window.addEventListener("bff-session-expired", expired);
+  const fetcher = vi.fn().mockResolvedValueOnce({ok:false,status:401,json:async()=>({error:"reauthorization_required"})}).mockResolvedValueOnce({ok:true,json:async()=>({status:true})}); vi.stubGlobal("fetch",fetcher);
+  await expect(bffRequest("/uploads/sessions",{method:"POST",body:"{}"})).rejects.toMatchObject({status:401});
+  expect(fetcher).toHaveBeenCalledTimes(2); expect(fetcher.mock.calls[1][0]).toBe("/bff/auth/me"); expect(expired).not.toHaveBeenCalled(); window.removeEventListener("bff-session-expired",expired);
+ });
+ it("announces expiry only after Auth confirms it", async () => {
+  vi.stubGlobal("navigator", {});
+  const expired = vi.fn(); window.addEventListener("bff-session-expired", expired);
+  vi.stubGlobal("fetch",vi.fn().mockResolvedValue({ok:false,status:401,json:async()=>({error:"session_expired"})}));
+  await expect(bffRequest("/uploads/catalog")).rejects.toMatchObject({status:401});expect(expired).toHaveBeenCalledTimes(1);window.removeEventListener("bff-session-expired",expired);
+ });
 });

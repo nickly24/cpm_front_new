@@ -31,7 +31,13 @@ export async function loginRequest(
 ): Promise<{ user: User } | { error: string }> {
   if (BFF_DEV) {
     try { const data = await bffRequest<Identity>("/auth/login", { method: "POST", body: JSON.stringify({ login, password }) }); const user = acceptIdentity(data); announceSession(); return { user }; }
-    catch (e) { return { error: e instanceof Error ? e.message : "Ошибка входа" }; }
+    catch (e) {
+      if ((e as { code?: string }).code === "session_exists") {
+        try { const user = acceptIdentity(await bffRequest<Identity>("/auth/me")); announceSession(); return { user }; }
+        catch (error) { return { error: error instanceof Error ? error.message : "Не удалось восстановить действующую сессию" }; }
+      }
+      return { error: e instanceof Error ? e.message : "Ошибка входа" };
+    }
   }
   try {
     const data = await apiRequest<AuthResponse>("/api/auth", {

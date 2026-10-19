@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
 import { adminHref } from "@/lib/auth/admin-access";
-import { domain } from "@/lib/bff/client";
+import { domain, bffRequest, exclusiveContext, resetRequests, announceSession, type Identity } from "@/lib/bff/client";
 import { useContextGuard } from "@/lib/bff/use-context-guard";
 import { examsAllPages, string, number } from "@/lib/bff/exams-shared";
 import { commitUpload, createUpload, downloadUploadTemplate, uploadExternalTargets, uploadDirections, uploadCanRetry, uploadCanRecover, uploadCanRevoke, uploadCanRetryConfirmation, uploadJobNeedsPolling, uploadCommandJournalState, watchedUploadJobs, pollUploadJob, recoverUploadJob, revokeUploadJob, retryUploadConfirmation, downloadUploadSource, editUpload, pendingUploadCommand, recoverUploadCommand, reconcileUpload, retryUpload, uploadCatalog, uploadError, uploadJobs, uploadLabels, uploadReport, uploadReportCSV, uploadSession, uploadSessions, uploadStates, type UploadCatalog, type UploadJob, type UploadSession } from "@/lib/bff/uploads";
@@ -18,7 +18,7 @@ interface Target { id: string; name: string }
 const instructions: Record<string, string> = {
   "users.credentials": "Колонки: full_name, login, password; необязательные role, class, tg_name, school_id, group_id, role_id. До 100 пользователей. Пароли не отображаются в предпросмотре и отчёте, исходный файл не хранится.",
   "users.legacy": "Excel: ФИО, Класс, Школа, Проктор; необязательный tg_name. Сопоставление школ, прокторов и групп выполняет Core. Максимум 100 строк; новые учётные записи требуют сброса пароля.",
-  "tests.json": "JSON теста или JS-экспорт OnlineTestPad (var test = {...}). Выберите направление. Файл не исполняется: нормализацию и проверку выполняет Tests. Для OnlineTestPad можно задать метаданные ниже.",
+  "tests.json": "Excel с колонками Название теста, Номер, Категория вопроса, Вопрос, Варианты ответов, Правильный ответ, Примечание к ответу; также JSON и JS-экспорт OnlineTestPad. Варианты в Excel отмечаются А., Б. и т. п.; за вопрос — 1 балл. Выберите подразделение и направление, затем проверьте вопросы и предупреждения перед импортом.",
   "tests.external-results": "Excel с результатами внешнего теста. Выберите существующий внешний тест; он закрепится за загрузкой. ФИО, проценты и физические строки передаются Tests без самостоятельного сопоставления или расчёта оценки.",
   "cards.xlsx": "Колонки: Вопрос, Ответ. Выберите направление и существующую или новую тему. Ответы сохраняют переносы строк. Карточки общие для организации; кабинет загрузки закреплён в журнале.",
   "exams.questions": "Колонки: part_code, question_text, answer_text. Части должны существовать в выбранном экзамене.",
@@ -30,6 +30,8 @@ function saveBlob(blob: Blob, filename: string) { const url = URL.createObjectUR
 export type UploadBackgroundIntent = { action: "commit"; session: UploadSession } | { action: "recover" | "revoke" | "retry" | "confirmation"; job: UploadJob; session?: UploadSession; originalRevision?: number };
 const actionLabels = { commit: "Разрешить фоновый импорт", confirmation: "Продолжить исходное подтверждение", recover: "Разрешить проверку квитанции", revoke: "Отозвать фоновое разрешение", retry: "Повторить доставку задания" };
 export function UploadBackgroundConfirmation({ intent, busy, onConfirm, onCancel }: { intent: UploadBackgroundIntent; busy: boolean; onConfirm: () => void; onCancel: () => void }) {
+  const { user } = useAuth();
+  const scope = user?.organizations?.find(org => org.id === (intent.action === "commit" ? intent.session : intent.job).organization_id);
   const dialog = useRef<HTMLDialogElement>(null);
   useEffect(() => { if (!dialog.current?.open) dialog.current?.showModal(); }, []);
   const value = intent.action === "commit" ? intent.session : intent.job;
@@ -42,7 +44,7 @@ export function UploadBackgroundConfirmation({ intent, busy, onConfirm, onCancel
   return <dialog ref={dialog} className={s.main} aria-labelledby="upload-confirm-title" onCancel={event => { event.preventDefault(); if (!busy) onCancel(); }} style={{ width: "min(560px, calc(100vw - 32px))", maxHeight: "calc(100dvh - 40px)", overflow: "auto" }}>
     <h2 id="upload-confirm-title">{actionLabels[intent.action]}</h2>
     <p>{uploadLabels[value.type] ?? "Импорт"}</p>
-    <p>Исходная организация {value.organization_id} · подразделение {value.division_id}</p>
+    <p>Организация: {scope?.name ?? value.organization_id} · подразделение: {scope?.divisions.find(division => division.id === value.division_id)?.name ?? value.division_id}</p>
     {target && <p>Выбранный объект: {target}</p>}{revision !== undefined && <p>Версия предпросмотра: {revision}</p>}
     {value.type === "cards.xlsx" && <>
       <p>Направление: {typeof cardsDirection === "number" && Number.isSafeInteger(cardsDirection) && cardsDirection > 0 ? `ID ${cardsDirection}` : "не указано в сохранённом предпросмотре"}</p>
@@ -70,6 +72,7 @@ export function UploadJobSummary({ job }: { job: UploadJob }) {
 
 function Workspace() {
   const { user } = useAuth();
+  const [scopeChanging, setScopeChanging] = useState(false);
   const [catalog, setCatalog] = useState<UploadCatalog | null>(null), [typesId, setTypesId] = useState("");
   const [sessions, setSessions] = useState<UploadSession[]>([]), [jobs, setJobs] = useState<UploadJob[]>([]);
   const [session, setSession] = useState<UploadSession | null>(null), [tab, setTab] = useState<"new" | "journal">("new");
@@ -77,7 +80,11 @@ function Workspace() {
   const [cards, setCards] = useState<CardDirection[]>([]), [targets, setTargets] = useState<Target[]>([]), [targetError, setTargetError] = useState<string | null>(null);
   const [direction, setDirection] = useState(""), [theme, setTheme] = useState(""), [newTheme, setNewTheme] = useState(true), [themeName, setThemeName] = useState(""), [target, setTarget] = useState("");
   const [templateFormat, setTemplateFormat] = useState<"cpm_json"|"online_test_pad">("cpm_json");
-  const [otp, setOtp] = useState({ title:"", startDate:"", endDate:"", timeLimitMinutes:"", published:"", visible:"" });
+  const [otp, setOtp] = useState(() => {
+    const date = new Date(), end = new Date(); end.setFullYear(end.getFullYear() + 5);
+    const local = (value: Date) => value.toLocaleString("sv-SE", { timeZone:"Europe/Moscow" }).slice(0, 16).replace(" ", "T");
+    return { title:"", startDate:local(date), endDate:local(end), timeLimitMinutes:"180", published:"false", visible:"false" };
+  });
   const [directions, setDirections] = useState<{id:number;name:string}[]>([]);
   const [file, setFile] = useState<File | null>(null), [limit, setLimit] = useState(50);
   const input = useRef<HTMLInputElement>(null), loadGeneration = useRef(0), selectedGeneration = useRef(0), restoredSelection = useRef(false), inFlight = useRef(false);
@@ -85,7 +92,7 @@ function Workspace() {
   const [journalReady, setJournalReady] = useState(false), [, setJournalEpoch] = useState(0);
   const journal = journalReady ? uploadCommandJournalState() : { pending: null, blocked: true, otherCabinet: false, error: "" };
   const pending = journal.pending, type = catalog?.types.find(t => t.type === typesId), disabled = busy || !!pending || journal.blocked || !!intent;
-  useContextGuard(busy || !!pending || journal.blocked && journalReady && !journal.otherCabinet || dirty || !!intent || session?.state === "preview");
+  useContextGuard(!scopeChanging && (busy || !!pending || journal.blocked && journalReady && !journal.otherCabinet || dirty || !!intent || session?.state === "preview"));
   useEffect(() => {
     const changed = () => setJournalEpoch(value => value + 1);
     queueMicrotask(() => setJournalReady(true));
@@ -184,7 +191,7 @@ function Workspace() {
     if (type.type === "tests.json") {
       if (!direction) throw new Error("Выберите направление");
       fields.direction_id = direction;
-      if (file.name.toLowerCase().endsWith(".js")) for (const [key,value] of Object.entries(otp)) if (value !== "") fields[key] = value;
+      if (/\.(js|xlsx)$/i.test(file.name)) for (const [key,value] of Object.entries(otp)) if (value !== "") fields[key] = value;
     }
     if (type.type === "tests.external-results") { if (!target) throw new Error("Выберите внешний тест"); fields.target_id = target; }
     if (type.type.startsWith("exams.")) { if (!target) throw new Error("Выберите экзамен"); fields.target_id = target; }
@@ -220,7 +227,7 @@ function Workspace() {
     {catalog && <>
       <nav className={s.sectionTabs} aria-label="Загрузки"><Button variant={tab === "new" ? "primary" : "ghost"} disabled={dirty || !!intent} onClick={() => setTab("new")}>Новая загрузка</Button><Button variant={tab === "journal" ? "primary" : "ghost"} disabled={dirty || !!intent} onClick={() => setTab("journal")}>Журнал</Button></nav>
       {tab === "new" && (session ? <section className={s.previewWrap}>
-        <div className={s.previewHeader}><div><h2>Предпросмотр загрузки</h2><p>{uploadLabels[session.type] ?? session.type} · {uploadStates[session.state] ?? session.state}</p><p className={s.hint}>Организация {session.organization_id} · подразделение {session.division_id} · срок {new Date(session.expires_at).toLocaleString("ru-RU")}</p></div><Button variant="ghost" disabled={disabled} onClick={close}>Закрыть предпросмотр</Button></div>
+        <div className={s.previewHeader}><div><h2>Предпросмотр загрузки</h2><p>{uploadLabels[session.type] ?? session.type} · {uploadStates[session.state] ?? session.state}</p><p className={s.hint}>Организация {scopeName?.name ?? session.organization_id} · подразделение {scopeName?.divisions.find(division => division.id === session.division_id)?.name ?? session.division_id} · срок {new Date(session.expires_at).toLocaleString("ru-RU")}</p></div><Button variant="ghost" disabled={disabled} onClick={close}>Закрыть предпросмотр</Button></div>
         <UploadPreview key={`${session.id}:${session.revision}`} session={session} editable={!!selectedType?.edit && session.state === "preview" && !disabled} busy={busy || !!intent} onDirty={setDirty} onSave={async (payload: Record<string, unknown>) => {
           if (inFlight.current || intent) throw new Error("Предыдущее действие ещё выполняется");
           inFlight.current = true; setBusy(true); setError(null);
@@ -240,11 +247,30 @@ function Workspace() {
         {!catalog.types.length && <div className={s.stateBox}>Нет доступных форматов. Нужны права на загрузку и соответствующий раздел.</div>}
         {type && <section className={s.main}><h2 className={s.mainTitle}>{uploadLabels[type.type] ?? type.type}</h2>
           {type.mode === "unavailable" ? <p>{"Источник пока не поддерживает этот формат."}</p> : type.type === "cards.transform" ? <p>Выбор карточек и создание черновика доступны в <Link href={adminHref(user, "train")}>разделе карточек</Link>.</p> : type.mode === "owner_direct_s3" || type.mode === "owner_attachment" ? <p>Загрузите файл в <Link href={adminHref(user, type.type === "homework.pdf" ? "assignments" : "zaps")}>соответствующем разделе</Link>; там сохраняется его состояние и доступ.</p> : <>
+            {type.type === "tests.json" && <label className={s.metaField}>Подразделение для теста<select aria-label="Подразделение для теста" value={String(user?.division_id ?? "")} disabled={disabled || !!file} onChange={event => {
+              const division = Number(event.target.value);
+              if (!division || division === user?.division_id) return;
+              if (inFlight.current) return;
+              inFlight.current = true; setScopeChanging(true); setBusy(true); setError(null);
+              void (async () => {
+                try {
+                  await exclusiveContext(async () => {
+                    resetRequests();
+                    await bffRequest<Identity>("/auth/context", { method:"POST", body:JSON.stringify({organization_id:user?.organization_id, division_id:division}) });
+                  });
+                  // Release the exclusive context lock before leaving. Keep our
+                  // own unload guard off until the new document takes over.
+                  announceSession(); window.location.replace(window.location.pathname);
+                } catch (reason) {
+                  setError(uploadError(reason).message); setScopeChanging(false); setBusy(false); inFlight.current = false;
+                }
+              })();
+            }}><option value="" disabled>Выберите подразделение</option>{scopeName?.divisions.map(value => <option key={value.id} value={value.id}>{value.name}</option>)}</select><span className={s.hint}>Выберите до файла. Импорт будет закреплён за этим подразделением.</span></label>}
             <p className={s.mainDesc}>{instructions[type.type]}</p><p className={s.hint}>До {type.max_rows ?? "—"} строк; файл до {Math.floor((type.max_bytes ?? 8 * 1024 * 1024) / 1024 / 1024)} МиБ.</p><Button variant="secondary" disabled={busy || type.template !== true || (type.type.startsWith("exams.") || type.type === "tests.external-results") && !target || type.type === "tests.json" && !direction} onClick={() => { void perform(async () => { const value = await downloadUploadTemplate(type, type.type === "tests.json" ? {directionId:Number(direction),format:templateFormat} : type.type.startsWith("exams.") || type.type === "tests.external-results" ? {targetId:target} : {}); saveBlob(value.blob, value.filename); }); }}>Скачать шаблон</Button>{type.template !== true && <p className={s.hint}>{type.template_reason === "not_applicable" ? "Этот формат не использует файловый шаблон." : "Источник пока не предоставил шаблон этого формата."}</p>}
             {!type.commit && <p role="status" className={s.notice}>Файл можно проверить и исправить. Фоновое применение ожидает разрешения доступа; подтверждение импорта пока недоступно. Данные не будут применены обходной повторной попыткой.</p>}
             {targetError && <p role="alert" className={s.previewErrorText}>{targetError}</p>}
             {type.type === "cards.xlsx" && <div className={s.metaEditor}><label className={s.metaField}>Направление<select value={direction} disabled={disabled || !type.create} onChange={e => { setDirection(e.target.value); setTheme(""); }}><option value="">Выберите направление</option>{cards.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}</select></label><label className={s.metaCheck}><input type="checkbox" checked={newTheme} disabled={disabled || !type.create} onChange={e => setNewTheme(e.target.checked)} />Создать новую тему</label>{newTheme ? <label className={s.metaField}>Название темы<input maxLength={200} value={themeName} disabled={disabled || !type.create} onChange={e => setThemeName(e.target.value)} /></label> : <label className={s.metaField}>Тема<select value={theme} disabled={disabled || !type.create} onChange={e => setTheme(e.target.value)}><option value="">Выберите тему</option>{cards.find(d => String(d.id) === direction)?.sections.filter(section => section.kind === "manual" && section.id).map(section => <option key={section.id} value={section.id}>{section.name}</option>)}</select></label>}</div>}
-            {type.type === "tests.json" && <><label className={s.metaField}>Формат шаблона<select value={templateFormat} disabled={busy || !!intent} onChange={event => setTemplateFormat(event.target.value as "cpm_json"|"online_test_pad")}><option value="cpm_json">JSON CPM (.json)</option><option value="online_test_pad">OnlineTestPad (.js)</option></select></label><label className={s.metaField}>Направление<select value={direction} disabled={disabled || !type.create} onChange={e => setDirection(e.target.value)}><option value="">Выберите направление</option>{directions.map(value => <option key={value.id} value={value.id}>{value.name}</option>)}</select></label>{file?.name.toLowerCase().endsWith(".js") && <div className={s.metaEditor}><p className={s.hint}>Метаданные OnlineTestPad (пустые поля сохраняют значения источника)</p>{(["title", "startDate", "endDate", "timeLimitMinutes"] as const).map(key => <label key={key} className={s.metaField}>{{title:"Название",startDate:"Начало",endDate:"Окончание",timeLimitMinutes:"Лимит, минут"}[key]}<input type={key === "startDate" || key === "endDate" ? "datetime-local" : key === "timeLimitMinutes" ? "number" : "text"} value={otp[key]} disabled={disabled} onChange={e => setOtp(previous => ({...previous,[key]:e.target.value}))} /></label>)}{(["published", "visible"] as const).map(key => <label key={key} className={s.metaField}>{key === "published" ? "Опубликовать" : "Показывать ответы"}<select value={otp[key]} disabled={disabled} onChange={e => setOtp(previous => ({...previous,[key]:e.target.value}))}><option value="">По источнику</option><option value="true">Да</option><option value="false">Нет</option></select></label>)}</div>}</>}
+            {type.type === "tests.json" && <><label className={s.metaField}>Формат шаблона<select value={templateFormat} disabled={busy || !!intent} onChange={event => setTemplateFormat(event.target.value as "cpm_json"|"online_test_pad")}><option value="cpm_json">JSON CPM (.json)</option><option value="online_test_pad">OnlineTestPad (.js)</option></select></label><label className={s.metaField}>Направление<select value={direction} disabled={disabled || !type.create} onChange={e => setDirection(e.target.value)}><option value="">Выберите направление</option>{directions.map(value => <option key={value.id} value={value.id}>{value.name}</option>)}</select></label>{file && /\.(js|xlsx)$/i.test(file.name) && <div className={s.metaEditor}><p className={s.hint}>Настройки теста: пустое название берётся из файла. Время указано по Москве. Новый тест по умолчанию скрыт.</p>{(["title", "startDate", "endDate", "timeLimitMinutes"] as const).map(key => <label key={key} className={s.metaField}>{{title:"Название",startDate:"Начало",endDate:"Окончание",timeLimitMinutes:"Лимит, минут"}[key]}<input type={key === "startDate" || key === "endDate" ? "datetime-local" : key === "timeLimitMinutes" ? "number" : "text"} value={otp[key]} disabled={disabled} onChange={e => setOtp(previous => ({...previous,[key]:e.target.value}))} /></label>)}{(["published", "visible"] as const).map(key => <label key={key} className={s.metaField}>{key === "published" ? "Опубликовать" : "Показывать ответы"}<select value={otp[key]} disabled={disabled} onChange={e => setOtp(previous => ({...previous,[key]:e.target.value}))}><option value="">По источнику</option><option value="true">Да</option><option value="false">Нет</option></select></label>)}</div>}</>}
             {type.type === "tests.external-results" && <label className={s.metaField}>Внешний тест<select value={target} disabled={disabled || !type.create} onChange={e => setTarget(e.target.value)}><option value="">Выберите внешний тест</option>{targets.map(value => <option key={value.id} value={value.id}>{value.name}</option>)}</select></label>}
             {type.type.startsWith("exams.") && <label className={s.metaField}>Экзамен<select value={target} disabled={disabled || !type.create} onChange={e => setTarget(e.target.value)}><option value="">Выберите экзамен</option>{targets.map(exam => <option key={exam.id} value={exam.id}>{exam.name} · {exam.id}</option>)}</select></label>}
             <label className={s.metaField}>Файл<input ref={input} type="file" accept={type.formats.map(ext => `.${ext}`).join(",")} disabled={disabled || !type.create || !!targetError} onChange={e => setFile(e.target.files?.[0] ?? null)} /></label>

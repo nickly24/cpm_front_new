@@ -1,7 +1,7 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-vi.mock("@/contexts/AuthContext", () => ({ useAuth: vi.fn() }));
+vi.mock("@/contexts/AuthContext", () => ({ useAuth: vi.fn(() => ({ user: { organizations: [{ id:7, name:"Сборная", divisions:[{id:11,name:"Основная"}] }] } })) }));
 import { UploadBackgroundConfirmation, UploadJobSummary, type UploadBackgroundIntent } from "./admin-uploads-bff-workspace";
 import type { UploadJob, UploadSession } from "@/lib/bff/uploads";
 
@@ -13,7 +13,7 @@ const confirm = (intent: UploadBackgroundIntent) => renderToStaticMarkup(createE
 describe("explicit background import intent", () => {
   it("shows the original cabinet, target and preview revision before granting background access", () => {
     const html = confirm({ action: "commit", session });
-    expect(html).toContain("Результаты экзамена вне LMS"); expect(html).toContain("организация 7"); expect(html).toContain("подразделение 11");
+    expect(html).toContain("Результаты экзамена вне LMS"); expect(html).toContain("Организация: Сборная"); expect(html).toContain("подразделение: Основная");
     expect(html).toContain("Выбранный объект: 42"); expect(html).toContain("Версия предпросмотра: 3");
     expect(html).toContain("после выхода из аккаунта"); expect(html).toContain("не отменяет уже применённые данные"); expect(html).toContain("Отмена");
   });
