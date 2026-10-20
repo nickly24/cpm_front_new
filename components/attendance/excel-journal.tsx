@@ -14,7 +14,7 @@ import { ReportGrid } from "@/components/admin/attendance/report/report-grid";
 import reportStyles from "@/components/admin/attendance/report/report.module.css";
 import { ActionNotice, useAction } from "./shared";
 
-import { applyConfirmedCell, type CellIntent } from "@/lib/attendance/confirmed-cell";
+import { applyConfirmedCell, applyConfirmedCells, type CellIntent } from "@/lib/attendance/confirmed-cell";
 import { prepareJournal, journalLoadError, type PreparedJournal } from "@/lib/attendance/journal-workspace";
 import { AttendanceActivity } from "./activity";
 import adminStyles from "./attendance-admin.module.css";
@@ -45,6 +45,7 @@ export function ExcelAttendanceJournal({ division, divisionName, period, onBack,
   const alive = useRef(true), painting = useRef(false), running = useRef(false);
   const fresh = useRef(Boolean(initialData));
   const [readReady,setReadReady]=useState(Boolean(initialData));
+  const inFlight = useRef<CellIntent[]>([]), inFlightKey = useRef<string | null>(null);
   const queue = useRef<CellIntent[]>([]), gesture = useRef(new Set<string>());
   const reportRef = useRef(report);
   const chooseType = (ts:AttendanceType[],current:number) => ts.some(t=>t.id===current&&t.is_active)?current:(ts.find(t=>t.is_active&&t.scan_default)??ts.find(t=>t.is_active))?.id??0;
@@ -86,23 +87,40 @@ export function ExcelAttendanceJournal({ division, divisionName, period, onBack,
     running.current=true;setQueueBusy(true);
     try {
       while(alive.current && queue.current.length && !paused.current) {
-        const intent=queue.current[0];const key=cellMapKey(intent.account,intent.day);
-        const entry=reportRef.current?.entries.find(e=>e.student_id===intent.account&&e.class_day_id===intent.day);
-        if(entry?.zap_id!=null||(!intent.type&&!entry)){queue.current.shift();setQueueLength(queue.current.length);continue;}
-        setPhase(key,"pending");const expected=revision.current;
-        const path=`${prefix}/class-days/${intent.day}/attendance`;
-        const result=await action.execute(command(intent.type?path:`${path}/${intent.account}`,intent.type?"POST":"DELETE",expected,intent.type?{account_id:intent.account,attendance_type_id:intent.type}:{}),confirmed=>{
-          // A successful HTTP response is committed even if its projection cannot
-          // be applied. Never submit that intent under a new command UUID.
-          if(queue.current[0]===intent){queue.current.shift();setQueueLength(queue.current.length);}
+        // The first click starts immediately. While it is in flight, a brush
+        // accumulates cells; the next request sends up to 100 of them together.
+        const batch:CellIntent[]=[];const seen=new Set<string>();
+        while(queue.current.length && batch.length<100){
+          const intent=queue.current[batch.length];if(!intent)break;
+          const key=cellMapKey(intent.account,intent.day);
+          if(seen.has(key))break;
+          const entry=reportRef.current?.entries.find(e=>e.student_id===intent.account&&e.class_day_id===intent.day);
+          if(entry?.zap_id!=null||(!intent.type&&!entry)){queue.current.splice(batch.length,1);setQueueLength(queue.current.length);continue;}
+          seen.add(key);batch.push(intent);
+        }
+        if(!batch.length)continue;
+        inFlight.current=batch;
+        for(const intent of batch)setPhase(cellMapKey(intent.account,intent.day),"pending");
+        const expected=revision.current,first=batch[0];
+        const path=`${prefix}/class-days/${first.day}/attendance`;
+        const request=batch.length>1
+          ?command(`${prefix}/attendance-cells/batch`,"POST",expected,{cells:batch.map(intent=>({class_day_id:intent.day,account_id:intent.account,attendance_type_id:intent.type}))})
+          :command(first.type?path:`${path}/${first.account}`,first.type?"POST":"DELETE",expected,first.type?{account_id:first.account,attendance_type_id:first.type}:{});
+        inFlightKey.current=request.key;
+        const result=await action.execute(request,confirmed=>{
+          // A confirmed HTTP commit consumes this exact batch even when its
+          // projection is damaged. Never resubmit it with a new UUID.
+          if(batch.every((intent,index)=>queue.current[index]===intent)){queue.current.splice(0,batch.length);setQueueLength(queue.current.length);}
+          inFlight.current=[];inFlightKey.current=null;
           try {
             if(!reportRef.current||revision.current!==expected)throw new Error("Журнал изменился параллельно. Обновите данные перед продолжением.");
-            const data=applyConfirmedCell(reportRef.current,confirmed,expected,division,intent);
-            revision.current=confirmed.revision;reportRef.current=data;setReport(data);fresh.current=true;setReadReady(true);skipRefresh.current=true;setPhase(key,"success");
-          }catch(e){fresh.current=false;setReadReady(false);pauseQueue();setError(attendanceError(e));setPhase(key,"error");throw e;}
+            const data=batch.length>1?applyConfirmedCells(reportRef.current,confirmed,expected,division,batch):applyConfirmedCell(reportRef.current,confirmed,expected,division,first);
+            revision.current=confirmed.revision;reportRef.current=data;setReport(data);fresh.current=true;setReadReady(true);skipRefresh.current=true;
+            for(const intent of batch)setPhase(cellMapKey(intent.account,intent.day),"success");
+          }catch(e){fresh.current=false;setReadReady(false);pauseQueue();setError(attendanceError(e));for(const intent of batch)setPhase(cellMapKey(intent.account,intent.day),"error");throw e;}
         });
         if(!alive.current)return;
-        if(!result){fresh.current=false;setReadReady(false);setPhase(key,"error");pauseQueue();break;}
+        if(!result){fresh.current=false;setReadReady(false);for(const intent of batch)setPhase(cellMapKey(intent.account,intent.day),"error");pauseQueue();break;}
         if(!fresh.current){pauseQueue();break;}
       }
     } finally {running.current=false;if(alive.current)setQueueBusy(false);}
@@ -113,10 +131,12 @@ export function ExcelAttendanceJournal({ division, divisionName, period, onBack,
     gesture.current.add(key);queue.current.push({account,day,type});setQueueLength(queue.current.length);void drain();
   }
   async function recoverQueue() {
-    const head=queue.current[0];
+    const batch=inFlight.current;
+    const ownPending=action.pending && "key" in action.pending && action.pending.key===inFlightKey.current;
     const recovered=await action.recover();
-    if(recovered) {
-      if(head&&queue.current[0]===head){queue.current.shift();setQueueLength(queue.current.length);setPhase(cellMapKey(head.account,head.day),"success");}
+    if(recovered && ownPending && batch.length && batch.every((intent,index)=>queue.current[index]===intent)) {
+      queue.current.splice(0,batch.length);inFlight.current=[];inFlightKey.current=null;setQueueLength(queue.current.length);
+      for(const intent of batch)setPhase(cellMapKey(intent.account,intent.day),"success");
     }
     return recovered;
   }
@@ -146,7 +166,7 @@ export function ExcelAttendanceJournal({ division, divisionName, period, onBack,
   return <div className={reportStyles.workspace} style={{ position: "fixed", inset: 0, zIndex: 70 }} aria-label="Excel-журнал посещаемости">
     <ReportToolbar onBack={close} periodLabel={`${divisionName} · ${period.dateFrom} — ${period.dateTo}`} fileName={`Посещаемость_${period.dateFrom}_${period.dateTo}.xlsx`} rowCountLabel={`${rows.length} / ${report?.students.length ?? 0}`} tool={tool} onToolChange={value => { if (!queueBusy && !blocked) setTool(value); }} typeId={typeId} onTypeIdChange={setTypeId} types={activeTypes} onExport={() => void exportFile()} onRefresh={() => { if (!queueBusy && !action.pending) void reload(); }} refreshing={loading} readOnly={!canEdit} />
     <div className={adminStyles.statusRow}><ActionNotice action={noticeAction}/>{error&&<p role="alert">{error}</p>}{loading&&<AttendanceActivity label="Обновление журнала"/>}{queueBusy&&<AttendanceActivity label="Сохранение отметок"/>}</div>
-    {(queueLength>0||queuePaused)&&<div className={adminStyles.queue}>{queueBusy?<AttendanceActivity label="Отправка очереди отметок"/>:null}<span>{queuePaused?"Очередь приостановлена":"В очереди"}: {queueLength}</span>{queuePaused&&<><span>Неотправленные отметки сохранены в этом окне.</span><button disabled={!!action.pending||action.busy||action.recovery==="committed"||!readReady} onClick={resumeQueue}>Продолжить очередь</button><button disabled={!!action.pending||action.busy} onClick={()=>{queue.current=[];setQueueLength(0);setQueuePaused(false);paused.current=false;setCellUi(new Map());}}>Отменить неотправленные</button></>}</div>}
+    {(queueLength>0||queuePaused)&&<div className={adminStyles.queue}>{queueBusy?<AttendanceActivity label="Отправка очереди отметок"/>:null}<span>{queuePaused?"Очередь приостановлена":"В очереди"}: {queueLength}</span>{queuePaused&&<><span>Неотправленные отметки сохранены в этом окне.</span><button disabled={!!action.pending||action.busy||action.recovery==="committed"||!readReady} onClick={resumeQueue}>Продолжить очередь</button><button disabled={!!action.pending||action.busy} onClick={()=>{queue.current=[];inFlight.current=[];inFlightKey.current=null;setQueueLength(0);setQueuePaused(false);paused.current=false;setCellUi(new Map());}}>Отменить неотправленные</button></>}</div>}
     {loading && !report ? <AttendanceActivity large label="Подготовка журнала"/> : report ? <ReportGrid students={rows} classDays={report?.class_days ?? []} cellMap={cellMap} cellUi={cellUi} tool={tool} sortKey={sortKey} sortDir={sortDir} onSort={key => { if (sortKey === key) setSortDir(value => value === "asc" ? "desc" : "asc"); else { setSortKey(key); setSortDir("asc"); } }} searchFio={search} onSearchFioChange={setSearch} classFilter={classFilter} onClassFilterChange={setClassFilter} schoolFilter={schoolFilter} onSchoolFilterChange={setSchoolFilter} groupFilter={groupFilter} onGroupFilterChange={setGroupFilter} filterOptions={options} disabled={queuePaused || (blocked && !queueBusy)} onCellPointerDown={pointerDown} onCellPointerEnter={(account, day) => { if (painting.current) enqueue(account, day, tool === "eraser" ? 0 : typeId); }} /> : null}
     {selected && <div className={reportStyles.popover} role="dialog" aria-label="Ячейка посещаемости" style={{ left: selected.x, top: selected.y }}>
       <h4 className={reportStyles.popoverTitle}>{report?.students.find(student => student.student_id === selected.account)?.full_name}</h4>

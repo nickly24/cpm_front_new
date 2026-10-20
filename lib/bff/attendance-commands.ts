@@ -23,7 +23,7 @@ export interface AttendanceCommandDependencies {
 const uuid=/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
 const id="[1-9][0-9]*", division=`divisions/${id}`, date="[0-9]{4}-[0-9]{2}-[0-9]{2}";
 const routes:Record<string,RegExp>={
-  POST:new RegExp(`^/(schedule/bulk|resources/rooms|${division}/(schedule|attendance-types|class-days|zaps|class-days/${id}/(attendance|scan)|zaps/${id}/process|zaps/${id}/dates/${date}/retry))$`),
+  POST:new RegExp(`^/(schedule/bulk|resources/rooms|${division}/(attendance-cells/batch|schedule|attendance-types|class-days|zaps|class-days/${id}/(attendance|scan)|zaps/${id}/process|zaps/${id}/dates/${date}/retry))$`),
   PUT:new RegExp(`^/${division}/(calendar|schedule/${id}|attendance-types/${id}|class-days/${id})$`),
   DELETE:new RegExp(`^/${division}/(schedule/${id}|attendance-types/${id}|class-days/${id}|class-days/${id}/attendance/${id}|zaps/${id}/dates/${date})$`),
 };

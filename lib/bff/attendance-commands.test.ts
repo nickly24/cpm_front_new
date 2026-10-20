@@ -104,3 +104,10 @@ describe("Attendance durable command recovery",()=>{
     expect(await env.runner().recover()).toBe(false);expect(JSON.parse(env.values.get(attendanceCommandJournalKey(scope))!).key).toBe(key2);expect(env.refresh).not.toHaveBeenCalled();
   });
 });
+
+it("restores a batch's metadata-only receipt without persisting or resending its cells",async()=>{
+  const env=setup(),c:Command={...command(),path:"/divisions/3/attendance-cells/batch",data:{cells:[{class_day_id:4,account_id:987654321,attendance_type_id:8}]}};
+  env.send.mockRejectedValueOnce(rejected(0,"transport_error"));await env.runner().execute(c);
+  const raw=env.values.get(attendanceCommandJournalKey(scope))!;expect(JSON.parse(raw)).toEqual(metadata(c));expect(raw).not.toContain("987654321");expect(raw).not.toContain("class_day_id");
+  env.receipt.mockResolvedValueOnce(committed(c));const restored=env.runner();expect(restored.getSnapshot().canRetry).toBe(false);expect(await restored.recover()).toBe(true);expect(env.send).toHaveBeenCalledOnce();expect(env.refresh).toHaveBeenCalledOnce();expect(env.values.size).toBe(0);
+});
