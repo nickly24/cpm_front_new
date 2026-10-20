@@ -1,0 +1,19 @@
+// @vitest-environment jsdom
+import {act,cleanup,fireEvent,render,screen,waitFor} from '@testing-library/react';
+import {afterEach,beforeEach,expect,it,vi} from 'vitest';
+const m=vi.hoisted(()=>({read:vi.fn(),user:{id:9,account_id:9,role:'admin',organization_admin:true,organization_id:1,division_id:2,organizations:[{id:1,name:'Synthetic',divisions:[{id:2,name:'Synthetic division',permissions:{}}]}]}}));
+vi.mock('@/contexts/AuthContext',()=>({useAuth:()=>({user:m.user})}));
+vi.mock('@/lib/bff/use-context-guard',()=>({useContextGuard:vi.fn()}));
+vi.mock('@/lib/bff/attendance',async original=>({...await original<typeof import('@/lib/bff/attendance')>(),readAttendance:m.read}));
+vi.mock('./shared',async original=>({...await original<typeof import('./shared')>(),useAction:()=>({busy:false,pending:null,execute:vi.fn(),recovery:'idle'}),ActionNotice:()=>null}));
+vi.mock('./excel-journal',()=>({ExcelAttendanceJournal:()=> <div aria-label="Ready Excel">Ready</div>}));
+vi.mock('@tanstack/react-virtual',()=>({useVirtualizer:()=>({getVirtualItems:()=>[],getTotalSize:()=>0})}));
+import {StaffJournalWithReport} from './journal';
+import {PeriodModal} from '@/components/admin/attendance/report/period-modal';
+const workspace={revision:7,value:{journal:{organization_id:1,division_id:2,days:[],entries:[],counts_by_type_code:{},unmarked_is_absent:false},students:[],types:[]}};
+beforeEach(()=>{vi.clearAllMocks();m.read.mockResolvedValue(workspace);});afterEach(cleanup);
+async function open(){render(<StaffJournalWithReport/>);await waitFor(()=>expect((screen.getByRole('button',{name:'Отчёт'}) as HTMLButtonElement).disabled).toBe(false));fireEvent.click(screen.getByRole('button',{name:'Отчёт'}));fireEvent.click(screen.getByRole('button',{name:'Открыть отчёт'}));}
+it('keeps the cabinet behind preparation and opens Excel only after one ready response',async()=>{let resolve!:(v:unknown)=>void;m.read.mockResolvedValueOnce(workspace).mockImplementationOnce(()=>new Promise(r=>{resolve=r;}));await open();expect(screen.getByRole('dialog',{name:'Подготовка отчёта'})).toBeTruthy();expect(screen.getByRole('progressbar').hasAttribute('aria-valuenow')).toBe(false);expect(screen.queryByLabelText('Ready Excel')).toBeNull();await act(async()=>resolve(workspace));expect(screen.getByLabelText('Ready Excel')).toBeTruthy();expect(m.read).toHaveBeenCalledTimes(2);});
+it('cancels the pending read and ignores its late success',async()=>{let resolve!:(v:unknown)=>void;m.read.mockResolvedValueOnce(workspace).mockImplementationOnce(()=>new Promise(r=>{resolve=r;}));await open();const signal=m.read.mock.calls[1][1] as AbortSignal;fireEvent.click(screen.getByRole('button',{name:'Отмена'}));expect(signal.aborted).toBe(true);await act(async()=>resolve(workspace));expect(screen.queryByLabelText('Ready Excel')).toBeNull();expect(screen.queryByRole('dialog')).toBeNull();});
+it('separates preparation errors and explicitly retries the read',async()=>{m.read.mockResolvedValueOnce(workspace).mockRejectedValueOnce(new Error('Temporary read failure')).mockResolvedValueOnce(workspace);await open();await screen.findByRole('alert');expect(screen.queryByLabelText('Ready Excel')).toBeNull();expect(screen.queryByRole('progressbar')).toBeNull();fireEvent.click(screen.getByRole('button',{name:'Повторить'}));await screen.findByLabelText('Ready Excel');expect(m.read).toHaveBeenCalledTimes(3);});
+it('validates a custom period before starting preparation',()=>{const create=vi.fn();render(<PeriodModal onClose={vi.fn()} onCreate={create}/>);fireEvent.click(screen.getByRole('button',{name:'Свой период'}));fireEvent.change(screen.getByLabelText('С',{exact:true}),{target:{value:'2026-10-20'}});fireEvent.change(screen.getByLabelText('По',{exact:true}),{target:{value:'2026-10-01'}});fireEvent.click(screen.getByRole('button',{name:'Открыть отчёт'}));expect(screen.getByRole('alert').textContent).toContain('не может быть позже');expect(create).not.toHaveBeenCalled();});

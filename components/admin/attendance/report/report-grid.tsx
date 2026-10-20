@@ -170,7 +170,14 @@ export function ReportGrid({
 
   const hasRows = students.length > 0;
 
-  return (
+  return (<>
+    <div className={reportStyles.reportFilters} role="group" aria-label="Фильтры журнала">
+      <label className={reportStyles.reportSearch}>Поиск ученика<input className={reportStyles.headerSearch} type="search" value={searchFio} placeholder="Фамилия или имя" aria-label="Поиск по ФИО" onChange={e=>onSearchFioChange(e.target.value)}/></label>
+      <label>Группа<HeaderSelect value={groupFilter} onChange={onGroupFilterChange} options={groupOptions} ariaLabel="Фильтр по группе"/></label>
+      <label>Класс<HeaderSelect value={classFilter} onChange={onClassFilterChange} options={classOptions} ariaLabel="Фильтр по классу"/></label>
+      <label>Школа<HeaderSelect value={schoolFilter} onChange={onSchoolFilterChange} options={schoolOptions} ariaLabel="Фильтр по школе"/></label>
+      <button type="button" className={reportStyles.resetFilters} disabled={!searchFio&&groupFilter==="all"&&classFilter==="all"&&schoolFilter==="all"} onClick={()=>{onSearchFioChange("");onGroupFilterChange("all");onClassFilterChange("all");onSchoolFilterChange("all");}}><X size={15} aria-hidden/>Сбросить</button>
+    </div>
     <div ref={scrollRef} className={reportStyles.gridWrap}>
       <table className={reportStyles.gridTable}>
         <thead>
@@ -185,12 +192,6 @@ export function ReportGrid({
                   Группа
                   <SortIcon active={sortKey === "group"} dir={sortDir} />
                 </button>
-                <HeaderSelect
-                  value={groupFilter}
-                  onChange={onGroupFilterChange}
-                  options={groupOptions}
-                  ariaLabel="Фильтр по группе"
-                />
               </div>
             </th>
             <th className={reportStyles.colClass}>
@@ -203,12 +204,6 @@ export function ReportGrid({
                   Класс
                   <SortIcon active={sortKey === "class"} dir={sortDir} />
                 </button>
-                <HeaderSelect
-                  value={classFilter}
-                  onChange={onClassFilterChange}
-                  options={classOptions}
-                  ariaLabel="Фильтр по классу"
-                />
               </div>
             </th>
             <th className={reportStyles.colSchool}>
@@ -221,12 +216,6 @@ export function ReportGrid({
                   Школа
                   <SortIcon active={sortKey === "school"} dir={sortDir} />
                 </button>
-                <HeaderSelect
-                  value={schoolFilter}
-                  onChange={onSchoolFilterChange}
-                  options={schoolOptions}
-                  ariaLabel="Фильтр по школе"
-                />
               </div>
             </th>
             <th className={reportStyles.colFio}>
@@ -240,31 +229,7 @@ export function ReportGrid({
                   ФИО
                   <SortIcon active={sortKey === "fio"} dir={sortDir} />
                 </button>
-                <div className={reportStyles.headerSearchWrap}>
-                  <input
-                    type="text"
-                    className={reportStyles.headerSearch}
-                    value={searchFio}
-                    placeholder="Поиск…"
-                    aria-label="Поиск по ФИО"
-                    onChange={(event) => onSearchFioChange(event.target.value)}
-                    onClick={(event) => event.stopPropagation()}
-                  />
-                  {searchFio ? (
-                    <button
-                      type="button"
-                      className={reportStyles.headerSearchClear}
-                      title="Очистить поиск"
-                      aria-label="Очистить поиск"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        onSearchFioChange("");
-                      }}
-                    >
-                      <X size={12} aria-hidden />
-                    </button>
-                  ) : null}
-                </div>
+
               </div>
             </th>
             {classDays.map((day) => {
@@ -314,7 +279,7 @@ export function ReportGrid({
                 <td
                   className={`${reportStyles.colGroup} ${reportStyles.frozenCell} ${reportStyles.frozenCellMuted}`}
                 >
-                  <span className={reportStyles.frozenCellInner}>
+                  <span className={reportStyles.frozenCellInner} title={student.group_name??undefined}>
                     {student.group_name ?? "—"}
                   </span>
                 </td>
@@ -326,7 +291,7 @@ export function ReportGrid({
                 <td
                   className={`${reportStyles.colSchool} ${reportStyles.frozenCell} ${reportStyles.frozenCellMuted}`}
                 >
-                  <span className={reportStyles.frozenCellInner}>
+                  <span className={reportStyles.frozenCellInner} title={student.school_short_name??undefined}>
                     {student.school_short_name ?? "—"}
                   </span>
                 </td>
@@ -372,6 +337,6 @@ export function ReportGrid({
           ) : null}
         </tbody>
       </table>
-    </div>
+    </div></>
   );
 }

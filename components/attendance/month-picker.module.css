@@ -14,7 +14,7 @@
 .months{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
 .month{position:relative;display:flex;align-items:center;justify-content:center;border:1px solid transparent;border-radius:10px;min-height:46px;background:transparent;font-size:13px!important;font-weight:500!important;padding:8px 3px 12px}
 .month:hover{background:var(--ds-surface-muted);border-color:var(--ds-border)}
-.selected,.selected:hover{background:var(--ds-sidebar)!important;color:#fff!important;border-color:var(--ds-sidebar)!important;font-weight:700!important}
+.selected,.selected:hover{background:var(--ds-accent)!important;color:var(--ds-accent-contrast,#fff)!important;border-color:var(--ds-accent)!important;font-weight:700!important}
 .dot{display:inline-block;width:4px;height:4px;border-radius:50%;background:var(--ds-accent);flex:none}
 .month .dot{position:absolute;bottom:5px;left:calc(50% - 2px)}
 .selected .dot{background:#fff}

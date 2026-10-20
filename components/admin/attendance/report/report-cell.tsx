@@ -1,5 +1,6 @@
 "use client";
 
+import { AttendanceActivity } from "@/components/attendance/activity";
 import reportStyles from "@/components/admin/attendance/report/report.module.css";
 import { paletteClassForCode } from "@/components/admin/attendance/report/report-palette-classes";
 import { getAttendanceCellMark } from "@/lib/attendance/attendance-palette";
@@ -72,7 +73,7 @@ export const ReportCell = memo(function ReportCell({
         }
       }}
     >
-      {mark ? (
+      {phase==="pending"?<AttendanceActivity label="Сохранение отметки"/>:mark ? (
         <span
           className={cn(
             reportStyles.cellMark,

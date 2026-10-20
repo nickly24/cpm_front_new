@@ -1,86 +1,35 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { AttendanceType, Command, Journal, Student } from "@/lib/bff/attendance";
-const mocks = vi.hoisted(() => ({ read: vi.fn(), execute: vi.fn(), user: { role: "admin", organization_admin: true, organization_id: 1001, account_id: 9, division_id: 2 }, refresh: null as null | (() => Promise<void>), immersive: vi.fn() }));
-vi.mock("@/contexts/AuthContext", () => ({ useAuth: () => ({ user: mocks.user }) }));
-vi.mock("@/contexts/cabinet-chrome-context", () => ({ useCabinetChrome: () => ({ setImmersive: mocks.immersive }) }));
-vi.mock("@/lib/bff/use-context-guard", () => ({ useContextGuard: vi.fn() }));
-vi.mock("@/lib/bff/attendance", async original => ({ ...await original<typeof import("@/lib/bff/attendance")>(), readAttendance: mocks.read }));
-vi.mock("./shared", () => ({ useAction: (refresh: () => Promise<void>) => { mocks.refresh = refresh; return { busy: false, pending: null, execute: mocks.execute }; }, ActionNotice: () => null }));
-vi.mock("@tanstack/react-virtual", () => ({ useVirtualizer: ({ count }: { count: number }) => ({ getVirtualItems: () => Array.from({ length: count }, (_, index) => ({ index, key: index, start: index * 40, end: (index + 1) * 40 })), getTotalSize: () => count * 40 }) }));
-import { ExcelAttendanceJournal } from "./excel-journal";
-import { excelReport } from "@/lib/attendance/excel-report";
-import { summarizeStudentAttendance } from "@/lib/attendance/attendance-report-summary";
-import { buildCellMap } from "@/lib/attendance/attendance-report-utils";
-
-const type: AttendanceType = { id: 88, division_id: 2, code: "custom_excused", name: "Особая причина", color: "#abcdef", mark: "УП", version: 3, is_active: true, sort_order: 1, counts_as_present: false, counts_as_absent: true, is_excused: true, scan_default: false, zap_default: true };
-const student: Student = { account_id: 7, profile_id: 700, role: "student", full_name: "Synthetic student", class: 11, group_id: null, group_name: null, school_id: 8, school_name: "Synthetic school", school_short_name: "School" };
-let revision: number, journal: Journal;
-function mount() { return render(<ExcelAttendanceJournal division={2} divisionName="Synthetic division" period={{ dateFrom: "2026-06-01", dateTo: "2026-06-30" }} onBack={vi.fn()} />); }
-async function loaded() { await waitFor(() => expect(screen.queryByText("Загрузка журнала…")).toBeNull()); }
-describe("restored Attendance Excel journal", () => {
-  beforeEach(() => {
-    vi.clearAllMocks(); revision = 3; mocks.user.role = "admin";
-    journal = { organization_id: 1001, division_id: 2, days: [1, 2].map(id => ({ id, division_id: 2, date: `2026-06-0${id}`, comment: "", lesson_ids: [], has_history: false })), entries: [], counts_by_type_code: {}, unmarked_is_absent: false };
-    mocks.read.mockImplementation(async (path: string) => ({ revision, value: path.includes("attendance-report") ? structuredClone(journal) : path.endsWith("/students") ? [student] : [type] }));
-    mocks.execute.mockImplementation(async (command: Command) => { revision++; await mocks.refresh?.(); return { revision, value: command.data }; });
-  });
-  afterEach(cleanup);
-  it("loads scoped current-owner data and writes the account ID with CAS, not the profile ID", async () => {
-    mount(); await loaded(); expect(mocks.read.mock.calls[0][0]).toBe("/divisions/2/attendance-report?date_from=2026-06-01&date_to=2026-06-30");
-    fireEvent.mouseDown(screen.getAllByRole("button", { name: "Пусто" })[0], { button: 0 });
-    fireEvent.click(screen.getByRole("button", { name: "Сохранить" }));
-    await waitFor(() => expect(mocks.execute).toHaveBeenCalledTimes(1));
-    expect(mocks.execute.mock.calls[0][0]).toMatchObject({ path: "/divisions/2/class-days/1/attendance", method: "POST", revision: 3, data: { account_id: 7, attendance_type_id: 88 } });
-  });
-  it("serializes a brush stroke with the confirmed revision of each preceding cell", async () => {
-    let release!: () => void;
-    mocks.execute.mockImplementationOnce(async () => { await new Promise<void>(resolve => { release = resolve; }); revision++; await mocks.refresh?.(); return { revision, value: {} }; });
-    mount(); await loaded(); fireEvent.click(screen.getByRole("button", { name: "Кисть" }));
-    const cells = screen.getAllByRole("button", { name: "Пусто" });
-    fireEvent.mouseDown(cells[0], { button: 0 }); fireEvent.mouseEnter(cells[1]); fireEvent.mouseEnter(cells[1]);
-    expect(mocks.execute).toHaveBeenCalledTimes(1); await act(async () => release());
-    await waitFor(() => expect(mocks.execute).toHaveBeenCalledTimes(2));
-    expect(mocks.execute.mock.calls.map(call => call[0].revision)).toEqual([3, 4]);
-  });
-  it("stops queued brush commands when a reply is unknown", async () => {
-    let release!: () => void;
-    mocks.execute.mockImplementationOnce(async () => { await new Promise<void>(resolve => { release = resolve; }); return null; });
-    mount(); await loaded(); fireEvent.click(screen.getByRole("button", { name: "Кисть" })); const cells = screen.getAllByRole("button", { name: "Пусто" });
-    fireEvent.mouseDown(cells[0], { button: 0 }); fireEvent.mouseEnter(cells[1]); await act(async () => release());
-    expect(mocks.execute).toHaveBeenCalledTimes(1);
-  });
-  it("stops a brush if a concurrent change arrives before the readback", async () => {
-    let release!: () => void;
-    mocks.execute.mockImplementationOnce(async () => { await new Promise<void>(resolve => { release = resolve; }); revision += 2; await mocks.refresh?.(); return { revision: revision - 1, value: {} }; });
-    mount(); await loaded(); fireEvent.click(screen.getByRole("button", { name: "Кисть" })); const cells = screen.getAllByRole("button", { name: "Пусто" });
-    fireEvent.mouseDown(cells[0], { button: 0 }); fireEvent.mouseEnter(cells[1]); await act(async () => release());
-    expect(mocks.execute).toHaveBeenCalledTimes(1); expect(screen.getByRole("alert").textContent).toContain("изменился параллельно");
-  });
-  it("shows immutable custom/archived display and protects a mark linked to a zap", async () => {
-    journal.entries = [{ id: 45, division_id: 2, class_day_id: 1, account_id: 7, group_id: null, full_name: student.full_name, type: { ...type, is_active: false }, zap_id: 12, is_deleted: false, updated_at: "2026-06-01T12:00:00Z" }];
-    const report = excelReport(journal, [student], "2026-06-01", "2026-06-30");
-    expect(summarizeStudentAttendance(7, report.class_days, buildCellMap(report.entries))).toMatchObject({ marked: 1, empty: 1, snapshots: [{ name: type.name, color: type.color, mark: type.mark, count: 1 }] });
-    mount(); await loaded(); const cell = screen.getByRole("button", { name: "Особая причина" }); expect(cell.style.backgroundColor).toBe("rgb(171, 205, 239)");
-    fireEvent.mouseDown(cell, { button: 0 }); expect(screen.getByText(/связана с отгулом №12/)).toBeTruthy(); expect(screen.queryByRole("button", { name: "Сохранить" })).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Закрыть" })); fireEvent.click(screen.getByRole("button", { name: "Ластик" })); fireEvent.mouseDown(cell, { button: 0 }); expect(mocks.execute).not.toHaveBeenCalled();
-  });
-  it("uses account ID in the DELETE path", async () => {
-    journal.entries = [{ id: 45, division_id: 2, class_day_id: 1, account_id: 7, group_id: null, full_name: student.full_name, type, zap_id: null, is_deleted: false, updated_at: "2026-06-01T12:00:00Z" }];
-    mount(); await loaded(); fireEvent.click(screen.getByRole("button", { name: "Ластик" })); fireEvent.mouseDown(screen.getByRole("button", { name: type.name }), { button: 0 });
-    await waitFor(() => expect(mocks.execute).toHaveBeenCalledTimes(1));
-    expect(mocks.execute.mock.calls[0][0]).toMatchObject({ method: "DELETE", path: "/divisions/2/class-days/1/attendance/7", revision: 3, data: {} });
-  });
-  it("does not continue a brush after a confirmed command if authoritative refresh fails", async () => {
-    let release!: () => void;
-    mocks.execute.mockImplementationOnce(async () => { await new Promise<void>(resolve => { release = resolve; }); revision++; mocks.read.mockRejectedValue(new Error("Unavailable")); await mocks.refresh?.(); return { revision, value: {} }; });
-    mount(); await loaded(); fireEvent.click(screen.getByRole("button", { name: "Кисть" })); const cells = screen.getAllByRole("button", { name: "Пусто" });
-    fireEvent.mouseDown(cells[0], { button: 0 }); fireEvent.mouseEnter(cells[1]); await act(async () => release());
-    expect(mocks.execute).toHaveBeenCalledTimes(1); expect(screen.getByRole("alert").textContent).toContain("Unavailable");
-  });
-  it("keeps empty cells unmarked and allows read-only inspection", async () => {
-    mocks.user.role = "supervisor"; mount(); await loaded(); expect(screen.queryByRole("button", { name: "Карандаш" })).toBeNull();
-    fireEvent.mouseDown(screen.getAllByRole("button", { name: "Пусто" })[0], { button: 0 }); expect(screen.getByRole("dialog")).toBeTruthy(); expect(mocks.execute).not.toHaveBeenCalled();
-  });
+import {act,cleanup,fireEvent,render,screen,waitFor} from "@testing-library/react";
+import {afterEach,beforeEach,describe,expect,it,vi} from "vitest";
+import type {AttendanceType,Command,Entry,Journal,Student} from "@/lib/bff/attendance";
+const m=vi.hoisted(()=>({read:vi.fn(),execute:vi.fn(),user:{role:"admin",organization_admin:true,organization_id:1001,account_id:9,division_id:2},refresh:null as null|(()=>Promise<void>),immersive:vi.fn(),pending:null as null|{blocked:boolean}}));
+vi.mock("@/contexts/AuthContext",()=>({useAuth:()=>({user:m.user})}));
+vi.mock("@/contexts/cabinet-chrome-context",()=>({useCabinetChrome:()=>({setImmersive:m.immersive})}));
+vi.mock("@/lib/bff/use-context-guard",()=>({useContextGuard:vi.fn()}));
+vi.mock("@/lib/bff/attendance",async original=>({...await original<typeof import("@/lib/bff/attendance")>(),readAttendance:m.read}));
+vi.mock("./shared",()=>({useAction:(refresh:()=>Promise<void>)=>{m.refresh=refresh;return{busy:false,pending:m.pending,execute:m.execute};},ActionNotice:()=>null}));
+vi.mock("@tanstack/react-virtual",()=>({useVirtualizer:({count}:{count:number})=>({getVirtualItems:()=>Array.from({length:count},(_,index)=>({index,key:index,start:index*40,end:(index+1)*40})),getTotalSize:()=>count*40})}));
+import {ExcelAttendanceJournal} from "./excel-journal";
+import {excelReport} from "@/lib/attendance/excel-report";
+const type:AttendanceType={id:88,division_id:2,code:"custom_excused",name:"Особая причина",color:"#abcdef",mark:"УП",version:3,is_active:true,sort_order:1,counts_as_present:false,counts_as_absent:true,is_excused:true,scan_default:false,zap_default:true};
+const student:Student={account_id:7,profile_id:700,role:"student",full_name:"Synthetic student",class:11,group_id:null,group_name:null,school_id:8,school_name:"Synthetic school",school_short_name:"School"};
+let revision:number,journal:Journal;
+const period={dateFrom:"2026-06-01",dateTo:"2026-06-30"};
+function mount(prepared=false){return render(<ExcelAttendanceJournal division={2} divisionName="Synthetic division" period={period} onBack={vi.fn()} initialData={prepared?{revision,value:{journal,students:[student],types:[type]},report:excelReport(journal,[student],period.dateFrom,period.dateTo)}:undefined}/>);}
+const loaded=()=>screen.findAllByRole("button",{name:"Пусто"});
+function entry(day=1):Entry{return{id:45+day,division_id:2,class_day_id:day,account_id:7,group_id:null,full_name:student.full_name,type:{...type},zap_id:null,is_deleted:false,updated_at:"2026-06-01T12:00:00Z"};}
+async function save(command:Command,onSuccess?:(r:unknown)=>void){revision++;const result={revision,value:command.method==="DELETE"?{deleted:true}:entry(Number(command.path.split('/')[4]))};onSuccess?.(result);await m.refresh?.();return result;}
+describe("confirmed attendance editing",()=>{
+ beforeEach(()=>{vi.clearAllMocks();revision=3;m.user.role="admin";m.pending=null;journal={organization_id:1001,division_id:2,days:[1,2].map(id=>({id,division_id:2,date:`2026-06-0${id}`,comment:"",lesson_ids:[],has_history:false})),entries:[],counts_by_type_code:{},unmarked_is_absent:false};m.read.mockImplementation(async()=>({revision,value:{journal:structuredClone(journal),students:[student],types:[type]}}));m.execute.mockImplementation(save);});
+ afterEach(cleanup);
+ it("loads one coherent workspace and commits an account ID without any full readback",async()=>{mount();const cells=await loaded();expect(m.read).toHaveBeenCalledTimes(1);expect(m.read.mock.calls[0][0]).toBe("/divisions/2/journal-workspace?date_from=2026-06-01&date_to=2026-06-30");fireEvent.mouseDown(cells[0],{button:0});fireEvent.click(screen.getByRole("button",{name:"Сохранить"}));await screen.findByRole("button",{name:type.name});expect(m.read).toHaveBeenCalledTimes(1);expect(m.execute.mock.calls[0][0]).toMatchObject({revision:3,data:{account_id:7,attendance_type_id:88}});expect(screen.queryByLabelText("Обновление журнала")).toBeNull();});
+ it("keeps the journal ready for a second separate edit after confirmed saving",async()=>{mount();const cells=await loaded();fireEvent.mouseDown(cells[0],{button:0});fireEvent.click(screen.getByRole("button",{name:"Сохранить"}));await screen.findByRole("button",{name:type.name});fireEvent.mouseDown(screen.getByRole("button",{name:"Пусто"}),{button:0});const saveButton=screen.getByRole("button",{name:"Сохранить"}) as HTMLButtonElement;expect(saveButton.disabled).toBe(false);fireEvent.click(saveButton);await waitFor(()=>expect(m.execute).toHaveBeenCalledTimes(2));expect(m.execute.mock.calls.map(c=>c[0].revision)).toEqual([3,4]);expect(m.read).toHaveBeenCalledTimes(1);});
+ it("mounts an already prepared report without fetching it again",async()=>{mount(true);await loaded();expect(m.read).not.toHaveBeenCalled();expect(m.immersive).toHaveBeenCalledWith(true);});
+ it("does not render empty results or enter immersive mode while loading",async()=>{let resolve!:(value:unknown)=>void;m.read.mockImplementation(()=>new Promise(r=>{resolve=r;}));mount();await screen.findByLabelText("Подготовка журнала");expect(screen.queryByText(/нет дней занятий/)).toBeNull();expect(m.immersive).not.toHaveBeenCalledWith(true);await act(async()=>resolve({revision,value:{journal,students:[student],types:[type]}}));await loaded();});
+ it("serializes consecutive brush cells with committed revisions and no further reads",async()=>{let release!:()=>void;m.execute.mockImplementationOnce(async(c,onSuccess)=>{await new Promise<void>(r=>{release=r;});return save(c,onSuccess);});mount();const cells=await loaded();fireEvent.click(screen.getByRole("button",{name:"Кисть"}));fireEvent.mouseDown(cells[0],{button:0});fireEvent.mouseEnter(cells[1]);fireEvent.mouseEnter(cells[1]);expect(m.execute).toHaveBeenCalledTimes(1);await act(async()=>release());await waitFor(()=>expect(m.execute).toHaveBeenCalledTimes(2));expect(m.execute.mock.calls.map(c=>c[0].revision)).toEqual([3,4]);expect(m.read).toHaveBeenCalledTimes(1);expect(screen.getAllByRole("button",{name:type.name})).toHaveLength(2);});
+ it("retains queued intents after an UNKNOWN and never resends them automatically",async()=>{let release!:()=>void;m.execute.mockImplementationOnce(async()=>{await new Promise<void>(r=>{release=r;});m.pending={blocked:true};return null;});mount();const cells=await loaded();fireEvent.click(screen.getByRole("button",{name:"Кисть"}));fireEvent.mouseDown(cells[0],{button:0});fireEvent.mouseEnter(cells[1]);await act(async()=>release());expect(m.execute).toHaveBeenCalledTimes(1);expect(screen.getByText("Очередь приостановлена: 2")).toBeTruthy();expect((screen.getByRole("button",{name:"Продолжить очередь"}) as HTMLButtonElement).disabled).toBe(true);expect((screen.getByRole("button",{name:"Отменить неотправленные"}) as HTMLButtonElement).disabled).toBe(true);});
+ it("keeps the unsent tail when a committed response has an unexpected revision",async()=>{let release!:()=>void;m.execute.mockImplementationOnce(async(c,onSuccess)=>{await new Promise<void>(r=>{release=r;});revision++;const result={revision:revision+1,value:entry()};try{onSuccess(result);}catch{}return result;});mount();const cells=await loaded();fireEvent.click(screen.getByRole("button",{name:"Кисть"}));fireEvent.mouseDown(cells[0],{button:0});fireEvent.mouseEnter(cells[1]);await act(async()=>release());expect(m.execute).toHaveBeenCalledTimes(1);expect(screen.getByRole("alert").textContent).toContain("не соответствует ячейке");expect(screen.getByText("Очередь приостановлена: 1")).toBeTruthy();});
+ it("uses the immutable owner snapshot and protects a zap-linked entry",async()=>{journal.entries=[{...entry(),type:{...type,is_active:false},zap_id:12}];mount();const cell=await screen.findByRole("button",{name:type.name});expect(cell.style.backgroundColor).toBe("rgb(171, 205, 239)");fireEvent.mouseDown(cell,{button:0});expect(screen.getByText(/связана с отгулом №12/)).toBeTruthy();expect(screen.queryByRole("button",{name:"Сохранить"})).toBeNull();fireEvent.click(screen.getByRole("button",{name:"Закрыть"}));fireEvent.click(screen.getByRole("button",{name:"Ластик"}));fireEvent.mouseDown(cell,{button:0});expect(m.execute).not.toHaveBeenCalled();});
+ it("applies a confirmed DELETE to the account's cell without reloading",async()=>{journal.entries=[entry()];mount();const cell=await screen.findByRole("button",{name:type.name});fireEvent.click(screen.getByRole("button",{name:"Ластик"}));fireEvent.mouseDown(cell,{button:0});await waitFor(()=>expect(screen.queryByRole("button",{name:type.name})).toBeNull());expect(m.execute.mock.calls[0][0]).toMatchObject({method:"DELETE",path:"/divisions/2/class-days/1/attendance/7",revision:3});expect(m.read).toHaveBeenCalledTimes(1);});
+ it("keeps a read-only journal inspectable",async()=>{m.user.role="supervisor";mount();const cells=await loaded();expect(screen.queryByRole("button",{name:"Карандаш"})).toBeNull();fireEvent.mouseDown(cells[0],{button:0});expect(screen.getByRole("dialog")).toBeTruthy();expect(m.execute).not.toHaveBeenCalled();});
 });

@@ -1,5 +1,6 @@
 "use client";
 
+import { AttendanceActivity } from "@/components/attendance/activity";
 import reportStyles from "@/components/admin/attendance/report/report.module.css";
 import { ReportLegend } from "@/components/admin/attendance/report/report-legend";
 import { ReportMacClose } from "@/components/admin/attendance/report/report-mac-close";
@@ -116,7 +117,7 @@ export function ReportToolbar({
               aria-hidden
               className={reportStyles.exportIcon}
             />
-            <span>{exporting ? "Экспорт…" : "Экспорт"}</span>
+            {exporting?<AttendanceActivity label="Экспорт отчёта"/>:<span>Экспорт</span>}
           </button>
           <button
             type="button"
@@ -125,8 +126,7 @@ export function ReportToolbar({
             disabled={refreshing}
             onClick={onRefresh}
           >
-            <RefreshCw size={17} aria-hidden />
-            <span>{refreshing ? "Обновление…" : "Обновить"}</span>
+            {refreshing?<AttendanceActivity label="Обновление журнала"/>:<><RefreshCw size={17} aria-hidden/><span>Обновить</span></>}
           </button>
         </ExcelZone>
       </div>

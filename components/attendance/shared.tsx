@@ -18,9 +18,10 @@ export function useAction(refresh: () => Promise<void>) {
 export function ActionNotice({ action }: {
     action: ReturnType<typeof useAction>;
 }) { return <>{action.error && <p className={styles.error} role="alert">{action.error}</p>}{action.notice && <p className={styles.muted} role="status">{action.notice}</p>}{action.pending && action.canRecover && !action.busy && <div className={styles.actions}><button type="button" onClick={()=>void action.recover()}>Проверить исход команды</button>{action.canRetry && <button type="button" onClick={() => void action.retry()}>Повторить ту же команду</button>}</div>}{action.recovery==="committed" && !action.busy && <button type="button" onClick={action.acknowledgeRecovery}>Понятно / начать новое действие</button>}</>; }
-export function Range({ from, to, setFrom, setTo }: {
+export function Range({ from, to, setFrom, setTo, disabled=false }: {
     from: string;
     to: string;
+    disabled?: boolean;
     setFrom: (v: string) => void;
     setTo: (v: string) => void;
-}) { return <><label>С даты<input aria-label="С даты" type="date" value={from} onChange={e => setFrom(e.target.value)}/></label><label>По дату<input aria-label="По дату" type="date" value={to} onChange={e => setTo(e.target.value)}/></label></>; }
+}) { return <><label>С даты<input disabled={disabled} aria-label="С даты" type="date" value={from} onChange={e => setFrom(e.target.value)}/></label><label>По дату<input disabled={disabled} aria-label="По дату" type="date" value={to} onChange={e => setTo(e.target.value)}/></label></>; }
