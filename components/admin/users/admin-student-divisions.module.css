@@ -31,5 +31,8 @@
 .dialog legend { font-size: 13px; color: var(--ds-text-muted); margin-bottom: 10px; }
 .option { display: flex; align-items: center; gap: 12px; padding: 13px 0; border-bottom: 1px solid var(--ds-border); cursor: pointer; }
 .option input { width: 19px; height: 19px; accent-color: var(--ds-accent); }
+.assignment { padding-bottom: 4px; }
+.roleField { display: grid; gap: 7px; padding: 10px 0 12px 31px; font-size: 13px; color: var(--ds-text-muted); }
+.roleField select { width: 100%; min-height: 44px; padding: 10px; border: 1px solid var(--ds-border); border-radius: 9px; background: var(--ds-surface-muted); color: var(--ds-text); font: inherit; }
 .dialog footer { display: flex; justify-content: flex-end; gap: 12px; flex-wrap: wrap; margin-top: 24px; }
 @media (max-width: 600px) { .dialog { padding: 20px; } .toolbar input, .toolbar select { font-size: 16px; } .selection > div { width: 100%; } }

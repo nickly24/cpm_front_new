@@ -4,6 +4,8 @@ import { CoreCreateRecovery, CoreEditOnly } from "@/components/admin/users/core-
 
 import styles from "@/components/admin/tests/admin-tests.module.css";
 import userStyles from "@/components/admin/users/admin-users.module.css";
+import { AdminStudentDivisions } from "@/components/admin/users/admin-student-divisions";
+import { canManageCoreAccess } from "@/lib/bff/core-access";
 import { AdminStaffPanel } from "@/components/admin/users/admin-staff-panel";
 import { Button } from "@/components/ui/button";
 import { LoadingState } from "@/components/ui/loading-state";
@@ -41,6 +43,7 @@ function passwordLabel(user: AdminStaffUser): string {
 
 export function AdminStaffTab() {
   const {user: actor}=useAuth();
+  const [distribution, setDistribution] = useState(false);
   const loadSerial=useRef(0);
   const [role, setRole] = useState<AdminStaffRole>("proctor");
   const [users, setUsers] = useState<AdminStaffUser[]>([]);
@@ -132,6 +135,8 @@ export function AdminStaffTab() {
     }
   };
 
+  if (distribution && BFF_DEV && canManageCoreAccess(actor)) return <AdminStudentDivisions initialRole="staff_admin" onClose={() => { setDistribution(false); void load(); }} />;
+
   return (
     <>
       <CoreCreateRecovery onRecovered={load} />
@@ -157,6 +162,7 @@ export function AdminStaffTab() {
         <span className={userStyles.statPill}>
           Всего: <strong>{users.length}</strong>
         </span>
+        {role === "staff_admin" && BFF_DEV && canManageCoreAccess(actor) ? <Button variant="secondary" onClick={() => setDistribution(true)}>Распределить по подразделениям</Button> : null}
         <CoreEditOnly fullAdmin><Button
           type="button"
           onClick={() => {

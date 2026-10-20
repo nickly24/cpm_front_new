@@ -2,11 +2,12 @@
 
 import { BFF_DEV } from "@/lib/config";
 import { domain } from "@/lib/bff/client";
-import { testsCatalog, testsAction } from "@/lib/bff/tests-admin";
+import { testsCatalogPage, testsAction } from "@/lib/bff/tests-admin";
 import { useContextGuard } from "@/lib/bff/use-context-guard";
 
 import { EditOnly, ReadOnlyControl, useAdminSectionAccess } from "@/components/admin/admin-section-access";
 
+import { AdminListPaginationBar } from "@/components/admin/tests/admin-list-pagination";
 import { AdminTestCalculationSettings } from "@/components/admin/tests/admin-test-calculation-settings";
 import { AdminCreateTestMenu } from "@/components/admin/tests/admin-create-test-menu";
 import { AdminDirectionCombobox } from "@/components/admin/tests/admin-direction-combobox";
@@ -80,8 +81,8 @@ const PAGE_SIZE = 6;
 export function AdminTestsSection() {
   const searchParams = useSearchParams();
   const { canEdit } = useAdminSectionAccess("tests");
-  const openedFromUrlRef = useRef(false);
   const catalogGeneration = useRef(0);
+  const catalogRequest = useRef<AbortController | null>(null);
   const [catalogMode, setCatalogMode] = useState<"division"|"bank">("division");
   const [relation, setRelation] = useState("all");
   const [archiveFilter, setArchiveFilter] = useState("false");
@@ -89,24 +90,32 @@ export function AdminTestsSection() {
   const [divisions, setDivisions] = useState<{id:number;name:string}[]>([]);
   const [actionBusy, setActionBusy] = useState<string|null>(null);
   const [directions, setDirections] = useState<Direction[]>([]);
-  const [directionName, setDirectionName] = useState("");
+  const [directionName, setDirectionName] = useState(() => searchParams.get("direction") || "");
   const [tests, setTests] = useState<AdminTestListItem[]>([]);
   const [drafts, setDrafts] = useState<AdminTestDraft[]>([]);
   const [loadingDirections, setLoadingDirections] = useState(true);
-  const [loadingTests, setLoadingTests] = useState(false);
+  const [loadingTests, setLoadingTests] = useState(BFF_DEV);
   const [loadingDrafts, setLoadingDrafts] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [view, setView] = useState<AdminTestsView>("list");
+  const [view, setView] = useState<AdminTestsView>(() => searchParams.get("test") ? "workspace" : "list");
   const [editingTest, setEditingTest] = useState<AdminTestDetail | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [catalogSearch, setCatalogSearch] = useState("");
+  const [serverTotal, setServerTotal] = useState(0);
+  const [serverPage, setServerPage] = useState(1);
+  const [statusCounts, setStatusCounts] = useState<Record<string, number>>({});
   const [statusFilter, setStatusFilter] = useState<AdminTestStatusFilter>("all");
   const [dateFilter, setDateFilter] = useState<TestsDateFilter>({
     startDate: "",
     endDate: "",
   });
-  const [currentPage, setCurrentPage] = useState(1);
+  const filterKey = JSON.stringify([catalogMode, directionName, relation, archiveFilter, ownerFilter, BFF_DEV ? catalogSearch : searchTerm, statusFilter, dateFilter.startDate, dateFilter.endDate]);
+  const [pageSelection, setPageSelection] = useState({ key: filterKey, page: 1 });
+  const currentPage = pageSelection.key === filterKey ? pageSelection.page : 1;
+  const setCurrentPage = (page: number) => setPageSelection({ key: filterKey, page });
+  const activePage = BFF_DEV ? serverPage : currentPage;
   const [toggleBusy, setToggleBusy] = useState<string | null>(null);
-  const [workspaceTestId, setWorkspaceTestId] = useState<string | null>(null);
+  const [workspaceTestId, setWorkspaceTestId] = useState<string | null>(() => searchParams.get("test"));
   const [editingDraft, setEditingDraft] = useState<AdminTestDraft | null>(null);
   const [editingTestId, setEditingTestId] = useState<string | null>(null);
   const [draftEditorMode, setDraftEditorMode] = useState<"draft" | "testEdit">(
@@ -122,30 +131,47 @@ export function AdminTestsSection() {
   const [draftsOpen, setDraftsOpen] = useState(false);
   const { setImmersive } = useCabinetChrome();
 
+  const selectedDirectionId = directions.find(d => d.name === directionName)?.id;
   const loadTests = useCallback(async (direction: string) => {
-    const generation=++catalogGeneration.current;
+    const generation = ++catalogGeneration.current;
+    catalogRequest.current?.abort();
+    const controller = new AbortController();
+    catalogRequest.current = controller;
     if (!direction && !BFF_DEV) {
       setTests([]);
       return;
     }
-
     setLoadingTests(true);
     setError(null);
-
     try {
-      const data = BFF_DEV ? await testsCatalog({bank:catalogMode==="bank",direction,relation,ownerDivisionId:ownerFilter,archived:archiveFilter}) : await fetchAdminTestsByDirection(direction);
-      if(generation!==catalogGeneration.current)return;
-      setTests(Array.isArray(data) ? data : []);
+      if (BFF_DEV) {
+        const data = await testsCatalogPage({ bank: catalogMode === "bank", direction, directionId: selectedDirectionId,
+          relation, ownerDivisionId: ownerFilter, archived: archiveFilter, q: catalogSearch,
+          status: statusFilter, dateFrom: dateFilter.startDate, dateTo: dateFilter.endDate,
+          page: currentPage, limit: PAGE_SIZE, signal: controller.signal });
+        if (generation !== catalogGeneration.current || controller.signal.aborted) return;
+        setTests(data.items);
+        setServerTotal(data.total);
+        setServerPage(Math.floor(data.offset / data.limit) + 1);
+        setStatusCounts(data.statusCounts);
+      } else {
+        const data = await fetchAdminTestsByDirection(direction);
+        if (generation !== catalogGeneration.current || controller.signal.aborted) return;
+        setTests(Array.isArray(data) ? data : []);
+      }
     } catch (err) {
-      if(generation!==catalogGeneration.current)return;
+      if (generation !== catalogGeneration.current || controller.signal.aborted) return;
       setTests([]);
-      setError(
-        err instanceof Error ? err.message : "Не удалось загрузить тесты",
-      );
+      setError(err instanceof Error ? err.message : "Не удалось загрузить тесты");
     } finally {
-      if(generation===catalogGeneration.current)setLoadingTests(false);
+      if (generation === catalogGeneration.current && !controller.signal.aborted) setLoadingTests(false);
     }
-  }, [catalogMode, relation, ownerFilter, archiveFilter]);
+  }, [catalogMode, relation, ownerFilter, archiveFilter, selectedDirectionId, catalogSearch, statusFilter, dateFilter.startDate, dateFilter.endDate, currentPage]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setCatalogSearch(searchTerm.trim()), 300);
+    return () => window.clearTimeout(timer);
+  }, [searchTerm]);
 
   const loadDrafts = useCallback(async () => {
     setLoadingDrafts(true);
@@ -189,20 +215,20 @@ export function AdminTestsSection() {
 
     loadDirections();
     if(BFF_DEV) void domain<{id:number;name:string}[]>("/core/divisions").then(setDivisions).catch(() => {});
-    const draftTimer = window.setTimeout(() => {
-      loadDrafts();
-    }, 0);
     return () => {
       cancelled = true;
-      window.clearTimeout(draftTimer);
     };
-  }, [loadDrafts]);
+  }, []);
 
   useEffect(() => {
-    if (directionName || BFF_DEV) {
-      loadTests(directionName);
-    }
-  }, [directionName, loadTests]);
+    const timer = window.setTimeout(() => {
+      if (!loadingDirections && (directionName || BFF_DEV)) void loadTests(directionName);
+    }, 0);
+    return () => {
+      window.clearTimeout(timer);
+      catalogRequest.current?.abort();
+    };
+  }, [directionName, loadTests, loadingDirections]);
 
   useEffect(() => {
     setImmersive(IMMERSIVE_VIEWS.includes(view));
@@ -224,24 +250,8 @@ export function AdminTestsSection() {
     };
   }, [draftsOpen]);
 
-  useEffect(() => {
-    if (openedFromUrlRef.current || loadingDirections) return;
-
-    const direction = searchParams.get("direction");
-    const testId = searchParams.get("test");
-    if (!direction && !testId) return;
-
-    openedFromUrlRef.current = true;
-    if (direction) {
-      setDirectionName(direction);
-    }
-    if (testId) {
-      setWorkspaceTestId(testId);
-      setView("workspace");
-    }
-  }, [loadingDirections, searchParams]);
-
   const filteredTests = useMemo(() => {
+    if (BFF_DEV) return tests;
     let list = tests;
     list = filterAdminTestsBySearch(list, searchTerm);
     list = filterAdminTestsByStatus(list, statusFilter);
@@ -249,15 +259,15 @@ export function AdminTestsSection() {
     return list;
   }, [tests, searchTerm, statusFilter, dateFilter]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredTests.length / PAGE_SIZE));
+  const hasListFilters = Boolean(directionName || searchTerm.trim() || statusFilter !== "all" || dateFilter.startDate || dateFilter.endDate || relation !== "all" || ownerFilter || archiveFilter !== "false");
+  const unfilteredEmpty = BFF_DEV ? !hasListFilters : tests.length === 0;
+  const totalItems = BFF_DEV ? serverTotal : filteredTests.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
   const paginatedTests = useMemo(() => {
+    if (BFF_DEV) return tests;
     const start = (currentPage - 1) * PAGE_SIZE;
     return filteredTests.slice(start, start + PAGE_SIZE);
-  }, [filteredTests, currentPage]);
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm, statusFilter, dateFilter, directionName, catalogMode, relation, archiveFilter, ownerFilter]);
+  }, [filteredTests, currentPage, tests]);
 
   useContextGuard(["create","createExternal","edit","draftEditor"].includes(view) || actionBusy!==null || externalDeleting);
 
@@ -404,7 +414,7 @@ export function AdminTestsSection() {
     patchTestInList(testId, { published });
     try {
       const saved=await patchAdminTestFields(testId, { published });
-      if(BFF_DEV)patchTestInList(testId,{revision:saved.revision});
+      if(BFF_DEV) { patchTestInList(testId,{revision:saved.revision}); await loadTests(directionName); }
     } catch (err) {
       patchTestInList(testId, { published: !published });
       window.alert(
@@ -420,7 +430,7 @@ export function AdminTestsSection() {
     patchTestInList(testId, { visible });
     try {
       const saved=await patchAdminTestFields(testId, { visible });
-      if(BFF_DEV)patchTestInList(testId,{revision:saved.revision});
+      if(BFF_DEV) { patchTestInList(testId,{revision:saved.revision}); await loadTests(directionName); }
     } catch (err) {
       patchTestInList(testId, { visible: !visible });
       window.alert(
@@ -448,6 +458,7 @@ export function AdminTestsSection() {
   };
 
   const countByStatus = (status: AdminTestStatusFilter) => {
+    if (BFF_DEV) return statusCounts[status] ?? 0;
     if (status === "all") return tests.length;
     return tests.filter((t) => getAdminTestStatus(t) === status).length;
   };
@@ -795,7 +806,7 @@ export function AdminTestsSection() {
         </div>
       </div>
 
-      {!loadingTests && !error ? <p className={styles.resultsSummary}>Найдено тестов: <strong>{filteredTests.length}</strong>{filteredTests.length !== tests.length ? ` из ${tests.length}` : ""}</p> : null}
+      {!loadingTests && !error ? <p className={styles.resultsSummary}>Найдено тестов: <strong>{totalItems}</strong></p> : null}
 
       {loadingTests ? (
         <LoadingState
@@ -812,8 +823,8 @@ export function AdminTestsSection() {
         </div>
       ) : filteredTests.length === 0 ? (
         <div className={styles.stateBox}>
-          <p>{tests.length === 0 ? "Тестов пока нет" : "По фильтрам ничего не найдено"}</p>
-          {tests.length === 0 ? (
+          <p>{unfilteredEmpty ? "Тестов пока нет" : "По фильтрам ничего не найдено"}</p>
+          {unfilteredEmpty ? (
             <div className={styles.emptyActions}>
               <EditOnly><Button type="button" size="sm" onClick={() => setView("create")}>
                 Создать первый тест
@@ -923,38 +934,11 @@ export function AdminTestsSection() {
             })}
           </div>
 
-          {totalPages > 1 ? (
-            <nav className={styles.pagination} aria-label="Страницы">
-              <button
-                type="button"
-                className={styles.pageBtn}
-                disabled={currentPage <= 1}
-                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              >
-                ← Назад
-              </button>
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                <button
-                  key={page}
-                  type="button"
-                  className={`${styles.pageNum} ${currentPage === page ? styles.pageNumActive : ""}`}
-                  onClick={() => setCurrentPage(page)}
-                >
-                  {page}
-                </button>
-              ))}
-              <button
-                type="button"
-                className={styles.pageBtn}
-                disabled={currentPage >= totalPages}
-                onClick={() =>
-                  setCurrentPage((p) => Math.min(totalPages, p + 1))
-                }
-              >
-                Вперёд →
-              </button>
-            </nav>
-          ) : null}
+          <AdminListPaginationBar
+            pagination={{ page: activePage, limit: PAGE_SIZE, total: totalItems, totalPages,
+              hasPrev: activePage > 1, hasNext: activePage < totalPages }}
+            onPageChange={setCurrentPage}
+          />
         </>
       )}
     </div>

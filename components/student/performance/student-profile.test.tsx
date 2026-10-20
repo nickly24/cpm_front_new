@@ -27,6 +27,7 @@ it("shows only the personal profile and encodes plain student ID without request
   expect(await screen.findByRole("img", { name: "QR-код ученика" })).toBeTruthy();
   expect(state.qr).toHaveBeenCalledWith("7", expect.objectContaining({ margin: 4 }));
   expect(state.fetch).not.toHaveBeenCalled();
+  expect(screen.getByText("ID профиля: 7")).toBeTruthy();
   expect(screen.queryByText(/рейтинг|внешние|подразделение|день занятия/i)).toBeNull();
   expect(screen.queryAllByRole("textbox")).toHaveLength(0);
   expect(screen.queryAllByRole("combobox")).toHaveLength(0);

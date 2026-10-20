@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-const state = vi.hoisted(() => ({ identity: { user: { account_id: 8, organization_id: 1, division_id: 10, role: "admin", organization_admin: true }, context_revision: "r1" }, read: vi.fn(), save: vi.fn() }));
+const state = vi.hoisted(() => ({ identity: { user: { account_id: 8, organization_id: 1, division_id: 10, role: "admin", organization_admin: true }, context_revision: "r1" }, read: vi.fn(), save: vi.fn(), accounts: vi.fn(), roles: vi.fn() }));
 vi.mock("./client", () => ({ getIdentity: () => state.identity }));
-vi.mock("./core-organization", () => ({ coreOrganizationAccountMemberships: state.read, saveCoreOrganizationParticipation: state.save }));
-import { assignStudentDivisions } from "./student-divisions";
+vi.mock("./core-organization", () => ({ coreOrganizationAccountMemberships: state.read, saveCoreOrganizationParticipation: state.save, coreOrganizationAccounts: state.accounts, coreOrganizationRoles: state.roles }));
+import { assignStudentDivisions, assignStaffAdminDivisions } from "./student-divisions";
 
 let memberships: Map<number, Set<number>>;
 beforeEach(() => {
@@ -52,5 +52,50 @@ describe("additive student distribution", () => {
     state.read.mockResolvedValueOnce({ can_assign: false, memberships: [] });
     await expect(assignStudentDivisions([45], [20], vi.fn())).rejects.toThrow("владельца");
     expect(state.save).not.toHaveBeenCalled();
+  });
+});
+
+
+describe("restricted administrator distribution", () => {
+  beforeEach(() => {
+    state.accounts.mockResolvedValue([45,46].map(account_id => ({ account_id, role:"staff_admin", owner_organization_id:1 })));
+    state.roles.mockResolvedValue([{id:3,name:"Преподаватель"},{id:4,name:"Куратор"}]);
+    state.read.mockImplementation(async (account_id:number) => ({account_id,can_assign:true,memberships:[...memberships.get(account_id)!].map(division_id=>({division_id,role_id:division_id===20?4:3}))}));
+    const assignedRoles=new Map<string,number>();
+    state.read.mockImplementation(async (account_id:number) => ({account_id,can_assign:true,memberships:[...memberships.get(account_id)!].map(division_id=>({division_id,role_id:assignedRoles.get(`${account_id}:${division_id}`) ?? (division_id===20?4:3)}))}));
+    state.save.mockImplementation(async (division:number,account:number,role:number) => { memberships.get(account)!.add(division);assignedRoles.set(`${account}:${division}`,role); });
+  });
+  it("grants different explicit roles for each new division and confirms those roles",async()=>{
+    state.read.mockResolvedValueOnce({can_assign:true,memberships:[{division_id:10,role_id:3}]}).mockResolvedValueOnce({memberships:[{division_id:10,role_id:3},{division_id:20,role_id:4}]}).mockResolvedValueOnce({memberships:[{division_id:30,role_id:3}]});
+    expect(await assignStaffAdminDivisions([45],[{divisionId:20,roleId:4},{divisionId:30,roleId:3}],vi.fn())).toEqual({added:2,existing:0,total:2});
+    expect(state.save.mock.calls).toEqual([[20,45,4],[30,45,3]]);
+  });
+  it("does not replace existing roles in a bulk assignment",async()=>{
+    expect(await assignStaffAdminDivisions([45,46],[{divisionId:10,roleId:4},{divisionId:20,roleId:4}],vi.fn())).toEqual({added:2,existing:2,total:4});
+    expect(state.save.mock.calls).toEqual([[20,45,4],[10,46,4]]);
+  });
+  it.each([0,-1,NaN,999])("rejects a missing or foreign role before writing (%s)",async(roleId)=>{
+    await expect(assignStaffAdminDivisions([45],[{divisionId:20,roleId}],vi.fn())).rejects.toThrow(/роль/);
+    expect(state.save).not.toHaveBeenCalled();
+  });
+  it.each([{role:"student",owner_organization_id:1},{role:"admin",owner_organization_id:1},{role:"staff_admin",owner_organization_id:99}])("refuses a wrong account category/owner before writing %o",async(patch)=>{
+    state.accounts.mockResolvedValueOnce([{account_id:45,...patch}]);
+    await expect(assignStaffAdminDivisions([45],[{divisionId:20,roleId:4}],vi.fn())).rejects.toThrow("своей организации");
+    expect(state.save).not.toHaveBeenCalled();
+  });
+  it("stops when readback reports a different role, without writing the next division",async()=>{
+    state.read.mockResolvedValueOnce({can_assign:true,memberships:[]}).mockResolvedValueOnce({memberships:[{division_id:20,role_id:3}]});
+    await expect(assignStaffAdminDivisions([45],[{divisionId:20,roleId:4},{divisionId:30,roleId:3}],vi.fn())).rejects.toThrow("подтвердить назначение и роль");
+    expect(state.save.mock.calls).toEqual([[20,45,4]]);
+  });
+  it("stops after a lost reply and never automatically applies to the next account",async()=>{
+    state.save.mockRejectedValueOnce(new Error("lost reply"));
+    await expect(assignStaffAdminDivisions([45,46],[{divisionId:20,roleId:4}],vi.fn())).rejects.toThrow("lost reply");
+    expect(state.save).toHaveBeenCalledTimes(1);
+  });
+  it("requires the full organization administrator even for valid scoped roles",async()=>{
+    state.identity.user.role="staff_admin";
+    await expect(assignStaffAdminDivisions([45],[{divisionId:20,roleId:4}],vi.fn())).rejects.toThrow("администратору организации");
+    expect(state.roles).not.toHaveBeenCalled();expect(state.save).not.toHaveBeenCalled();
   });
 });

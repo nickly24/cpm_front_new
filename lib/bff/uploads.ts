@@ -315,7 +315,7 @@ export async function uploadExternalTargets(signal?: AbortSignal): Promise<Uploa
   }
   throw new Error("Каталог слишком большой. Уточните список внешних тестов");
 }
-export interface UploadTemplateOptions { targetId?:string; directionId?:number; format?:"cpm_json"|"online_test_pad"; signal?:AbortSignal }
+export interface UploadTemplateOptions { targetId?:string; directionId?:number; format?:"cpm_json"|"online_test_pad"|"question_table"; signal?:AbortSignal }
 export async function downloadUploadTemplate(type: UploadType, options:UploadTemplateOptions = {}): Promise<{blob:Blob; filename:string}> {
   const snapshot = uploadScope();
   if (type.template !== true) throw new Error(type.template_reason === "not_applicable" ? "Этот формат не использует файловый шаблон" : "Шаблон этого формата пока недоступен");
@@ -329,7 +329,7 @@ export async function downloadUploadTemplate(type: UploadType, options:UploadTem
   const format=options.format??"cpm_json";
   if (json) {
     if (!Number.isSafeInteger(options.directionId) || (options.directionId??0)<1) throw new Error("Выберите направление для шаблона");
-    if (!["cpm_json","online_test_pad"].includes(format)) throw new Error("Недопустимый формат шаблона теста");
+    if (!["cpm_json","online_test_pad","question_table"].includes(format)) throw new Error("Недопустимый формат шаблона теста");
     query.set("direction_id",String(options.directionId));query.set("format",format);
   } else if (options.directionId !== undefined || options.format !== undefined) throw new Error("Направление и формат задаются только для шаблона JSON / OnlineTestPad");
   const path = `/uploads/templates/${encodeURIComponent(type.type)}${query.size?`?${query}`:""}`;
@@ -337,7 +337,7 @@ export async function downloadUploadTemplate(type: UploadType, options:UploadTem
   try { blob = await bffBlobRequest(path, { signal:options.signal }); } catch (error) { throw uploadError(error); }
   scoped(snapshot, snapshot);
   const mime = blob.type.split(";")[0].toLowerCase();
-  const expected = json ? format === "online_test_pad" ? {mime:"text/javascript",extension:"js"} : {mime:"application/json",extension:"json"} : type.type === "users.credentials" ? {mime:"text/csv",extension:"csv"} : {mime:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",extension:"xlsx"};
+  const expected = json ? format === "question_table" ? {mime:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",extension:"xlsx"} : format === "online_test_pad" ? {mime:"text/javascript",extension:"js"} : {mime:"application/json",extension:"json"} : type.type === "users.credentials" ? {mime:"text/csv",extension:"csv"} : {mime:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",extension:"xlsx"};
   if (mime !== expected.mime) throw new Error("Источник вернул неподдерживаемый формат шаблона");
   // Check only JSON transport syntax. Subject shape and JavaScript/OTP parsing belong to Tests.
   if (expected.extension === "json") {

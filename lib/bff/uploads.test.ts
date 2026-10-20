@@ -181,3 +181,10 @@ describe("protected owner template capabilities",()=>{
     state.blob.mockResolvedValueOnce(new Blob(["{}"],{type:"application/json"}));await expect(downloadUploadTemplate({...type,type:"tests.json"},{directionId:19,format:"online_test_pad"})).rejects.toThrow("неподдерживаемый формат");
   });
 });
+
+it("downloads the Excel question-table template as binary, preserving the selected direction",async()=>{
+ const blob=new Blob(["PK workbook"],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});state.blob.mockResolvedValueOnce(blob);
+ expect(await downloadUploadTemplate({...type,type:"tests.json",create:false,edit:false,commit:false},{directionId:19,format:"question_table"})).toEqual({blob,filename:"tests-json-template.xlsx"});
+ expect(state.blob.mock.calls[0][0]).toBe("/uploads/templates/tests.json?direction_id=19&format=question_table");
+ state.blob.mockResolvedValueOnce(new Blob(["{}"],{type:"application/json"}));await expect(downloadUploadTemplate({...type,type:"tests.json"},{directionId:19,format:"question_table"})).rejects.toThrow("неподдерживаемый формат");
+});

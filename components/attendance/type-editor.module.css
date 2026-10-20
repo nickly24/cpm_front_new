@@ -1,0 +1,9 @@
+.editor{color:var(--ds-text)}
+.editor form{background:var(--ds-surface);border:1px solid var(--ds-border);box-shadow:var(--ds-shadow-md)}
+.editor label{display:grid;gap:6px;font-size:13px}
+.editor label:has(input[type=checkbox]){display:flex;align-items:center}
+.editor input{min-width:0;max-width:100%;border:1px solid var(--ds-border);background:var(--ds-surface-muted);color:inherit;padding:9px 11px;border-radius:8px}
+.editor input[type=color]{height:40px;padding:4px;width:100%}
+.editor input[type=checkbox]{width:16px;height:16px;accent-color:var(--ds-accent)}
+.editor button{border:1px solid var(--ds-border);background:var(--ds-surface);color:inherit;padding:10px 16px;border-radius:9px;cursor:pointer}
+.editor button:disabled{opacity:.5;cursor:default}

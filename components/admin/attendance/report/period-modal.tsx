@@ -5,15 +5,13 @@ import reportStyles from "@/components/admin/attendance/report/report.module.css
 import styles from "@/components/admin/tests/admin-tests.module.css";
 import { Button } from "@/components/ui/button";
 import { DismissibleOverlay } from "@/components/ui/dismissible-overlay";
-import { OptionSelect } from "@/components/ui/option-select";
+import { MonthPicker } from "@/components/attendance/month-picker";
 import {
   getMonthRange,
-  MONTH_NAMES,
   todayIsoDate,
-  yearOptions,
 } from "@/lib/attendance/attendance-utils";
 import { Calendar, CalendarRange, CalendarDays } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
 export type PeriodMode = "current_month" | "year_month" | "date_range";
 
@@ -47,26 +45,6 @@ export function PeriodModal({ title = "Журнал посещаемости", o
   const [dateTo, setDateTo] = useState(todayIsoDate());
   const [error, setError] = useState<string | null>(null);
 
-  const yearSelectOptions = useMemo(
-    () =>
-      yearOptions().map((value) => ({
-        value,
-        label: String(value),
-        icon: Calendar,
-      })),
-    [],
-  );
-
-  const monthSelectOptions = useMemo(
-    () =>
-      MONTH_NAMES.map((name, index) => ({
-        value: index + 1,
-        label: name,
-        icon: CalendarDays,
-      })),
-    [],
-  );
-
   const resolvePeriod = (): ReportPeriodSelection | null => {
     if (mode === "current_month") {
       const current = getMonthRange(now.getFullYear(), now.getMonth() + 1);
@@ -98,9 +76,13 @@ export function PeriodModal({ title = "Журнал посещаемости", o
   return (
     <DismissibleOverlay className={attendanceStyles.modalOverlay} onDismiss={onClose}>
       <form
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
         className={attendanceStyles.modal}
-        style={{ maxWidth: 480 }}
+        style={{ maxWidth: 480, maxHeight: "calc(100dvh - 40px)", overflowY: "auto" }}
         onClick={(event) => event.stopPropagation()}
+        onKeyDown={event => { if (event.key === "Escape") { event.stopPropagation(); onClose(); } }}
         onSubmit={handleSubmit}
       >
         <h3 className={attendanceStyles.modalTitle}>{title}</h3>
@@ -131,20 +113,7 @@ export function PeriodModal({ title = "Журнал посещаемости", o
 
         {mode === "year_month" ? (
           <div className={reportStyles.periodFields}>
-            <OptionSelect
-              label="Год"
-              value={year}
-              options={yearSelectOptions}
-              onChange={setYear}
-              className={reportStyles.filterSelect}
-            />
-            <OptionSelect
-              label="Месяц"
-              value={month}
-              options={monthSelectOptions}
-              onChange={setMonth}
-              className={reportStyles.filterSelect}
-            />
+            <MonthPicker inline value={`${year}-${String(month).padStart(2, "0")}`} onChange={value => { setYear(Number(value.slice(0, 4))); setMonth(Number(value.slice(5, 7))); }} />
           </div>
         ) : null}
 
@@ -183,7 +152,7 @@ export function PeriodModal({ title = "Журнал посещаемости", o
           <Button type="button" variant="ghost" onClick={onClose}>
             Отмена
           </Button>
-          <Button type="submit">Создать</Button>
+          <Button type="submit">Открыть отчёт</Button>
         </div>
       </form>
     </DismissibleOverlay>

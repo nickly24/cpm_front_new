@@ -40,5 +40,6 @@ export function StudentProfileQr({ studentId }: { studentId?: number }) {
       ) : <p role="status">{!payload ? "QR-код недоступен" : failedPayload === payload ? "Не удалось создать QR-код" : "Подготовка QR-кода…"}</p>}
     </div>
     <p className={styles.profileQrLabel}>Мой QR-код</p>
+    {payload && <p className={styles.profileQrLabel}>ID профиля: {payload}</p>}
   </div>;
 }

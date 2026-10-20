@@ -65,6 +65,54 @@ export function testsListItem(t:OwnerTest):AdminTestListItem {
   return {id:t.id,title:t.title,startDate:s.start_at,endDate:s.end_at,timeLimitMinutes:s.time_limit_minutes,published:s.published,visible:s.answers_visible,description:t.description,directionName:t.direction_name,ownerDivisionId:t.owner_division_id,ownerDivisionName:t.owner_division_name,isOwner:t.is_owner,isAttached:t.is_attached,isArchived:t.is_archived,bankAvailable:t.bank_available,origin:t.origin,actions:t.actions,revision:t.revision,questionCount:t.question_count};
 }
 export interface TestsCatalogFilter {bank?:boolean;direction?:string;relation?:string;ownerDivisionId?:string;archived?:string;q?:string}
+export interface TestsCatalogPageQuery extends TestsCatalogFilter {
+  page?: number;
+  limit?: number;
+  directionId?: number;
+  status?: import("@/lib/admin/admin-tests-types").AdminTestStatusFilter;
+  dateFrom?: string;
+  dateTo?: string;
+  signal?: AbortSignal;
+}
+export interface TestsCatalogPage {
+  items: AdminTestListItem[];
+  total: number;
+  limit: number;
+  offset: number;
+  statusCounts: Record<string, number>;
+}
+
+/** One server page, including external tests. Never enumerate catalogue pages. */
+export async function testsCatalogPage(filter: TestsCatalogPageQuery = {}): Promise<TestsCatalogPage> {
+  const page = filter.page ?? 1, limit = filter.limit ?? 6;
+  if (!Number.isSafeInteger(page) || page < 1 || !Number.isSafeInteger(limit) || limit < 1 || limit > 100 || (page - 1) * limit > 100000) {
+    throw new Error("Некорректная страница списка тестов");
+  }
+  const query = new URLSearchParams({ view: "admin", limit: String(limit), offset: String((page - 1) * limit), include_external: String(BFF_EXTERNAL_TESTS_DEV && !filter.bank) });
+  if (filter.directionId) query.set("direction_id", String(filter.directionId));
+  else if (filter.direction) query.set("direction_id", String(await directionId(filter.direction)));
+  if (filter.q?.trim()) query.set("q", filter.q.trim());
+  if (filter.relation && filter.relation !== "all") query.set("relation", filter.relation);
+  if (filter.ownerDivisionId) query.set("owner_division_id", filter.ownerDivisionId);
+  if (filter.archived) query.set("is_archived", filter.archived);
+  if (filter.status && filter.status !== "all") query.set("status", filter.status);
+  if (filter.dateFrom) query.set("date_from", filter.dateFrom);
+  if (filter.dateTo) query.set("date_to", filter.dateTo);
+  type Response = Page<{ test?: OwnerTest; external_test?: Parameters<typeof externalAdminItem>[0] }> & { status_counts: Record<string, number> };
+  const data = await domain<Response>(`/tests/${filter.bank ? "bank" : "catalog"}?${query}`, { signal: filter.signal });
+  if (!Array.isArray(data.items) || data.items.length > limit || data.limit !== limit || !Number.isSafeInteger(data.total) || data.total < 0 ||
+      !Number.isSafeInteger(data.offset) || data.offset < 0 || !data.status_counts || !Number.isSafeInteger(data.status_counts.all) ||
+      Object.values(data.status_counts).some(n => !Number.isSafeInteger(n) || n < 0)) {
+    throw new Error("Некорректный ответ страницы тестов. Проверьте версию сервера");
+  }
+  const items = data.items.map(row => {
+    if (row.test && !row.external_test) return testsListItem(remember(row.test));
+    if (row.external_test && !row.test) return externalAdminItem(row.external_test);
+    throw new Error("Некорректная карточка теста");
+  });
+  return { items, total: data.total, limit: data.limit, offset: data.offset, statusCounts: data.status_counts };
+}
+
 export async function testsCatalog(filter:TestsCatalogFilter={}):Promise<AdminTestListItem[]> {
   const query=new URLSearchParams();
   if(filter.direction)query.set("direction_id",String(await directionId(filter.direction)));
