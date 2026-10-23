@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { LoadingState } from "@/components/ui/loading-state";
 import { AdminUploadsBffPreview as UploadPreview, uploadPreviewCanCommit } from "./admin-uploads-bff-preview";
 import s from "./admin-upload.module.css";
+import { StudentImport } from "./student-import";
 
 interface CardDirection { id: number; name: string; sections: { kind: string; id?: number; name: string }[] }
 interface Target { id: string; name: string }
@@ -106,7 +107,7 @@ function Workspace() {
     try {
       const [c, ss, js] = await Promise.all([uploadCatalog(signal), uploadSessions(signal, limit), uploadJobs(signal, limit)]);
       if (signal?.aborted || generation !== loadGeneration.current) return;
-      setCatalog(c); setSessions(ss); setJobs(js); setTypesId(previous => c.types.some(t => t.type === previous) ? previous : c.types.find(t => t.create && ["owner_session", "validated_input"].includes(t.mode) && t.type !== "cards.transform")?.type ?? c.types[0]?.type ?? ""); setError(null);
+      setCatalog(c); setSessions(ss); setJobs(js); setTypesId(previous => c.types.some(t => t.type === previous) ? previous : c.types.find(t => !t.type.startsWith("users.") && t.create && ["owner_session", "validated_input"].includes(t.mode) && t.type !== "cards.transform")?.type ?? c.types[0]?.type ?? ""); setError(null);
     } catch (reason) { if (!signal?.aborted && generation === loadGeneration.current) setError(uploadError(reason).message); }
     finally { if (!signal?.aborted && generation === loadGeneration.current) setLoading(false); }
   }, [limit]);
@@ -243,7 +244,7 @@ function Workspace() {
           {session.file_id && session.type !== "users.credentials" && <Button variant="ghost" disabled={busy} onClick={() => { void perform(async () => saveBlob(await downloadUploadSource(session), `source.${selectedType?.formats[0] ?? "bin"}`)); }}>Скачать исходный файл</Button>}
         </div>
       </section> : <>
-        <div className={s.typeListHorizontal}>{catalog.types.map(item => <button key={item.type} type="button" className={`${s.typeCard} ${typesId === item.type ? s.typeCardActive : ""}`} disabled={disabled} onClick={() => setTypesId(item.type)}><span className={s.typeCardHead}><strong className={s.typeCardLabel}>{uploadLabels[item.type] ?? item.type}</strong><span className={`${s.badge} ${item.create ? s.badgeReady : s.badgeSoon}`}>{item.formats.join(" / ").toUpperCase()}</span></span><span className={s.typeCardDesc}>{item.mode === "unavailable" ? "Ожидает подключения" : !item.create ? "Просмотр" : ["owner_session", "validated_input"].includes(item.mode) ? item.commit ? "Предпросмотр и подтверждение" : "Предпросмотр; применение ожидает доступа" : "В соответствующем разделе"}</span></button>)}</div>
+        <div className={s.typeListHorizontal}>{catalog.types.filter(item=>!item.type.startsWith("users.")).map(item => <button key={item.type} type="button" className={`${s.typeCard} ${typesId === item.type ? s.typeCardActive : ""}`} disabled={disabled} onClick={() => setTypesId(item.type)}><span className={s.typeCardHead}><strong className={s.typeCardLabel}>{uploadLabels[item.type] ?? item.type}</strong><span className={`${s.badge} ${item.create ? s.badgeReady : s.badgeSoon}`}>{item.formats.join(" / ").toUpperCase()}</span></span><span className={s.typeCardDesc}>{item.mode === "unavailable" ? "Ожидает подключения" : !item.create ? "Просмотр" : ["owner_session", "validated_input"].includes(item.mode) ? item.commit ? "Предпросмотр и подтверждение" : "Предпросмотр; применение ожидает доступа" : "В соответствующем разделе"}</span></button>)}</div>
         {!catalog.types.length && <div className={s.stateBox}>Нет доступных форматов. Нужны права на загрузку и соответствующий раздел.</div>}
         {type && <section className={s.main}><h2 className={s.mainTitle}>{uploadLabels[type.type] ?? type.type}</h2>
           {type.mode === "unavailable" ? <p>{"Источник пока не поддерживает этот формат."}</p> : type.type === "cards.transform" ? <p>Выбор карточек и создание черновика доступны в <Link href={adminHref(user, "train")}>разделе карточек</Link>.</p> : type.mode === "owner_direct_s3" || type.mode === "owner_attachment" ? <p>Загрузите файл в <Link href={adminHref(user, type.type === "homework.pdf" ? "assignments" : "zaps")}>соответствующем разделе</Link>; там сохраняется его состояние и доступ.</p> : <>
@@ -302,5 +303,7 @@ function Workspace() {
 export function AdminUploadsBffWorkspace() {
   const { user } = useAuth();
   if (!user?.division_id) return <div className={s.stateBox}>Выберите подразделение в меню кабинетов, чтобы открыть загрузки.</div>;
-  return <Workspace key={`${user.account_id}:${user.organization_id}:${user.division_id}`} />;
+return <UploadModes key={`${user.account_id}:${user.organization_id}:${user.division_id}`} />;
 }
+
+function UploadModes(){const {user}=useAuth();const [other,setOther]=useState(!user?.organization_admin);return <><div className={s.actions}>{user?.organization_admin&&<Button variant={other?"secondary":"primary"} onClick={()=>setOther(false)}>Ученики · Excel</Button>}<Button variant={other?"primary":"secondary"} onClick={()=>setOther(true)}>Другие загрузки и журнал</Button></div>{other?<Workspace/>:<StudentImport/>}</>;}

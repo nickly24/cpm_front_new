@@ -7,7 +7,7 @@ export interface CoreUser { account_id:number; profile_id:number; role:string; f
 export interface CoreGroup { id:number; name:string; student_count:number; proctor_account_id:number|null }
 export interface CoreRole { id:number; name:string; permissions:{section:string;can_view:boolean|number;can_edit:boolean|number}[] }
 export interface CoreDashboard { organization_id:number; division_id:number; division_name:string; role:string; totals:{students:number|null;staff:number|null;groups:number|null;schools:number|null}; capabilities:string[] }
-export interface CoreCreateUser { role:string; full_name:string; class:number; tg_name:string; school_id:number|null; group_id:number|null; role_id:number|null; login:string; password:string }
+export interface CoreCreateUser { role:string; full_name:string; class:number|null; tg_name:string; school_id:number|null; group_id:number|null; role_id:number|null; login:string; password:string }
 export type CoreProfilePatch = Partial<Pick<CoreUser,"full_name"|"class"|"tg_name"|"school_id"|"group_id"|"role_id"|"login">> & {password?:string};
 
 export function coreCan(section:string, edit=false, user:User|undefined|null=getIdentity()?.user):boolean {
@@ -37,7 +37,7 @@ export const coreRoles=async(signal?:AbortSignal) => (await domain<{roles:CoreRo
 export const coreDashboard=(signal?:AbortSignal) => domain<CoreDashboard>("/core/dashboard",{signal});
 export function mapCoreStudent(row:CoreUser,schools:AdminSchool[]=[],groups:CoreGroup[]=[]):AdminStudent {
   const school=schools.find(s=>s.school_id===row.school_id);
-  return {id:id(row.account_id),profile_id:row.profile_id,full_name:row.full_name,class:row.class??0,group_id:row.group_id,group_name:groups.find(g=>g.id===row.group_id)?.name??null,school_id:row.school_id,school_name:school?.name??null,school_short_name:school?.short_name??null,tg_name:row.tg_name,login:row.login,password:null,password_hidden:true,is_active:active(row.is_active),role_id:row.role_id};
+  return {id:id(row.account_id),profile_id:row.profile_id,full_name:row.full_name,class:row.class,group_id:row.group_id,group_name:groups.find(g=>g.id===row.group_id)?.name??null,school_id:row.school_id,school_name:school?.name??null,school_short_name:school?.short_name??null,tg_name:row.tg_name,login:row.login,password:null,password_hidden:true,is_active:active(row.is_active),role_id:row.role_id};
 }
 export function mapCoreStaff(row:CoreUser,groups:CoreGroup[]=[]):AdminStaffUser {
   return {id:id(row.account_id),profile_id:row.profile_id,full_name:row.full_name,group_id:row.group_id,group_name:groups.find(g=>g.id===row.group_id)?.name??null,login:row.login,password:null,password_hidden:true,is_active:active(row.is_active),role_id:row.role_id};
@@ -50,13 +50,13 @@ export const coreSchool=async(schoolId:number) => mapCoreSchool(await domain<Par
 const labels:Record<string,string>={division_required:"Выберите подразделение в меню кабинетов",transport_error:"Не удалось получить ответ сервера. Обновите данные",login_exists:"Этот логин уже используется",invalid_user:"Проверьте ФИО, логин и пароль (не менее 8 символов)",invalid_profile:"Проверьте поля профиля",invalid_credentials:"Укажите логин и новый пароль (не менее 8 символов)",global_profile_requires_organization_admin:"Профиль используется в нескольких подразделениях. Его изменяет администратор организации",conflict:"Изменение конфликтует с текущими данными. Обновите список",cannot_disable_self:"Нельзя заблокировать свою учётную запись",inactive_user:"Сначала активируйте пользователя",dependency_unavailable:"Сервис временно недоступен"};
 export function coreError(error:unknown):Error { const e=error as Error & {code?:string;status?:number}; return Object.assign(new Error(labels[e.code??""]??e.message??"Не удалось выполнить запрос"),{code:e.code,status:e.status}); }
 export function coreUncertain(error:unknown):boolean { const status=(error as {status?:number})?.status; return status===0||status===502||status===503||status===504; }
-interface PendingCreate {scope:string;role:string;full_name:string;class:number;login:string;school_id:number|null;group_id:number|null;role_id:number|null}
+interface PendingCreate {scope:string;role:string;full_name:string;class:number|null;login:string;school_id:number|null;group_id:number|null;role_id:number|null}
 const journalKey=() => `cpm-core-create:${scope()}`;
 export function pendingCoreCreate():PendingCreate|null { try { return JSON.parse(sessionStorage.getItem(journalKey())??"null"); } catch { return null; } }
 export async function recoverCoreCreate():Promise<{account_id:number}> {
   const pending=pendingCoreCreate(); if(!pending) throw new Error("Нет запроса для проверки");
   const candidates=(await coreUsers(pending.role)).filter(u=>u.login===pending.login);
-  const found=candidates.find(u=>u.full_name===pending.full_name&&(u.class??0)===pending.class&&u.school_id===pending.school_id&&u.group_id===pending.group_id&&u.role_id===pending.role_id);
+  const found=candidates.find(u=>u.full_name===pending.full_name&&(u.class??0)===(pending.class??0)&&u.school_id===pending.school_id&&u.group_id===pending.group_id&&u.role_id===pending.role_id);
   if(!found) throw new Error(candidates.length?"Логин занят другим профилем. Обновите список и проверьте данные.":"Учётная запись пока не найдена. Обновите список перед повторным созданием.");
   assertScope(pending.scope); sessionStorage.removeItem(journalKey()); return {account_id:found.account_id};
 }
@@ -93,7 +93,7 @@ export async function updateCoreUser(accountId:number,patch:CoreProfilePatch):Pr
   }
   try {
     if(["full_name","class","tg_name","school_id"].some(key=>Object.prototype.hasOwnProperty.call(patch,key))) {
-      await domain(`/core/users/${id(accountId)}`,{method:"PUT",body:JSON.stringify({full_name:patch.full_name??row.full_name,class:patch.class??row.class??0,tg_name:patch.tg_name??row.tg_name??"",school_id:patch.school_id===undefined?row.school_id:patch.school_id})});
+      await domain(`/core/users/${id(accountId)}`,{method:"PUT",body:JSON.stringify({full_name:patch.full_name??row.full_name,class:patch.class===undefined?row.class:patch.class,tg_name:patch.tg_name??row.tg_name??"",school_id:patch.school_id===undefined?row.school_id:patch.school_id})});
     }
     assertScope(snapshot);
     if(patch.login!==undefined||patch.password!==undefined) await domain(`/core/users/${id(accountId)}/credentials`,{method:"PUT",body:JSON.stringify({login:patch.login??row.login,password:patch.password})});

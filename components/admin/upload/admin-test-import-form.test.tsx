@@ -13,7 +13,7 @@ vi.mock("@/lib/bff/uploads",async(importOriginal)=>({
 import { AdminUploadsBffWorkspace } from "./admin-uploads-bff-workspace";
 afterEach(()=>{cleanup();vi.clearAllMocks()});
 it("offers actual subdivisions and Excel files with hidden defaults and dates",async()=>{
- render(<AdminUploadsBffWorkspace/>);
+ render(<AdminUploadsBffWorkspace/>);fireEvent.click(screen.getByRole("button",{name:"Другие загрузки и журнал"}));
  const division=await screen.findByLabelText("Подразделение для теста");
  expect((division as HTMLSelectElement).value).toBe("11");expect(screen.getByRole("option",{name:"Другое подразделение"})).toBeTruthy();
  const input=screen.getByLabelText("Файл") as HTMLInputElement;expect(input.accept).toContain(".xlsx");
@@ -24,7 +24,7 @@ it("offers actual subdivisions and Excel files with hidden defaults and dates",a
  fireEvent.click(screen.getByRole("button",{name:"Убрать файл"}));expect((division as HTMLSelectElement).disabled).toBe(false);expect(screen.queryByLabelText("Опубликовать")).toBeNull();
 });
 it("changes the authenticated context before selecting a source file",async()=>{
- render(<AdminUploadsBffWorkspace/>);const division=await screen.findByLabelText("Подразделение для теста");
+ render(<AdminUploadsBffWorkspace/>);fireEvent.click(screen.getByRole("button",{name:"Другие загрузки и журнал"}));const division=await screen.findByLabelText("Подразделение для теста");
  fireEvent.change(division,{target:{value:"12"}});
  await waitFor(()=>expect(state.request).toHaveBeenCalledWith("/auth/context",{method:"POST",body:JSON.stringify({organization_id:7,division_id:12})}));
 });

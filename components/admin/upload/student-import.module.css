@@ -1,0 +1,161 @@
+.page {
+  padding: 24px;
+  display: grid;
+  gap: 18px;
+  min-width: 0;
+  background: var(--surface, #fff);
+  border-radius: 16px;
+}
+.header {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+.header h2 {
+  font-size: 24px;
+  margin: 0 0 8px;
+}
+.hint {
+  color: #607269;
+  font-size: 14px;
+  line-height: 1.6;
+  margin: 0;
+}
+.actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.field {
+  display: grid;
+  gap: 6px;
+  font-size: 14px;
+  max-width: 430px;
+}
+.field select,
+.field input,
+.cell input {
+  border: 1px solid #cedbd3;
+  border-radius: 7px;
+  padding: 10px;
+  background: white;
+  color: #20372a;
+}
+.notice {
+  padding: 14px 18px;
+  background: #f1f7f3;
+  border: 1px solid #c5dccc;
+  border-radius: 10px;
+  line-height: 1.6;
+}
+.error {
+  color: #a82d34;
+  font-size: 13px;
+  margin: 4px 0;
+}
+.tableWrap {
+  overflow: auto;
+  max-height: 65dvh;
+  min-height: 280px;
+  border: 1px solid #d7e2db;
+  border-radius: 10px;
+}
+.table {
+  border-collapse: separate;
+  border-spacing: 0;
+  min-width: 1200px;
+  width: 100%;
+  font-size: 14px;
+}
+.table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  text-align: left;
+  padding: 12px;
+  background: #edf5f0;
+  color: #255238;
+}
+.table td {
+  border-top: 1px solid #e1e9e4;
+  padding: 8px;
+  vertical-align: top;
+}
+.table th:first-child,
+.table td:first-child {
+  position: sticky;
+  left: 0;
+  background: #f3f7f5;
+  min-width: 48px;
+}
+.cell input {
+  width: 100%;
+  min-width: 135px;
+  box-sizing: border-box;
+}
+.name input {
+  min-width: 280px;
+}
+.cell input[aria-invalid="true"] {
+  border-color: #c44b55;
+  background: #fff7f7;
+}
+.cell input:disabled {
+  color: #486153;
+  background: #f7f9f8;
+}
+.password {
+  font-family: monospace;
+  max-width: 200px;
+  overflow-wrap: anywhere;
+}
+.stats {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+  font-size: 16px;
+}
+.progress {
+  width: 100%;
+  accent-color: #357b5a;
+  height: 12px;
+}
+.pages {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+.toolbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.panel {
+  display: grid;
+  gap: 12px;
+}
+.recent {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+@media (max-width: 700px) {
+  .page {
+    padding: 14px;
+  }
+  .header h2 {
+    font-size: 20px;
+  }
+  .tableWrap {
+    max-height: 60dvh;
+  }
+  .notice {
+    padding: 10px;
+  }
+  .stats {
+    gap: 12px;
+  }
+}

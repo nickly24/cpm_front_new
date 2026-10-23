@@ -54,6 +54,7 @@ async function request<T>(path: string, options: RequestInit, binary: boolean): 
         const labels: Record<string,string> = { invalid_credentials: "Неверный логин или пароль", session_expired: "Сессия завершена. Войдите снова", access_denied: "Недостаточно прав в выбранном кабинете", upstream_unavailable: "Сервис временно недоступен", section_not_connected: "Этот раздел пока недоступен" };
         throw Object.assign(new Error(labels[data.error] || data.error || "Ошибка сервера"), { status: res.status, code: data.error,
           retryAfterMs: parseRetryAfterMs(res.headers?.get("Retry-After")),
+          ...(data.error === "student_import_validation" && Array.isArray(data.issues) ? {issues:data.issues} : {}),
         });
       }
       return data as T;

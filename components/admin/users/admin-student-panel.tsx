@@ -36,7 +36,7 @@ export function AdminStudentPanel({
   const { user } = useAuth();
   useContextGuard(BFF_DEV);
   const [fullName, setFullName] = useState(student?.full_name ?? "");
-  const [classNumber, setClassNumber] = useState(String(student?.class ?? 9));
+  const [classNumber, setClassNumber] = useState(student?.class ? String(student.class) : "");
   const [tgName, setTgName] = useState(student?.tg_name ?? "");
   const [login, setLogin] = useState(student?.login ?? "");
   const [password, setPassword] = useState(student?.password ?? "");
@@ -65,8 +65,8 @@ export function AdminStudentPanel({
       setError("Укажите ФИО");
       return;
     }
-    const parsedClass = Number(classNumber);
-    if (!Number.isInteger(parsedClass) || parsedClass <= 0 || (BFF_DEV && parsedClass > 99)) {
+    const parsedClass = BFF_DEV && !classNumber.trim() ? null : Number(classNumber);
+    if (parsedClass !== null && (!Number.isInteger(parsedClass) || parsedClass <= 0 || (BFF_DEV && parsedClass > 99))) {
       setError(BFF_DEV ? "Класс должен быть целым числом от 1 до 99" : "Класс должен быть положительным целым числом");
       return;
     }
@@ -101,7 +101,7 @@ export function AdminStudentPanel({
       const payload: {
         student_id: number;
         full_name?: string;
-        class?: number;
+        class?: number | null;
         group_id?: number | null;
         tg_name?: string | null;
         login?: string;
@@ -184,7 +184,7 @@ export function AdminStudentPanel({
           </label>
 
           <label className={userStyles.field}>
-            <span className={userStyles.fieldLabel}>Класс</span>
+            <span className={userStyles.fieldLabel}>Класс{BFF_DEV ? " (необязательно)" : ""}</span>
             <input
               type="number"
               min="1"
@@ -193,7 +193,7 @@ export function AdminStudentPanel({
               className={userStyles.fieldInput}
               value={classNumber}
               onChange={(e) => setClassNumber(e.target.value)}
-              required
+              required={!BFF_DEV}
             />
           </label>
 

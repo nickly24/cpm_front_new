@@ -10,7 +10,7 @@ export interface AdminStudent {
   group_name?: string | null;
   student_id?: number;
   full_name: string;
-  class: number;
+  class: number | null;
   group_id: number | null;
   school_id?: number | null;
   school_name?: string | null;
@@ -113,7 +113,7 @@ export interface AdminGroupsSearchResponse {
   students: {
     id: number;
     full_name: string;
-    class: number;
+    class: number | null;
     group_id: number | null;
     group_name: string | null;
     school_id: number | null;
@@ -132,7 +132,7 @@ export interface AdminStudentFormData {
   login?: string;
   password?: string;
   full_name: string;
-  class: number;
+  class: number | null;
   tg_name?: string;
 }
 
@@ -142,7 +142,7 @@ export interface AdminStudentAddResponse {
   student_data?: {
     student_id: number;
     full_name: string;
-    class: number;
+    class: number | null;
     login: string;
     password: string;
     group_id: null;

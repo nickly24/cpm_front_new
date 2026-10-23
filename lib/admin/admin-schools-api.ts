@@ -112,7 +112,7 @@ export async function searchAdminStudentsForSchool(
   {
     id: number;
     full_name: string;
-    class: number;
+    class: number | null;
     group_id: number | null;
     group_name: string | null;
     school_id: number | null;
@@ -128,7 +128,7 @@ export async function searchAdminStudentsForSchool(
     students: {
       id: number;
       full_name: string;
-      class: number;
+      class: number | null;
       group_id: number | null;
       group_name: string | null;
       school_id: number | null;

@@ -53,7 +53,7 @@ export function AdminStudentsTab() {
   const canDelete = !BFF_DEV && canAccessSection(user, "users", "edit");
 
   const classOptions = useMemo(
-    () => Array.from(new Set(students.map((student) => student.class))).sort((a, b) => a - b),
+    () => Array.from(new Set(students.map((student) => student.class).filter((v):v is number=>v!==null))).sort((a, b) => a - b),
     [students],
   );
 
@@ -215,7 +215,7 @@ export function AdminStudentsTab() {
             >
               <option value="all">Все</option>
               {classOptions.map((classNumber) => (
-                <option key={classNumber} value={classNumber}>
+                <option key={classNumber} value={classNumber??""}>
                   {classNumber}
                 </option>
               ))}

@@ -84,7 +84,7 @@ describe("Core access owner contracts", () => {
     state.domain.mockResolvedValueOnce(staff).mockResolvedValueOnce(staff).mockResolvedValue(null);
     expect(await saveCoreAccessUser({ full_name: "Другое имя", login: "staff", role_id: 4, is_active: false }, 45)).toEqual({ status: true, id: 45 });
     expect(state.domain.mock.calls.map(call => call[0])).toEqual(["/core/users/45", "/core/users/45", "/core/users/45", "/core/memberships/45", "/core/users/45/active"]);
-    expect(JSON.parse(state.domain.mock.calls[2][1].body)).toEqual({ full_name: "Другое имя", class: 0, tg_name: "keep", school_id: null });
+    expect(JSON.parse(state.domain.mock.calls[2][1].body)).toEqual({ full_name: "Другое имя", class: null, tg_name: "keep", school_id: null });
     expect(storage.size).toBe(0);
   });
   it("returns a submitted password only as an immediate save result and never journals it", async () => {

@@ -176,7 +176,7 @@ export async function addAdminStudent(
 export async function editAdminStudent(payload: {
   student_id: number;
   full_name?: string;
-  class?: number;
+  class?: number | null;
   group_id?: number | null;
   tg_name?: string | null;
   login?: string;
