@@ -4,6 +4,7 @@
   gap: 18px;
   min-width: 0;
   background: var(--surface, #fff);
+  color: #20372a;
   border-radius: 16px;
 }
 .header {
