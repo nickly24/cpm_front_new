@@ -5,7 +5,7 @@ export type PreviewInput = Record<string, PreviewValue>;
 export interface PreviewRow {
   id:string; source:number; input:PreviewInput; excluded:boolean; errors:string[]; warnings:string[];
   literalErrors?:boolean; caption?:string; candidates?:{account_id:number; full_name:string}[];
-  unavailableFields?:string[];
+  unavailableFields?:string[]; fieldErrors?:Record<string,string[]>;
 }
 export interface PreviewView {
   kind:"core"|"legacy"|"cards"|"transform"|"exams"|"tests"|"external"|"unsupported";
@@ -13,6 +13,7 @@ export interface PreviewView {
   nativeCanCommit?:boolean; fields?:string[]; summary?:{label:string; value:PreviewValue}[]; issues?:string[];
   editBlockedReason?:string;
 }
+export const questionTableFields = ["title", "number", "category", "question", "options", "answer"];
 export const legacyFields = ["full_name", "class_raw", "school_name", "proctor_name", "tg_name"];
 export const externalFields = ["full_name", "account_id", "legacy_student_id", "percent", "correct_count", "completed_at", "time_spent", "login"];
 const externalIdFields = ["account_id", "legacy_student_id"];
@@ -75,6 +76,28 @@ export function nativeUploadView(session:UploadSession):PreviewView|null {
       values.correct_answers=Array.isArray(question.correct_answers)?question.correct_answers.filter(value=>typeof value === "string").join("\n"):"";
       return {id:String(question.question_id || index+1),source:index+1,input:values,excluded:false,errors:[],warnings:[]};
     });
+    const source=record(owner.source_table);
+    if (source.importFormat === "question_table" && Array.isArray(source.rows)) {
+      const tableRows:PreviewRow[]=source.rows.map((value,index)=>{
+        const raw=record(value), fieldErrors:Record<string,string[]>={};
+        const errors=(Array.isArray(preview.errors)?preview.errors:[]).flatMap(value=>{
+          const error=record(value), path=text(error.path), match=path.match(/^(rows|questions)\[(\d+)\](?:\.(.+))?$/);
+          if (!match || Number(match[2])!==index) return [];
+          const rawField=(match[3]||"").split(/[.\[]/)[0];
+          const field=match[1]==="rows"?rawField:({questionId:"number",question_id:"number",type:"category",text:"question",answers:"options",correctAnswers:"answer",correct_answers:"answer"} as Record<string,string>)[rawField]||rawField;
+          const message=text(error.message)||"Проверьте значение";
+          if (questionTableFields.includes(field)) (fieldErrors[field]??=[]).push(message);
+          return [message];
+        });
+        const rowWarnings=(Array.isArray(preview.warnings)?preview.warnings:[]).filter((value):value is string=>typeof value==="string" && value.startsWith(`Строка ${raw.row}:`));
+        return {id:`source-${index}`,source:count(raw.row)??0,input:input(raw,questionTableFields),excluded:false,errors,warnings:rowWarnings,literalErrors:true,fieldErrors,caption:`Вопрос ${text(raw.number)||index+1}`};
+      });
+      const globalIssues=(Array.isArray(preview.errors)?preview.errors:[]).flatMap(value=>{const error=record(value);return /^(rows|questions)\[\d+\]/.test(text(error.path))?[]:[text(error.message)||"Проверьте настройки теста"];});
+      return {...base,kind:"tests",rows:tableRows,total:tableRows.length,partial:tableRows.length!==questions.length,fields:questionTableFields,nativeCanCommit:preview.valid===true,
+        valid:scoped(preview,session) && typeof preview.valid==="boolean" && distinct(tableRows) && tableRows.length>0 && tableRows.length<=200,
+        target:text(test.title)||text(preview.source_title),issues:globalIssues,
+        summary:summary(preview.summary,{errors_count:"Всего ошибок",total_points:"Баллов"})};
+    }
     const total=count(record(preview.summary).questions_total)??0;
     const issues=Array.isArray(preview.errors)?preview.errors.map(value=>{const error=record(value);return `${text(error.path)}: ${text(error.message)||"Источник не подтвердил данные"}`;}):[];
     const settings=record(test.settings);
@@ -90,6 +113,18 @@ export function nativeUploadView(session:UploadSession):PreviewView|null {
 /** Whole native snapshot, including untouched rows on other pages; no scope or coordinator revision. */
 export function nativeUploadEditPayload(session:UploadSession, changes:Record<string,{input:PreviewInput;excluded:boolean}>):Record<string,unknown>|null {
   const current=nativeUploadView(session);
+  if (current?.kind === "tests" && record(record(session.preview).source_table).importFormat === "question_table") {
+    if (!current.valid || current.partial) throw new Error("Нужен полный предпросмотр источника");
+    if (Object.keys(changes).some(id=>!current.rows.some(row=>row.id===id))) throw new Error("Строка больше не существует");
+    const source=record(record(session.preview).source_table), originals=source.rows as unknown[];
+    const rows=current.rows.map((row,index)=>{
+      const values=changes[row.id]?.input??row.input, original=record(originals[index]);
+      const cellErrors={...record(original.cell_errors)};
+      for (const field of questionTableFields) if(values[field]!==row.input[field]) delete cellErrors[field];
+      return {row:row.source,...Object.fromEntries(questionTableFields.map(field=>[field,text(values[field])])),...(Object.keys(cellErrors).length?{cell_errors:cellErrors}:{})};
+    });
+    return {payload:{importFormat:"question_table",rows,metadata:record(source.metadata)}};
+  }
   if (!current || !["legacy","external"].includes(current.kind)) return null;
   if (current.editBlockedReason) throw new Error(current.editBlockedReason);
   if (!current.valid || current.partial) throw new Error("Нужен полный предпросмотр источника");

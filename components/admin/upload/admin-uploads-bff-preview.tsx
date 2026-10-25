@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import type { UploadSession } from "@/lib/bff/uploads";
 import { Button } from "@/components/ui/button";
 import shared from "./admin-upload.module.css";
@@ -27,6 +27,7 @@ const strings = (value: unknown) => value === undefined || value === null ? [] :
 const numberFields = new Set(["studentId", "points", "grade", "replacementLimit", "account_id", "legacy_student_id", "percent", "correct_count", ...Array.from({ length: 6 }, (_, i) => `examinator${i + 1}Id`)]);
 const coreFields = ["full_name", "role", "class", "login", "school_id", "group_id"];
 const fieldLabels: Record<string, string> = {
+  title:"Название теста", number:"Номер вопроса", category:"Категория вопроса", options:"Варианты ответов",
   class_raw: "Класс из файла", school_name: "Школа", proctor_name: "Проктор", tg_name: "Контакт (tg_name)", account_id: "ID аккаунта ученика", legacy_student_id: "ID профиля ученика", percent: "Процент из файла", correct_count: "Верных ответов из файла", completed_at: "Дата результата", time_spent: "Затраченное время", question_id: "ID вопроса", type: "Тип вопроса", text: "Вопрос", answers: "Варианты (✓ — правильный)", correct_answers: "Эталонные ответы", full_name: "ФИО", role: "Роль", class: "Класс", login: "Логин", school_id: "ID школы", group_id: "ID группы",
   question: "Вопрос", answer: "Ответ", partCode: "Код части", questionText: "Вопрос", answerText: "Эталонный ответ",
   studentId: "ID аккаунта ученика", studentLogin: "Логин ученика", points: "Баллы", grade: "Оценка", examinator: "Экзаменатор", replacementLimit: "Лимит замен",
@@ -107,7 +108,8 @@ function normalizedInput(input: Input, fields: string[]): Input {
 /** Build only the native owner edit shape; coordinator supplies expected_revision. */
 export function uploadPreviewEditPayload(session: UploadSession, changes: Record<string, Change>): Record<string, unknown> {
   const current = view(session);
-  if (!active(session, current.ownerState) || !current.valid || current.partial || !["cards", "exams", "legacy", "external"].includes(current.kind)) throw new Error("Этот предпросмотр нельзя редактировать");
+  if (!active(session, current.ownerState) || !current.valid || current.partial || !["cards", "exams", "legacy", "external", "tests"].includes(current.kind)) throw new Error("Этот предпросмотр нельзя редактировать");
+  if (current.kind === "tests" && !record(ownerPreview(session).source_table).importFormat) throw new Error("Для этого формата загрузите исправленный файл");
   const native = nativeUploadEditPayload(session, changes);
   if (native) return native;
   const ids = new Set(current.rows.map(row => row.id));
@@ -141,6 +143,7 @@ function PreviewEditor({ session, editable, busy, onSave, onDirty }: Props) {
   const current = view(session);
   const [changes, setChanges] = useState<Record<string, Change>>({});
   const [page, setPage] = useState(0), [size, setSize] = useState(20), [onlyErrors, setOnlyErrors] = useState(false);
+  const [expanded, setExpanded] = useState<string|null>(null);
   const [saving, setSaving] = useState(false), [error, setError] = useState("");
   const [, expiredTick] = useState(0);
   const dirty = Object.keys(changes).length > 0, callback = useRef(onDirty), running = useRef(false);
@@ -153,7 +156,7 @@ function PreviewEditor({ session, editable, busy, onSave, onDirty }: Props) {
     const timer = setTimeout(() => expiredTick(value => value + 1), Math.min(remaining + 1, 2147483647));
     return () => clearTimeout(timer);
   }, [session.expires_at]);
-  const canEdit = editable && active(session, current.ownerState) && current.valid && !current.partial && !current.editBlockedReason && ["cards", "exams", "legacy", "external"].includes(current.kind);
+  const canEdit = (current.kind !== "tests" || !!record(ownerPreview(session).source_table).importFormat) && editable && active(session, current.ownerState) && current.valid && !current.partial && !current.editBlockedReason && ["cards", "exams", "legacy", "external", "tests"].includes(current.kind);
   const disabled = !canEdit || busy || saving;
   const filtered = current.rows.filter(row => !onlyErrors || row.errors.length > 0);
   const pages = Math.max(1, Math.ceil(filtered.length / size)), selectedPage = Math.min(page, pages - 1), visible = filtered.slice(selectedPage * size, (selectedPage + 1) * size);
@@ -168,17 +171,20 @@ function PreviewEditor({ session, editable, busy, onSave, onDirty }: Props) {
     catch { setError("Изменения не подтверждены. Проверьте исход сохранения в журнале загрузок."); }
     finally { running.current = false; setSaving(false); }
   };
+  const columnLabel = (field:string) => current.kind === "tests" && field === "answer" ? "Правильный ответ" : fieldLabel(field);
   const columns = current.fields ?? (current.kind === "core" ? coreFields : current.kind === "exams" ? examFields(session.type) : ["question", "answer"]);
+  const compactQuestions = current.kind === "tests" && record(ownerPreview(session).source_table).importFormat === "question_table";
+  const fields = (row:Row, local:Change) => <div className={styles.fields}>{columns.map(field => <label className={styles.field} key={field}><span>{columnLabel(field)}</span>{canEdit ? <textarea aria-invalid={!!row.fieldErrors?.[field]?.length} aria-describedby={row.fieldErrors?.[field]?.length ? `${row.id}-${field}-errors` : undefined} rows={["question","options","answer","questionText","answerText"].includes(field) ? 3 : 1} inputMode={numberFields.has(field) ? "decimal" : undefined} value={local.input[field] ?? ""} disabled={disabled || local.excluded && ["cards", "exams"].includes(current.kind)} aria-label={`${columnLabel(field)}, строка ${row.source}`} onChange={event => change(row, { input: { ...local.input, [field]: event.target.value } })} /> : <span className={styles.value}>{row.unavailableFields?.includes(field) ? "ID не отображается: точное значение недоступно" : String(local.input[field] ?? "—")}</span>}{row.fieldErrors?.[field]?.length ? <span className={styles.error} id={`${row.id}-${field}-errors`}>{row.fieldErrors[field].join("; ")}</span> : null}</label>)}</div>;
   return <section className={shared.previewWrap} aria-label="Предпросмотр загрузки">
     <div className={shared.previewHeader}><div><h2 className={shared.mainTitle}>Предпросмотр</h2><p className={shared.hint}>Сохранённые данные источника. Изменения проверяются перед применением.</p></div>{canEdit && <div className={shared.actions}><Button disabled={busy || saving || !dirty} onClick={() => void save()}>{saving ? "Сохранение…" : "Сохранить правки"}</Button><Button variant="ghost" disabled={busy || saving || !dirty} onClick={() => { setChanges({}); setError(""); }}>Отменить мои правки</Button></div>}</div>
-    <div className={shared.summaryGrid}><span className={shared.statPill}>Строк: <strong>{current.total}</strong></span>{current.kind !== "core" && <><span className={shared.statPill}>Включено: <strong>{included.length}</strong></span><span className={shared.statPill}>Ошибок: <strong>{errors}</strong></span></>}</div>
+    <div className={shared.summaryGrid}><span className={shared.statPill}>Строк: <strong>{current.total}</strong></span>{current.kind !== "core" && <><span className={shared.statPill}>Включено: <strong>{included.length}</strong></span><span className={shared.statPill}>Строк с ошибками: <strong>{errors}</strong></span></>}</div>
     {current.summary?.length ? <div className={shared.summaryGrid}>{current.summary.map(item => <span key={item.label} className={shared.statPill}>{item.label}: <strong>{String(item.value ?? "—")}</strong></span>)}</div> : null}
     {current.issues?.length ? <ul className={styles.warning}>{current.issues.map((issue, index) => <li key={index}>{issue}</li>)}</ul> : null}
     {current.editBlockedReason && <p className={styles.warning}>{current.editBlockedReason}</p>}
     {current.target && <p className={current.collision ? styles.warning : styles.note}>{current.kind === "transform" ? `Черновик: ${current.target}` : current.target}</p>}
     {current.kind === "core" && <p className={styles.note}>Учётные данные уже проверены источником. Предпросмотр не редактируется; пароли не показываются.</p>}
     {current.kind === "legacy" && <p className={styles.note}>Сопоставления и решение о применении проверяет Core. Правки отправляются полным снимком строк; существующие ученики пропускаются. Максимум 100 строк. Новые учётные записи требуют сброса пароля; пароли здесь не создаются и не выдаются.</p>}
-    {current.kind === "tests" && <p className={styles.note}>Нормализация Excel / JSON / OnlineTestPad и проверка выполнены Tests. Для правок загрузите исправленный файл: источник не возвращает исходный редактируемый payload. Баллы и правильные ответы показаны по его превью.</p>}
+    {current.kind === "tests" && <p className={styles.note}>Откройте строку, исправьте поля и сохраните правки. Импорт доступен после проверки без ошибок.</p>}
     {current.kind === "external" && <p className={styles.note}>Внешний тест закреплён за загрузкой. Проценты сохраняются как в источнике, без пересчёта по числу ответов. Выберите аккаунт при неоднозначном совпадении; сопоставление и оценку проверяет Tests.</p>}
     {current.kind === "transform" && <p className={styles.note}>Преобразование использует сохранённый порядок выбранных карточек. Снимок не редактируется.</p>}
     {!active(session, current.ownerState) && <p className={styles.note}>Предпросмотр доступен только для чтения: загрузка завершена, срок истёк или требуется проверить её состояние.</p>}
@@ -187,10 +193,21 @@ function PreviewEditor({ session, editable, busy, onSave, onDirty }: Props) {
     {dirty && <p className={styles.warning} role="status">Есть несохранённые правки. Сохраните их и дождитесь проверки источником перед применением загрузки.</p>}
     {error && <p className={styles.error} role="alert">{error}</p>}
     {current.rows.length > 0 && <><div className={shared.previewFilters}><label className={styles.check}><input type="checkbox" checked={onlyErrors} onChange={event => { setOnlyErrors(event.target.checked); setPage(0); }} />Только строки с ошибками</label><label className={styles.pageSize}>Строк на странице<select value={size} onChange={event => { setSize(Number(event.target.value)); setPage(0); }}><option value={20}>20</option><option value={50}>50</option></select></label></div>
-      <div className={styles.rows}>{visible.map(row => {
+      {compactQuestions ? <div className={styles.compactWrap}><table className={styles.compactTable} aria-label="Вопросы из Excel"><thead><tr><th>№</th><th>Строка Excel</th><th>Вопрос</th><th>Правильный ответ</th><th>Проверка</th><th><span className={styles.srOnly}>Редактирование</span></th></tr></thead><tbody>{visible.map(row => {
+ const local=changes[row.id]??row;
+ const label=String(local.input.number??row.source);
+ const messages=[...row.errors,...row.warnings];
+ return <Fragment key={row.id}><tr className={row.errors.length ? styles.invalidRow : undefined}>
+ <td>{label}</td><td>{row.source}</td><td><span className={styles.cellText} title={String(local.input.question??"")}>{String(local.input.question??"")||"Без текста"}</span></td>
+ <td><span className={`${styles.cellText} ${row.fieldErrors?.answer?.length?styles.error:""}`} title={String(local.input.answer??"")}>{String(local.input.answer??"")||"—"}</span></td>
+ <td><span className={row.errors.length?styles.error:row.warnings.length?styles.warning:styles.ok} title={messages.join("; ")}>{row.errors.length?row.errors.length===1?"Ошибка":`${row.errors.length} ошибок`:row.warnings.length?"Проверьте":"Готово"}</span>{Object.keys(row.fieldErrors??{}).length>0 && <span className={styles.cellHint}>{Object.keys(row.fieldErrors??{}).map(columnLabel).join(", ")}</span>}</td>
+ <td><button type="button" className={styles.expandButton} aria-expanded={expanded===row.id} aria-label={`${expanded===row.id?"Свернуть":"Изменить"} вопрос ${label}`} onClick={()=>setExpanded(expanded===row.id?null:row.id)}>{expanded===row.id?"Свернуть":"Открыть"}</button></td></tr>
+ {expanded===row.id && <tr><td colSpan={6} className={styles.expandedCell}><div className={styles.rowHeader}><strong>Строка Excel {row.source}</strong><span className={styles.note}>Вопрос {label}</span></div>{fields(row,local)}{messages.length>0 && <ul className={row.errors.length?styles.error:styles.warning}>{messages.map((message,index)=><li key={index}>{message}</li>)}</ul>}</td></tr>}
+ </Fragment>;
+ })}</tbody></table></div> : <div className={styles.rows}>{visible.map(row => {
         const local = changes[row.id] ?? row;
-        return <article key={row.id} className={`${styles.row} ${local.excluded ? styles.excluded : ""}`}><div className={styles.rowHeader}><strong>Строка {row.source}{local.excluded ? " · исключена" : ""}</strong>{canEdit && ["cards", "exams"].includes(current.kind) && <label className={styles.check}><input type="checkbox" aria-label={`Исключить строку ${row.source}`} checked={local.excluded} disabled={disabled} onChange={event => change(row, { excluded: event.target.checked })} />Исключить</label>}</div>{row.caption && <p className={styles.note}>{row.caption}</p>}{canEdit && row.candidates?.length ? <label className={styles.field}><span>Выбрать совпавший аккаунт</span><select aria-label={`Аккаунт, строка ${row.source}`} disabled={disabled} value={local.input.account_id ?? ""} onChange={event => change(row, { input: { ...local.input, account_id:event.target.value } })}><option value="">Выберите аккаунт</option>{row.candidates.map(candidate => <option key={candidate.account_id} value={candidate.account_id}>{candidate.full_name} · {candidate.account_id}</option>)}</select></label> : null}<div className={styles.fields}>{columns.map(field => <label className={styles.field} key={field}><span>{fieldLabel(field)}</span>{canEdit ? <textarea rows={field === "question" || field === "answer" || field === "questionText" || field === "answerText" ? 3 : 1} inputMode={numberFields.has(field) ? "decimal" : undefined} value={local.input[field] ?? ""} disabled={disabled || local.excluded && ["cards", "exams"].includes(current.kind)} aria-label={`${fieldLabel(field)}, строка ${row.source}`} onChange={event => change(row, { input: { ...local.input, [field]: event.target.value } })} /> : <span className={styles.value}>{row.unavailableFields?.includes(field) ? "ID не отображается: точное значение недоступно" : local.input[field] === undefined || local.input[field] === null || local.input[field] === "" ? "—" : String(local.input[field])}</span>}</label>)}</div>{row.errors.length > 0 && <ul className={styles.error}>{row.errors.map((code, i) => <li key={i}>{row.literalErrors ? code : issueLabel(code)}</li>)}</ul>}{row.warnings.length > 0 && <ul className={styles.warning}>{row.warnings.map((code, i) => <li key={i}>{issueLabel(code)}</li>)}</ul>}</article>;
-      })}</div>{!visible.length && <p className={styles.note}>Строк с ошибками нет.</p>}<div className={styles.pagination}><Button variant="ghost" disabled={selectedPage === 0} onClick={() => setPage(selectedPage - 1)}>Назад</Button><span>Страница {selectedPage + 1} из {pages}</span><Button variant="ghost" disabled={selectedPage + 1 >= pages} onClick={() => setPage(selectedPage + 1)}>Далее</Button></div></>}
+        return <article key={row.id} className={`${styles.row} ${local.excluded ? styles.excluded : ""}`}><div className={styles.rowHeader}><strong>{current.kind === "tests" ? "Строка Excel" : "Строка"} {row.source}{local.excluded ? " · исключена" : ""}</strong>{canEdit && ["cards", "exams"].includes(current.kind) && <label className={styles.check}><input type="checkbox" aria-label={`Исключить строку ${row.source}`} checked={local.excluded} disabled={disabled} onChange={event => change(row, { excluded: event.target.checked })} />Исключить</label>}</div>{row.caption && <p className={styles.note}>{row.caption}</p>}{canEdit && row.candidates?.length ? <label className={styles.field}><span>Выбрать совпавший аккаунт</span><select aria-label={`Аккаунт, строка ${row.source}`} disabled={disabled} value={local.input.account_id ?? ""} onChange={event => change(row, { input: { ...local.input, account_id:event.target.value } })}><option value="">Выберите аккаунт</option>{row.candidates.map(candidate => <option key={candidate.account_id} value={candidate.account_id}>{candidate.full_name} · {candidate.account_id}</option>)}</select></label> : null}{fields(row, local)}{row.errors.length > 0 && <ul className={styles.error}>{row.errors.map((code, i) => <li key={i}>{row.literalErrors ? code : issueLabel(code)}</li>)}</ul>}{row.warnings.length > 0 && <ul className={styles.warning}>{row.warnings.map((code, i) => <li key={i}>{row.literalErrors ? code : issueLabel(code)}</li>)}</ul>}</article>;
+      })}</div>}{!visible.length && <p className={styles.note}>Строк с ошибками нет.</p>}<div className={styles.pagination}><Button variant="ghost" disabled={selectedPage === 0} onClick={() => setPage(selectedPage - 1)}>Назад</Button><span>Страница {selectedPage + 1} из {pages}</span><Button variant="ghost" disabled={selectedPage + 1 >= pages} onClick={() => setPage(selectedPage + 1)}>Далее</Button></div></>}
     {current.rows.length === 0 && <p className={styles.note}>{current.kind === "core" && current.total ? "Список пользователей появится после обновления сохранённого предпросмотра." : "Строк для применения нет."}</p>}
   </section>;
 }
