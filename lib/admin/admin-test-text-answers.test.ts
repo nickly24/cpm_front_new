@@ -8,9 +8,11 @@ describe("text answer validation before saving a test", () => {
   it.each([
     [[], "хотя бы один"], [["Москва", "  "], "пустой вариант"], [["Москва", " МОСКВА "], "повторяет вариант №1"],
     [["x".repeat(1001)], "1000 символов"], [["a\0b"], "недопустимый символ"], [["\uD800"], "недопустимый символ"],
-    [Array.from({length: 51}, (_, i) => String(i)), "50 правильных"],
   ] as [string[], string][]) ("rejects invalid aliases %j", (answers, message) => {
     expect(textAnswerIssue(question(answers))?.message).toContain(message);
+  });
+  it("accepts any number of distinct text answers", () => {
+    expect(textAnswerIssue(question(Array.from({length: 6000}, (_, i) => String(i))))).toBeNull();
   });
   it("matches Go's Unicode whitespace and simple lowercase", () => {
     for (const aliases of [["\u0085"], ["İ", "i"], ["ΟΣ", "οσ"], ["Москва", "\u0085МОСКВА\u0085"]]) expect(textAnswerIssue(question(aliases))).not.toBeNull();

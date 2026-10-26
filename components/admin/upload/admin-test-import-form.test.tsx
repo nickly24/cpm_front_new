@@ -15,6 +15,9 @@ afterEach(()=>{cleanup();vi.clearAllMocks()});
 it("offers actual subdivisions and Excel files with hidden defaults and dates",async()=>{
  render(<AdminUploadsBffWorkspace/>);fireEvent.click(screen.getByRole("button",{name:"Другие загрузки и журнал"}));
  const division=await screen.findByLabelText("Подразделение для теста");
+ expect(screen.getByText(/Без ограничения числа вопросов и вариантов/)).toBeTruthy();
+ expect(screen.queryByText(/До 200 строк/)).toBeNull();
+ expect(screen.getByText(/каждый с новой строки либо через/)).toBeTruthy();
  expect((division as HTMLSelectElement).value).toBe("11");expect(screen.getByRole("option",{name:"Другое подразделение"})).toBeTruthy();
  const input=screen.getByLabelText("Файл") as HTMLInputElement;expect(input.accept).toContain(".xlsx");
  fireEvent.change(input,{target:{files:[new File(["synthetic"],"questions.xlsx")]}});

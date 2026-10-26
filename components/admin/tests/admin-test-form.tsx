@@ -607,7 +607,7 @@ function QuestionPopup({
                 </label>
               </div>
             ))}
-            <button type="button" className={styles.linkBtn} disabled={BFF_DEV && question.answers.length>=50} onClick={addAnswer}>
+            <button type="button" className={styles.linkBtn} onClick={addAnswer}>
               + Вариант
             </button>
           </div>
@@ -638,7 +638,6 @@ function QuestionPopup({
             <button
               type="button"
               className={styles.linkBtn}
-              disabled={question.correctAnswers.length >= 50}
               onClick={() =>
                 onChange({
                   ...question,

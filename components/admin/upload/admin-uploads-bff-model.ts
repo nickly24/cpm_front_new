@@ -94,7 +94,7 @@ export function nativeUploadView(session:UploadSession):PreviewView|null {
       });
       const globalIssues=(Array.isArray(preview.errors)?preview.errors:[]).flatMap(value=>{const error=record(value);return /^(rows|questions)\[\d+\]/.test(text(error.path))?[]:[text(error.message)||"Проверьте настройки теста"];});
       return {...base,kind:"tests",rows:tableRows,total:tableRows.length,partial:tableRows.length!==questions.length,fields:questionTableFields,nativeCanCommit:preview.valid===true,
-        valid:scoped(preview,session) && typeof preview.valid==="boolean" && distinct(tableRows) && tableRows.length>0 && tableRows.length<=200,
+        valid:scoped(preview,session) && typeof preview.valid==="boolean" && distinct(tableRows) && tableRows.length>0,
         target:text(test.title)||text(preview.source_title),issues:globalIssues,
         summary:summary(preview.summary,{errors_count:"Всего ошибок",total_points:"Баллов"})};
     }

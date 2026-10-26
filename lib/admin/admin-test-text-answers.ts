@@ -16,7 +16,6 @@ export function textAnswerIssue(question: Pick<AdminTestQuestion, "type" | "corr
   if (question.type !== "text") return null;
   const answers = question.correctAnswers || [];
   if (answers.length < 1) return { message: "Добавьте хотя бы один правильный текстовый ответ." };
-  if (answers.length > 50) return { message: "Допустимо не больше 50 правильных текстовых ответов." };
   const seen = new Map<string, number>();
   for (let index = 0; index < answers.length; index++) {
     const answer = answers[index], key = aliasKey(answer);

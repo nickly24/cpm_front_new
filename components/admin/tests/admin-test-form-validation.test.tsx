@@ -17,6 +17,25 @@ beforeEach(() => vi.clearAllMocks());
 afterEach(cleanup);
 
 describe("test editor text alias recovery", () => {
+  it("allows another choice after 62 imported options", () => {
+    const questions: AdminTestDetail["questions"] = [{questionId: 20, type: "multiple", text: "Выберите", points: 1, answers: Array.from({length: 62}, (_, i) => ({id: `opt_${i+1}`, text: `Ответ ${i+1}`, isCorrect: i === 39 || i === 60})), correctAnswers: []}];
+    render(<AdminTestForm mode="edit" editingTest={{...detail, questions}} directions={[{id: 1, name: "Право"}]} onBack={vi.fn()} onSaved={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", {name: "Редактировать"}));
+    const button = screen.getByRole("button", {name: "+ Вариант"}) as HTMLButtonElement;
+    expect(button.disabled).toBe(false);
+    expect(screen.getAllByRole("checkbox").length).toBeGreaterThanOrEqual(62);
+    fireEvent.click(button);
+    expect(screen.getAllByRole("checkbox").length).toBeGreaterThanOrEqual(63);
+  });
+  it("allows another accepted text answer after 62 aliases", () => {
+    const questions: AdminTestDetail["questions"] = [{...detail.questions[0], correctAnswers: Array.from({length: 62}, (_, i) => `Ответ ${i+1}`)}];
+    render(<AdminTestForm mode="edit" editingTest={{...detail, questions}} directions={[{id: 1, name: "Право"}]} onBack={vi.fn()} onSaved={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", {name: "Редактировать"}));
+    const button = screen.getByRole("button", {name: "+ Ответ"}) as HTMLButtonElement;
+    expect(button.disabled).toBe(false);
+    fireEvent.click(button);
+    expect(screen.getByRole("textbox", {name: "Правильный ответ 63"})).toBeTruthy();
+  });
   it("opens the offending question before sending a save, then permits removing the duplicate", () => {
     render(<AdminTestForm mode="edit" editingTest={detail} directions={[{id: 1, name: "Право"}]} onBack={vi.fn()} onSaved={vi.fn()} />);
     fireEvent.submit(screen.getByRole("button", {name: "Сохранить изменения"}).closest("form")!);
