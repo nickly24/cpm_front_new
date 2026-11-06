@@ -164,10 +164,8 @@ export async function cardsAdminCatalog(signal?: AbortSignal): Promise<AdminTrai
   const [exams, names] = await Promise.all([examsAllPages("/exams?scope=division&type=classic", signal), examsDirections(signal)]);
   const groups = new Map(raw.directions.map(direction => [direction.id, { ...direction, sections: [...direction.sections] }]));
   for (const exam of exams) {
-    const training = record(await domain(`/exams/${number(exam.id)}/training?preview=true`, { signal }));
-    const stats = record(training.stats);
     const directionId = number(exam.direction_id), direction = groups.get(directionId) ?? { id: directionId, name: names.find(item => item.id === directionId)?.name ?? "Направление", sections: [], topics: [], topics_count: 0, cards_count: 0 };
-    direction.sections.push({ kind: "exam", exam_id: number(exam.id), name: string(exam.name), direction_id: directionId, cards_count: number(stats.total), parts_count: records(training.parts).length, visible: Boolean(exam.training_enabled), training_enabled: Boolean(exam.training_enabled) });
+    direction.sections.push({ kind: "exam", exam_id: number(exam.id), name: string(exam.name), direction_id: directionId, cards_count: number(exam.cards_count), parts_count: number(exam.parts_count), visible: Boolean(exam.training_enabled), training_enabled: Boolean(exam.training_enabled) });
     groups.set(directionId, direction);
   }
   return [...groups.values()].map(direction => ({ ...direction, topics: direction.sections, topics_count: direction.sections.length, cards_count: direction.sections.reduce((sum, section) => sum + section.cards_count, 0) }));

@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const state = vi.hoisted(() => ({ identity: { user: { account_id: 8, organization_id: 1, division_id: 10, role: "admin", organization_admin: true }, context_revision: "r1" }, read: vi.fn(), save: vi.fn(), accounts: vi.fn(), roles: vi.fn() }));
 vi.mock("./client", () => ({ getIdentity: () => state.identity }));
 vi.mock("./core-organization", () => ({ coreOrganizationAccountMemberships: state.read, saveCoreOrganizationParticipation: state.save, coreOrganizationAccounts: state.accounts, coreOrganizationRoles: state.roles }));
-import { assignStudentDivisions, assignStaffAdminDivisions } from "./student-divisions";
+import { assignStudentDivisions, assignStaffAdminDivisions, assignExaminerDivisions } from "./student-divisions";
 
 let memberships: Map<number, Set<number>>;
 beforeEach(() => {
@@ -60,13 +60,13 @@ describe("restricted administrator distribution", () => {
   beforeEach(() => {
     state.accounts.mockResolvedValue([45,46].map(account_id => ({ account_id, role:"staff_admin", owner_organization_id:1 })));
     state.roles.mockResolvedValue([{id:3,name:"Преподаватель"},{id:4,name:"Куратор"}]);
-    state.read.mockImplementation(async (account_id:number) => ({account_id,can_assign:true,memberships:[...memberships.get(account_id)!].map(division_id=>({division_id,role_id:division_id===20?4:3}))}));
+    state.read.mockImplementation(async (account_id:number) => ({account_id,role:"staff_admin",owner_organization_id:1,can_assign:true,memberships:[...memberships.get(account_id)!].map(division_id=>({division_id,role_id:division_id===20?4:3}))}));
     const assignedRoles=new Map<string,number>();
-    state.read.mockImplementation(async (account_id:number) => ({account_id,can_assign:true,memberships:[...memberships.get(account_id)!].map(division_id=>({division_id,role_id:assignedRoles.get(`${account_id}:${division_id}`) ?? (division_id===20?4:3)}))}));
+    state.read.mockImplementation(async (account_id:number) => ({account_id,role:"staff_admin",owner_organization_id:1,can_assign:true,memberships:[...memberships.get(account_id)!].map(division_id=>({division_id,role_id:assignedRoles.get(`${account_id}:${division_id}`) ?? (division_id===20?4:3)}))}));
     state.save.mockImplementation(async (division:number,account:number,role:number) => { memberships.get(account)!.add(division);assignedRoles.set(`${account}:${division}`,role); });
   });
   it("grants different explicit roles for each new division and confirms those roles",async()=>{
-    state.read.mockResolvedValueOnce({can_assign:true,memberships:[{division_id:10,role_id:3}]}).mockResolvedValueOnce({memberships:[{division_id:10,role_id:3},{division_id:20,role_id:4}]}).mockResolvedValueOnce({memberships:[{division_id:30,role_id:3}]});
+    state.read.mockResolvedValueOnce({role:"staff_admin",owner_organization_id:1,can_assign:true,memberships:[{division_id:10,role_id:3}]}).mockResolvedValueOnce({memberships:[{division_id:10,role_id:3},{division_id:20,role_id:4}]}).mockResolvedValueOnce({memberships:[{division_id:30,role_id:3}]});
     expect(await assignStaffAdminDivisions([45],[{divisionId:20,roleId:4},{divisionId:30,roleId:3}],vi.fn())).toEqual({added:2,existing:0,total:2});
     expect(state.save.mock.calls).toEqual([[20,45,4],[30,45,3]]);
   });
@@ -79,12 +79,12 @@ describe("restricted administrator distribution", () => {
     expect(state.save).not.toHaveBeenCalled();
   });
   it.each([{role:"student",owner_organization_id:1},{role:"admin",owner_organization_id:1},{role:"staff_admin",owner_organization_id:99}])("refuses a wrong account category/owner before writing %o",async(patch)=>{
-    state.accounts.mockResolvedValueOnce([{account_id:45,...patch}]);
+    state.read.mockResolvedValueOnce({account_id:45,can_assign:true,memberships:[],...patch});
     await expect(assignStaffAdminDivisions([45],[{divisionId:20,roleId:4}],vi.fn())).rejects.toThrow("своей организации");
     expect(state.save).not.toHaveBeenCalled();
   });
   it("stops when readback reports a different role, without writing the next division",async()=>{
-    state.read.mockResolvedValueOnce({can_assign:true,memberships:[]}).mockResolvedValueOnce({memberships:[{division_id:20,role_id:3}]});
+    state.read.mockResolvedValueOnce({role:"staff_admin",owner_organization_id:1,can_assign:true,memberships:[]}).mockResolvedValueOnce({memberships:[{division_id:20,role_id:3}]});
     await expect(assignStaffAdminDivisions([45],[{divisionId:20,roleId:4},{divisionId:30,roleId:3}],vi.fn())).rejects.toThrow("подтвердить назначение и роль");
     expect(state.save.mock.calls).toEqual([[20,45,4]]);
   });
@@ -98,4 +98,18 @@ describe("restricted administrator distribution", () => {
     await expect(assignStaffAdminDivisions([45],[{divisionId:20,roleId:4}],vi.fn())).rejects.toThrow("администратору организации");
     expect(state.roles).not.toHaveBeenCalled();expect(state.save).not.toHaveBeenCalled();
   });
+});
+
+
+describe("examiner division distribution", () => {
+ beforeEach(()=>{state.read.mockImplementation(async (account_id:number)=>({account_id,role:"examinator",is_active:1,owner_organization_id:1,can_assign:true,memberships:[...(memberships.get(account_id)??[])].map(division_id=>({division_id}))}));});
+ it("adds memberships to the same examiner account without replacing existing participation", async()=>{
+  expect(await assignExaminerDivisions([45],[10,20],vi.fn())).toEqual({added:1,existing:1,total:2});
+  expect(state.save.mock.calls).toEqual([[20,45,null]]);expect(state.roles).not.toHaveBeenCalled();
+ });
+ it.each([{role:"student"},{owner_organization_id:99},{is_active:0}])("rejects wrong-role, inactive and foreign-owned examiners %o",async patch=>{
+  state.read.mockResolvedValue({account_id:45,role:"examinator",is_active:1,owner_organization_id:1,can_assign:true,memberships:[],...patch});
+  await expect(assignExaminerDivisions([45],[20],vi.fn())).rejects.toThrow("активные аккаунты");expect(state.save).not.toHaveBeenCalled();
+ });
+ it("keeps unknown assignment recoverable and does not replay it",async()=>{state.save.mockRejectedValue(new Error("lost reply"));await expect(assignExaminerDivisions([45],[20,30],vi.fn())).rejects.toThrow("lost reply");expect(state.save).toHaveBeenCalledTimes(1);});
 });

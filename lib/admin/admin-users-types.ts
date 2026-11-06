@@ -35,6 +35,7 @@ export interface AdminStaffUser {
 }
 
 export interface AdminStaffFormData {
+  division_ids?: number[];
   password?: string;
   role_id?: number | null;
   full_name: string;

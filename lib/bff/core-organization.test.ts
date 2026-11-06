@@ -24,7 +24,7 @@ beforeEach(() => {
     if (url.pathname === "/core/roles") return { roles: [role], sections: ["users"] };
     if (url.pathname === "/core/organization/users") { const offset = Number(url.searchParams.get("offset")); return accounts.slice(offset, offset + 200); }
     const match = url.pathname.match(/^\/core\/organization\/users\/(\d+)\/memberships$/);
-    if (match) { const account = accounts.find(row => row.account_id === Number(match[1])); return { account_id: account?.account_id, owner_organization_id: account?.owner_organization_id, can_assign: canAssign, can_revoke: true, memberships }; }
+    if (match) { const account = accounts.find(row => row.account_id === Number(match[1])); return { role: account?.role, is_active: account?.is_active, account_id: account?.account_id, owner_organization_id: account?.owner_organization_id, can_assign: canAssign, can_revoke: true, memberships }; }
     throw new Error(`Unexpected route ${path}`);
   });
 });
@@ -126,6 +126,7 @@ describe("Core organization public contract", () => {
   it("adds existing student account ID to another division without moving its profile/group or using profile ID", async () => {
     await saveCoreOrganizationParticipation(13, 45, null);
     expect(writes()).toEqual([["/core/divisions/13/memberships/45", { method: "PUT", body: '{"role_id":null}' }]]);
+    expect(state.domain.mock.calls.some(call=>String(call[0]).startsWith("/core/organization/users?"))).toBe(false);
   });
   it("sets a staff membership role only from the current organization's live role catalog", async () => {
     await expect(saveCoreOrganizationParticipation(13, 46, null)).rejects.toThrow("действующую роль");

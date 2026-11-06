@@ -15,6 +15,7 @@ import type {
 } from "@/lib/admin/admin-users-types";
 import { BFF_DEV } from "@/lib/config";
 import { coreCan, coreFullAdmin, coreRoles, type CoreRole } from "@/lib/bff/core-admin";
+import { coreOrganizationCatalog, type CoreDivision } from "@/lib/bff/core-organization";
 import { CoreCreateRecovery } from "./core-access";
 import { useAuth } from "@/contexts/AuthContext";
 import { useContextGuard } from "@/lib/bff/use-context-guard";
@@ -47,6 +48,16 @@ export function AdminStaffPanel({
   const {user: actor}=useAuth();
   useContextGuard(BFF_DEV);
   const [password,setPassword]=useState("");
+  const [divisions,setDivisions]=useState<CoreDivision[]>([]);
+  const [divisionIds,setDivisionIds]=useState<number[]>([]);
+  const [divisionsLoading,setDivisionsLoading]=useState(BFF_DEV && mode === "add" && role === "examinator" && coreFullAdmin(actor));
+  const [divisionsError,setDivisionsError]=useState<string|null>(null);
+  useEffect(()=>{
+    if(!BFF_DEV||mode!=="add"||role!=="examinator"||!coreFullAdmin(actor))return;
+    const controller=new AbortController();
+    void coreOrganizationCatalog(controller.signal).then(value=>{if(!controller.signal.aborted)setDivisions(value.divisions.filter(d=>d.is_active===true||d.is_active===1));}).catch(error=>{if(!controller.signal.aborted)setDivisionsError(error instanceof Error?error.message:"Не удалось загрузить подразделения");}).finally(()=>{if(!controller.signal.aborted)setDivisionsLoading(false);});
+    return()=>controller.abort();
+  },[actor,mode,role]);
   const [roles,setRoles]=useState<CoreRole[]>([]);
   const [roleId,setRoleId]=useState(user?.role_id!=null?String(user.role_id):"");
   const [fullName, setFullName] = useState(user?.full_name ?? "");
@@ -85,6 +96,7 @@ export function AdminStaffPanel({
       if (mode === "add") {
         const res = await addAdminStaffUser(role, {
           full_name: fullName.trim(),
+          ...(BFF_DEV && role === "examinator" ? {division_ids: divisionIds} : {}),
           ...(BFF_DEV ? {login:login.trim(),password,role_id:role==="staff_admin"?Number(roleId):null} : {}),
           group_id:
             role === "proctor" && groupId !== "none" ? Number(groupId) : null,
@@ -202,6 +214,13 @@ export function AdminStaffPanel({
             </label>
           ) : null}
 
+          {BFF_DEV && mode === "add" && role === "examinator" && coreFullAdmin(actor) ? <fieldset disabled={submitting || !!credentials} className={userStyles.field}>
+            <legend className={userStyles.fieldLabel}>Подразделения экзаменатора</legend>
+            <p className={userStyles.memberMeta}>Текущий кабинет включён. Добавьте другие подразделения, в которых экзаменатор будет принимать экзамены. Все участия сохранятся вместе с аккаунтом.</p>
+            {divisionsLoading ? <p role="status">Загрузка подразделений…</p> : null}
+            {divisionsError ? <p role="alert">{divisionsError}</p> : null}
+            {divisions.map(division=><label key={division.id}><input type="checkbox" checked={division.id===actor?.division_id || divisionIds.includes(division.id)} disabled={division.id===actor?.division_id} onChange={event=>setDivisionIds(previous=>event.target.checked?[...previous,division.id]:previous.filter(id=>id!==division.id))} /> {division.name}{division.id===actor?.division_id?" · текущий кабинет":""}</label>)}
+          </fieldset> : null}
           <CoreCreateRecovery onRecovered={onSaved} />
           {error ? <p className={styles.errorText}>{error}</p> : null}
 

@@ -135,7 +135,7 @@ export function AdminStaffTab() {
     }
   };
 
-  if (distribution && BFF_DEV && canManageCoreAccess(actor)) return <AdminStudentDivisions initialRole="staff_admin" onClose={() => { setDistribution(false); void load(); }} />;
+  if (distribution && BFF_DEV && canManageCoreAccess(actor)) return <AdminStudentDivisions initialRole={role === "examinator" ? "examinator" : "staff_admin"} onClose={() => { setDistribution(false); void load(); }} />;
 
   return (
     <>
@@ -162,7 +162,7 @@ export function AdminStaffTab() {
         <span className={userStyles.statPill}>
           Всего: <strong>{users.length}</strong>
         </span>
-        {role === "staff_admin" && BFF_DEV && canManageCoreAccess(actor) ? <Button variant="secondary" onClick={() => setDistribution(true)}>Распределить по подразделениям</Button> : null}
+        {(role === "staff_admin" || role === "examinator") && BFF_DEV && canManageCoreAccess(actor) ? <Button variant="secondary" onClick={() => setDistribution(true)}>Распределить по подразделениям</Button> : null}
         <CoreEditOnly fullAdmin><Button
           type="button"
           onClick={() => {

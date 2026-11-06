@@ -1,4 +1,5 @@
 /** Translation at the UI boundary. IDs of people are auth account IDs. */
+import { ApiError } from "@/lib/api/client";
 import { domain, getIdentity } from "./client";
 import type { Assignment, AttemptResult, Config, Direction, ExamSummary, Grade, OutsideResult, Page, Part, Person, Readiness, Validation, BankQuestion } from "@/lib/exams-v2/types";
 export type OwnerRecord = Record<string, unknown>;
@@ -10,6 +11,32 @@ export const nullableString = (value: unknown): string | null => typeof value ==
 export function ownerPerson(value: unknown): Person { const v = record(value), id = number(v.account_id); return { id, fullName: string(v.full_name, `Аккаунт ${id}`), login: nullableString(v.login) }; }
 export function ownerPage<T>(items: T[], total: number, limit = 20, offset = 0): Page<T> { const page = Math.floor(offset / limit) + 1, totalPages = Math.max(1, Math.ceil(total / limit)); return { items, pagination: { page, limit, total, totalPages, hasNext: offset + limit < total, hasPrev: offset > 0 } }; }
 export function clientPage<T>(items: T[], params: Record<string, unknown>): Page<T> { const limit = Math.max(1, Math.min(200, Number(params.limit) || 20)), page = Math.max(1, Number(params.page) || 1), offset = (page - 1) * limit; return ownerPage(items.slice(offset, offset + limit), items.length, limit, offset); }
+/** A UI page is one owner page; never drain the collection to display a slice. */
+export function examPageQuery(params: Record<string, unknown> = {}, extra: Record<string, unknown> = {}): string {
+    const requestedLimit = Number(params.limit), requestedPage = Number(params.page);
+    const limit = Number.isFinite(requestedLimit) && requestedLimit > 0 ? Math.min(200, Math.floor(requestedLimit)) || 1 : 20;
+    const offset = ((Number.isFinite(requestedPage) ? Math.max(1, Math.floor(requestedPage)) : 1) - 1) * limit;
+    const query = new URLSearchParams();
+    for (const [key, value] of Object.entries({ ...extra, limit, offset } as Record<string, unknown>))
+        if (value !== undefined && value !== null && value !== "") query.set(key, String(value));
+    return query.toString();
+}
+export async function examOwnerPage(path: string, params: Record<string, unknown> = {}, extra: Record<string, unknown> = {}, signal?: AbortSignal): Promise<OwnerRecord> {
+    signal?.throwIfAborted();
+    const context = examContextKey();
+    const query = examPageQuery(params, extra);
+    const value = record(await domain(`${path}${path.includes("?") ? "&" : "?"}${query}`, { signal }));
+    signal?.throwIfAborted();
+    if (context !== examContextKey()) throw new ApiError("Кабинет изменился. Обновите страницу.", 409, undefined, "context_changed");
+    const requested = new URLSearchParams(query), limit = Number(requested.get("limit")), offset = Number(requested.get("offset"));
+    if (!Array.isArray(value.items) || !Number.isSafeInteger(value.total) || number(value.total) < 0 || value.items.length > limit ||
+        value.limit !== undefined && value.limit !== limit || value.offset !== undefined && value.offset !== offset && value.offset !== Math.min(offset, number(value.total)))
+        throw new ApiError("Некорректная страница экзаменов. Обновите данные.", 502, undefined, "invalid_response");
+    return { ...value, limit, offset };
+}
+export function mappedExamPage<T>(value: OwnerRecord, map: (row: OwnerRecord) => T): Page<T> {
+    return ownerPage(records(value.items).map(map), number(value.total), number(value.limit, 20), number(value.offset));
+}
 export async function examsAllPages(path: string, signal?: AbortSignal): Promise<OwnerRecord[]> { const out: OwnerRecord[] = []; for (let offset = 0; offset <= 100000; offset += 200) {
     const page = record(await domain<unknown>(`${path}${path.includes("?") ? "&" : "?"}limit=200&offset=${offset}`, { signal }));
     const items = records(page.items);

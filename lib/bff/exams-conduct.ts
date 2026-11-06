@@ -1,8 +1,8 @@
 import { ApiError } from "@/lib/api/client";
 import type { ExamCommand, Query } from "@/lib/exams-v2/api";
 import type { AttemptState, CommandResult, ExaminerAssignment, ExaminerExam, PresentedQuestion, Receipt, Round, Vote } from "@/lib/exams-v2/types";
-import { domain, getIdentity } from "./client";
-import { clientPage, examDetail, examsAllPages, examsDirections, nullableString, number, ownerPage, ownerPerson, ownerResult, ownerValidation, record, records, string } from "./exams-shared";
+import { domain } from "./client";
+import { examDetail, examOwnerPage, mappedExamPage, examsDirections, nullableString, number, ownerPage, ownerPerson, ownerResult, ownerValidation, record, records, string } from "./exams-shared";
 
 export function conductRound(value: unknown): Round {
   const v = record(value);
@@ -26,41 +26,22 @@ function parse(path: string, params: Query) {
   const q: Query = { ...Object.fromEntries(u.searchParams), ...params };
   return { path: u.pathname, q };
 }
-async function assignments(examId: number, signal?: AbortSignal): Promise<ExaminerAssignment[]> {
-  const rows = await examsAllPages(`/exams/${examId}/assignments`, signal), out: ExaminerAssignment[] = [];
-  for (const v of rows) {
-    const readiness = record(await domain(`/exams/${examId}/readiness?assignment_id=${number(v.id)}`, { signal }));
-    const attemptId = number(v.attempt_id) || null;
-    out.push({ assignmentId: number(v.id), attemptNo: number(v.attempt_no, 1) as 1 | 2, student: ownerPerson(v.student), commission: records(v.members).map(ownerPerson), replacementLimit: number(v.replacement_limit), status: string(v.status, "not_started") as ExaminerAssignment["status"], attemptId, historyGeneration: number(v.history_generation), canPrepare: readiness.can_prepare === true, canStart: readiness.can_start_now === true, unavailableReasons: ownerValidation(readiness.errors) });
-  }
-  return out;
+function assignment(v: Record<string, unknown>): ExaminerAssignment {
+  const readiness = record(v.readiness), attemptId = number(v.attempt_id) || null;
+  return { assignmentId: number(v.id), attemptNo: number(v.attempt_no, 1) as 1 | 2, student: ownerPerson(v.student), commission: records(v.members).map(ownerPerson), replacementLimit: number(v.replacement_limit), status: string(v.status, "not_started") as ExaminerAssignment["status"], attemptId, historyGeneration: number(v.history_generation), canPrepare: readiness.can_prepare === true, canStart: readiness.can_start_now === true, unavailableReasons: ownerValidation(readiness.errors) };
 }
 export async function examsConductGet(input: string, params: Query = {}, signal?: AbortSignal): Promise<unknown> {
   const { path, q } = parse(input, params);
   if (/^\/api\/exams\/lookups\/(students|examinators)$/.test(path)) {
-    const user = getIdentity()?.user;
-    if (user?.role !== "admin" && !user?.organization_admin && !user?.permissions?.users?.view) throw new ApiError("Для списка пользователей нужны права просмотра пользователей. Можно указать ID аккаунта.", 403, undefined, "access_denied");
-    const role = path.endsWith("students") ? "student" : "examinator", people = [];
-    for (let offset = 0; offset <= 100000; offset += 200) {
-      const rows = records(await domain(`/core/users?role=${role}&limit=200&offset=${offset}`, { signal }));
-      people.push(...rows.filter(r => r.role === role).map(ownerPerson));
-      if (rows.length < 200) return clientPage(people.filter(p => !q.search || `${p.fullName} ${p.id} ${p.login ?? ""}`.toLowerCase().includes(String(q.search).toLowerCase())), q);
-    }
-    throw new Error("Уточните поиск: пользователей слишком много");
+    const role = path.endsWith("students") ? "student" : "examinator";
+    return mappedExamPage(await examOwnerPage("/core/exam-participants", q, { role, q: q.search }, signal), ownerPerson);
   }
   if (path === "/api/examiner/exams") {
-    const directions = await examsDirections(signal), rows: ExaminerExam[] = [];
-    for (const exam of await examsAllPages("/exams?type=classic", signal)) {
-      const id = number(exam.id), detail = await examDetail(id, signal), window = record(detail.exam_window ?? detail.config), assigned = await examsAllPages(`/exams/${id}/assignments`, signal);
-      rows.push({ id, directionId: number(exam.direction_id), directionName: string(exam.name, directions.find(d => d.id === number(exam.direction_id))?.name), startAt: nullableString(window.start_at), endAt: nullableString(window.end_at), readiness: "", assignedStudentsCount: assigned.length });
-    }
-    return clientPage(rows.filter(row => !q.search || row.directionName.toLowerCase().includes(String(q.search).toLowerCase())), q);
+    const [page, directions] = await Promise.all([examOwnerPage("/exams", q, { type: "classic", q: q.search }, signal), examsDirections(signal)]);
+    return mappedExamPage(page, exam => ({ id: number(exam.id), directionId: number(exam.direction_id), directionName: string(exam.name, directions.find(d => d.id === number(exam.direction_id))?.name), startAt: nullableString(exam.start_at), endAt: nullableString(exam.end_at), readiness: "", assignedStudentsCount: number(exam.assigned_students_count) } satisfies ExaminerExam));
   }
   let m = path.match(/^\/api\/examiner\/exams\/(\d+)\/students$/);
-  if (m) {
-    const rows = await assignments(Number(m[1]), signal);
-    return clientPage(rows.filter(r => (!q.search || `${r.student.fullName} ${r.student.id}`.toLowerCase().includes(String(q.search).toLowerCase())) && (!q.status || r.status === q.status)), q);
-  }
+  if (m) return mappedExamPage(await examOwnerPage(`/exams/${m[1]}/assignments`, q, { q: q.search, status: q.status, include_readiness: true }, signal), assignment);
   if (/^\/api\/examiner\/attempts\//.test(path)) throw new ApiError("Выберите экзамен перед открытием сдачи", 400, undefined, "exam_required");
   m = path.match(/^\/api\/examiner\/exams\/(\d+)\/attempts\/(\d+)(?:\/questions(?:\/(\d+)\/rounds)?)?$/) ?? path.match(/^\/api\/exams\/(\d+)\/classic\/attempts\/(\d+)\/questions(?:\/(\d+)\/rounds)?$/);
   if (!m) return undefined;

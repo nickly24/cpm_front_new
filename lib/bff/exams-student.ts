@@ -5,7 +5,7 @@ import type { AttemptStatus, ExamSummary, OutsideStudentResult, Page, PresentedQ
 import type { MarkCardLearnedPayload, SectionBatchResponse, SectionStudyViewResponse, StudyFilter, StudySettings, StudySettingsPayload, TrainingCard, TrainingDirection, TrainingSectionNode, TrainingSectionsResponse } from "@/lib/training/training-types";
 import { filterStudyCards } from "@/lib/training/exam-training";
 import { domain, getIdentity } from "./client";
-import { adequateExamSummary, clientPage, examCalendarDate, examContextKey, examDetail, examsAllPages, examsDirections, nullableString, number, ownerExam, ownerOutsideResult, ownerPage, ownerResult, record, records, string, type OwnerRecord } from "./exams-shared";
+import { clientPage, examCalendarDate, examContextKey, examDetail, examOwnerPage, mappedExamPage, examsAllPages, examsDirections, nullableString, number, ownerExam, ownerOutsideResult, ownerPage, ownerResult, record, records, string, type OwnerRecord } from "./exams-shared";
 
 type Query = Record<string, string | number | boolean | null | undefined>;
 const pendingKeys = new Map<string, string>();
@@ -66,7 +66,7 @@ function hiddenTraining(error: unknown): boolean {
   return ["training_disabled", "exam_empty", "not_found"].includes(string(value.code)) || number(value.status) === 404;
 }
 async function availableTraining(examId: number, signal?: AbortSignal): Promise<OwnerRecord | null> {
-  try { return record(await request(`/exams/${examId}/training`, { signal })); }
+  try { return record(await request(`/exams/${examId}/training?summary=true`, { signal })); }
   catch (error) { if (hiddenTraining(error)) return null; throw error; }
 }
 function outsideStudent(value: unknown, exam: ExamSummary): OutsideStudentResult {
@@ -88,25 +88,12 @@ function classicStudent(value: OwnerRecord, exam: ExamSummary): StudentResult {
 async function studentResults(params: Query, signal?: AbortSignal): Promise<Page<StudentResult>> {
   selfAccount();
   const type = ["classic", "outside_lms"].includes(String(params.type)) ? String(params.type) : undefined;
-  const [catalog, directions] = await Promise.all([examsAllPages(`/exams${query({ scope: "division", type, date_from: params.dateFrom, date_to: params.dateTo, sort: params.sort })}`, signal), examsDirections(signal)]);
-  const results: StudentResult[] = [];
-  for (const item of catalog) {
-    signal?.throwIfAborted();
-    const id = number(item.id), rows = await examsAllPages(`/exams/${id}/results`, signal);
-    const completed = rows.filter(row => item.exam_type === "outside_lms" || completedResult(row));
-    if (!completed.length) continue;
-    const detail = adequateExamSummary(item) ? item : { ...item, ...await examDetail(id, signal) }, exam = ownerExam(detail, directions);
-    for (const row of completed) results.push(exam.examType === "outside_lms" ? outsideStudent(row, exam) : classicStudent(row, exam));
-  }
-  const search = string(params.search).trim().toLocaleLowerCase("ru");
-  const filtered = results.filter(row =>
-    (params.grade === undefined || params.grade === "" || (row.examType === "classic" ? row.currentAttempt.grade : row.grade) === Number(params.grade)) &&
-    (!params.directionId || String(row.directionId) === String(params.directionId)) &&
-    (!search || `${row.examName ?? ""} ${row.directionName}`.toLocaleLowerCase("ru").includes(search))
-  );
-  const date = (row: StudentResult) => row.examDate ?? "";
-  if (params.sort !== "direction_asc") filtered.sort((a, b) => (params.sort === "date_asc" ? date(a).localeCompare(date(b)) : date(b).localeCompare(date(a))) || (params.sort === "date_asc" ? a.examId - b.examId : b.examId - a.examId));
-  return clientPage(filtered, params);
+  const [page, directions] = await Promise.all([examOwnerPage("/exams/student-results", params, { type, date_from: params.dateFrom, date_to: params.dateTo, sort: params.sort, q: params.search, direction_id: params.directionId, grade: params.grade }, signal), examsDirections(signal)]);
+  return mappedExamPage(page, item => {
+    const exam = ownerExam(item.exam, directions), result = record(item.result);
+    if (exam.examType === "classic" && !completedResult(result)) throw new ApiError("Результаты экзаменов изменились. Обновите данные.", 502, undefined, "invalid_response");
+    return exam.examType === "outside_lms" ? outsideStudent(result, exam) : classicStudent(result, exam);
+  });
 }
 async function studentDetail(id: number, signal?: AbortSignal): Promise<StudentResultDetail> {
   const account = selfAccount();
@@ -129,7 +116,10 @@ export function handlesStudentPath(path: string): boolean {
 export async function examsStudentGet(path: string, params: Query = {}, signal?: AbortSignal): Promise<unknown> {
   const route = splitPath(path, params), p = route.params;
   if (route.pathname === "/api/student/exams/results") return studentResults(p, signal);
-  if (route.pathname === "/api/student/exams/training") return clientPage((await examTrainingTree(signal)).flatMap(direction => direction.sections), p);
+  if (route.pathname === "/api/student/exams/training") {
+    selfAccount();
+    return mappedExamPage(await examOwnerPage("/exams", p, { scope: "division", training: true, q: p.search, direction_id: p.directionId }, signal), item => ({ kind: "exam", refId: String(number(item.id)), name: string(item.name), exam_id: number(item.id), parts_count: number(item.parts_count), total_cards: number(item.cards_count) }));
+  }
   let match = /^\/api\/student\/exams\/(\d+)\/result$/.exec(route.pathname);
   if (match) return studentDetail(Number(match[1]), signal);
   match = /^\/api\/student\/exams\/(\d+)\/attempts\/(\d+)\/questions$/.exec(route.pathname);
@@ -143,7 +133,7 @@ export async function examsStudentGet(path: string, params: Query = {}, signal?:
   if (match) {
     const id = Number(match[1]);
     if (match[2]) return examTrainingView(String(id), true, signal);
-    const [detail, preview, directions] = await Promise.all([examDetail(id, signal), request<unknown>(`/exams/${id}/training?preview=true`, { signal }), examsDirections(signal)]);
+    const [detail, preview, directions] = await Promise.all([examDetail(id, signal), request<unknown>(`/exams/${id}/training?preview=true&summary=true`, { signal }), examsDirections(signal)]);
     const view = record(preview), exam = ownerExam(detail, directions);
     return { exam: { ...exam, version: number(detail.division_revision) }, parts_count: records(view.parts).length, cards_count: number(record(view.stats).total) };
   }
@@ -156,11 +146,17 @@ export async function examsStudentMutate(command: ExamCommand): Promise<unknown>
   return mutation(`/exams/${match[1]}/training`, "PUT", { training_enabled: body.enabled, expected_revision: body.expectedVersion }, command.key);
 }
 
-export async function examTrainingView(ref: string, preview = false, signal?: AbortSignal): Promise<SectionStudyViewResponse> {
+export type ExamTrainingSelection = { summary?: boolean; page?: number; limit?: number; batchIndex?: number; batchSize?: number };
+export async function examTrainingView(ref: string, preview = false, signal?: AbortSignal, selection: ExamTrainingSelection = {}): Promise<SectionStudyViewResponse> {
   if (!preview) selfAccount();
-  const { examId, partId } = sectionScope(ref);
-  const [raw, directions, detail] = await Promise.all([request<unknown>(`/exams/${examId}/training${query({ part_id: partId, preview: preview ? true : undefined })}`, { signal }), examsDirections(signal), examDetail(examId, signal)]);
-  return adaptTrainingView(raw, directions, detail);
+  const { examId, partId } = sectionScope(ref), context = examContextKey();
+  const limit = Math.max(1, Math.min(200, selection.limit ?? 20)), offset = (Math.max(1, selection.page ?? 1) - 1) * limit;
+  const [raw, directions] = await Promise.all([request<unknown>(`/exams/${examId}/training${query({ part_id: partId, preview: preview ? true : undefined, summary: selection.summary || undefined, batch_index: selection.batchIndex, batch_size: preview ? selection.batchSize : undefined, limit: selection.page ? limit : undefined, offset: selection.page ? offset : undefined })}`, { signal }), examsDirections(signal)]);
+  signal?.throwIfAborted();
+  if (context !== examContextKey()) throw new ApiError("Кабинет изменился. Обновите страницу.", 409, undefined, "context_changed");
+  const value = record(raw), cards = records(value.cards), pagination = record(value.cards_pagination);
+  if (selection.summary && cards.length || selection.page && (cards.length > limit || pagination.limit !== limit || !Number.isSafeInteger(pagination.total) || pagination.offset !== Math.min(offset, number(pagination.total)))) throw new ApiError("Некорректная страница подготовки. Обновите данные.", 502, undefined, "invalid_response");
+  return adaptTrainingView(raw, directions, {});
 }
 function adaptTrainingView(value: unknown, directions: Awaited<ReturnType<typeof examsDirections>>, detail: OwnerRecord): SectionStudyViewResponse {
   const row = record(value), rawExam = record(row.exam), id = number(rawExam.id), exam = ownerExam({ ...detail, ...rawExam, revision: rawExam.version, config: { start_at: rawExam.start_at, end_at: rawExam.end_at } }, directions);
@@ -200,10 +196,10 @@ export async function examTrainingSections(directionId: number, params: { page?:
   return { success: true, student_id: selfAccount(), direction_id: directionId, direction_name: direction?.name ?? "Направление", sections: paged.items, pagination: { page: pagination.page, limit: pagination.limit, total: pagination.total, pages: pagination.totalPages, has_next: pagination.hasNext, has_prev: pagination.hasPrev } };
 }
 export async function examTrainingBatch(ref: string, batchIndex: number, mode?: StudyFilter): Promise<SectionBatchResponse> {
-  const view = await examTrainingView(ref), filter = mode ?? view.settings.study_mode;
+  const view = await examTrainingView(ref, false, undefined, { batchIndex }), filter = mode ?? view.settings.study_mode;
   const batch = view.batches.find(item => item.index === batchIndex);
   if (!batch) throw new ApiError("Набор карточек больше недоступен. Обновите подготовку", 404, undefined, "not_found");
-  const cards = filterStudyCards(view.cards.slice(batchIndex * view.settings.batch_size, (batchIndex + 1) * view.settings.batch_size), filter);
+  const cards = filterStudyCards(view.cards, filter);
   return { success: true, student_id: selfAccount(), section_kind: "exam", section_ref_id: ref, batch_index: batchIndex, batch, study_mode: filter, cards, count: cards.length };
 }
 export async function examTrainingSettings(ref: string, payload: StudySettingsPayload) {

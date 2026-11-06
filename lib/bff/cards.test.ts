@@ -4,7 +4,7 @@ vi.mock("./client", () => ({ domain, getIdentity: () => identity }));
 vi.mock("./exams-student", () => ({ examTrainingTree }));
 beforeEach(() => {
   vi.resetModules(); domain.mockReset(); storage.clear(); examTrainingTree.mockReset(); examTrainingTree.mockResolvedValue([]);
-  identity.user.division_id = 1001; identity.user.organization_id = 2;
+  identity.user.division_id = 1001; identity.user.organization_id = 2; identity.user.role = "student";
   vi.stubGlobal("sessionStorage", { getItem: (key: string) => storage.get(key) ?? null, setItem: (key: string, value: string) => storage.set(key, value) });
 });
 describe("Cards owner boundary", () => {
@@ -90,4 +90,14 @@ describe("server-paginated student Cards adapter",()=>{
   expect(domain.mock.calls[0][0]).toBe("/cards/catalog");expect(domain.mock.calls[1][0]).toBe("/cards/directions/4/sections?page=2&limit=12&search=%D0%9F%D1%80%D0%B0%D0%B2%D0%BE&kind=manual");
   expect(examTrainingTree).not.toHaveBeenCalled();expect(domain.mock.calls[1][1].signal).toBe(controller.signal);
  });
+});
+
+
+it("uses exam catalog counts for admin preparation without downloading any training banks", async () => {
+  identity.user.role = "admin";
+  domain.mockImplementation((path: string) => path === "/cards/admin/catalog" ? { directions: [] } : path === "/core/directions" ? [{ id: 4, name: "Математика" }] : path.startsWith("/exams?") ? { items: [{ id: 31, direction_id: 4, name: "Алгебра", cards_count: 5000, parts_count: 4, training_enabled: true }], total: 1 } : Promise.reject(new Error(`Unexpected bank prefetch ${path}`)));
+  const { cardsAdminCatalog } = await import("./cards");
+  const result = await cardsAdminCatalog();
+  expect(result[0].sections[0]).toMatchObject({ exam_id: 31, cards_count: 5000, parts_count: 4, training_enabled: true });
+  expect(domain).toHaveBeenCalledTimes(3); expect(domain.mock.calls.some(call => String(call[0]).includes("/training"))).toBe(false);
 });

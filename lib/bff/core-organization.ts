@@ -10,7 +10,7 @@ export interface CoreOrganizationAccount {
   is_active: boolean | number; owner_organization_id: number | null;
 }
 export interface CoreParticipation { division_id: number; division_name: string; role_id: number | null; role_name: string | null; group_id: number | null; can_revoke: boolean }
-export interface CoreOrganizationMemberships { account_id: number; owner_organization_id: number | null; can_assign: boolean; can_revoke: boolean; memberships: CoreParticipation[] }
+export interface CoreOrganizationMemberships { role: string; is_active: boolean | number; account_id: number; owner_organization_id: number | null; can_assign: boolean; can_revoke: boolean; memberships: CoreParticipation[] }
 export interface CoreOrganizationCatalog { organization: CoreOrganization; divisions: CoreDivision[]; directions: CoreDirection[] }
 export type CoreCatalogKind = "organization" | "division" | "direction";
 interface Scope { account: number; organization: number; division: number | null; revision: string }
@@ -70,9 +70,9 @@ export async function coreOrganizationCatalog(signal?: AbortSignal): Promise<Cor
     return { organization, divisions, directions };
   } catch (error) { throw coreOrganizationError(error); }
 }
-export async function coreOrganizationAccounts(signal?: AbortSignal): Promise<CoreOrganizationAccount[]> {
+export async function coreOrganizationAccounts(signal?: AbortSignal, role?: string): Promise<CoreOrganizationAccount[]> {
   const snapshot = scope(true);
-  const accounts = await coreAll<CoreOrganizationAccount>("/core/organization/users", {}, signal);
+  const accounts = await coreAll<CoreOrganizationAccount>("/core/organization/users", role ? {role} : {}, signal);
   assertScope(snapshot);
   return accounts.map(row => ({ account_id: positive(row.account_id), profile_id: positive(row.profile_id), role: row.role, login: row.login, full_name: row.full_name, is_active: row.is_active, owner_organization_id: row.owner_organization_id }));
 }
@@ -81,7 +81,7 @@ export async function coreOrganizationAccountMemberships(accountId: number, sign
   const response = await domain<CoreOrganizationMemberships>(`/core/organization/users/${accountId}/memberships`, { signal }).catch(error => { throw coreOrganizationError(error); });
   assertScope(snapshot);
   if (response.account_id !== accountId || !Array.isArray(response.memberships)) throw new Error("Сервис вернул неверные участия аккаунта");
-  return { account_id: response.account_id, owner_organization_id: response.owner_organization_id, can_assign: response.can_assign === true, can_revoke: response.can_revoke === true, memberships: response.memberships.map(row => ({ division_id: positive(row.division_id), division_name: row.division_name, role_id: row.role_id, role_name: row.role_name, group_id: row.group_id, can_revoke: row.can_revoke === true })) };
+  return { role: response.role, is_active: response.is_active, account_id: response.account_id, owner_organization_id: response.owner_organization_id, can_assign: response.can_assign === true, can_revoke: response.can_revoke === true, memberships: response.memberships.map(row => ({ division_id: positive(row.division_id), division_name: row.division_name, role_id: row.role_id, role_name: row.role_name, group_id: row.group_id, can_revoke: row.can_revoke === true })) };
 }
 export async function coreOrganizationRoles(signal?: AbortSignal): Promise<CoreRole[]> {
   const snapshot = scope(true), roles = await coreRoles(signal); assertScope(snapshot); return roles;
@@ -127,11 +127,11 @@ export async function archiveCoreOrganizationCatalog(kind: "division" | "directi
 }
 async function membershipPreflight(snapshot: Scope, divisionId: number, accountId: number, roleId?: number | null) {
   positive(divisionId); positive(accountId);
-  const [divisions, accounts, detail, roles] = await Promise.all([getDivisions(), coreOrganizationAccounts(), coreOrganizationAccountMemberships(accountId), roleId === undefined || roleId === null ? Promise.resolve([]) : coreOrganizationRoles()]);
+  const [divisions, detail, roles] = await Promise.all([getDivisions(), coreOrganizationAccountMemberships(accountId), roleId === undefined || roleId === null ? Promise.resolve([]) : coreOrganizationRoles()]);
   assertScope(snapshot);
   if (!divisions.some(row => row.id === divisionId)) throw new Error("Подразделение больше не доступно в этой организации");
-  const account = accounts.find(row => row.account_id === accountId);
-  if (!account) throw new Error("Аккаунт больше не доступен в выбранной организации");
+  const account = detail;
+  if (!account.role) throw new Error("Не удалось проверить роль аккаунта. Обновите данные.");
   if (account.role === "admin") throw new Error("Администратор имеет доступ ко всей организации без отдельных участий");
   if (roleId !== undefined) {
     if (!detail.can_assign || account.owner_organization_id !== snapshot.organization || detail.owner_organization_id !== snapshot.organization) throw new Error("Назначение и изменение роли доступны только организации владельца аккаунта");

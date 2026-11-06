@@ -25,6 +25,7 @@ import {
 } from "./shared";
 import type { AdminPanelProps } from "./admin-settings";
 import s from "./exams.module.css";
+import { AssignmentImportGuide } from "./assignment-import-guide";
 
 const hints: Record<ImportKind, string> = {
   questions:
@@ -32,10 +33,10 @@ const hints: Record<ImportKind, string> = {
   outside:
     "Колонки: student_id и/или student_login, points, grade, examinator. Оценка 0–5, баллы произвольные неотрицательные.",
   assignments:
-    "Колонки: student_id и/или student_login; examinator_1_id…examinator_6_id и/или examinator_1_login…examinator_6_login; replacement_limit. Не менее одного экзаменатора. Старые examinator_N означают логин, не ID.",
+    "Распределите учеников по комиссиям для этого экзамена. В комиссии может быть от одного до шести экзаменаторов.",
 };
 const labels: Record<string, string> = {
-  studentId: "ID студента",
+  studentId: "ID аккаунта студента",
   studentLogin: "Логин студента",
   partCode: "Часть",
   questionText: "Вопрос",
@@ -43,7 +44,7 @@ const labels: Record<string, string> = {
   points: "Баллы",
   grade: "Оценка",
   examinator: "Имя экзаменатора",
-  commissionMemberIds: "ID комиссии (через запятую)",
+  commissionMemberIds: "ID аккаунтов экзаменаторов (через запятую)",
   commissionMemberLogins: "Логины комиссии (через запятую)",
   replacementLimit: "Лимит замен",
 };
@@ -70,7 +71,7 @@ function ImportTemplate({ examId, kind }: { examId: number; kind: ImportKind }) 
       if (!request.signal.aborted) setBusy(false);
     }
   };
-  return <div className={s.item}>
+  return <div className={s.stack}>
     <Action disabled={busy} onClick={() => void download()}>{busy ? "Скачиваем шаблон…" : "Скачать шаблон Excel"}</Action>
     <ErrorNotice error={error} />
   </div>;
@@ -125,6 +126,7 @@ export function PreviewEditor({
 }) {
   const [page, setPage] = useState(1);
   const [onlyErrors, setOnlyErrors] = useState(false);
+  const [expanded, setExpanded] = useState<string | null>(null);
   const [changes, setChanges] = useState<
     Record<string, { input: Record<string, unknown>; excluded: boolean }>
   >({});
@@ -202,7 +204,7 @@ export function PreviewEditor({
           <p className={s.muted}>
             Всего: {session.summary.total} · Включено:{" "}
             {session.summary.included} · Исключено: {session.summary.excluded} ·
-            Ошибок: {session.summary.errors} · Конфликтов:{" "}
+            Ошибок: {session.summary.errors} · Конфликтов на странице:{" "}
             {session.summary.conflicts}
           </p>
           {session.status === "committed" && (
@@ -224,21 +226,23 @@ export function PreviewEditor({
               Только ошибки
             </label>
             <Action onClick={resource.reload} disabled={dirty || mutation.busy}>
-              Проверить сохранённое превью
+              Обновить предпросмотр
             </Action>
           </div>
           {session.rows.map((row) => {
             const local = changes[row.rowId] ?? row;
+            const isOpen = (expanded ?? session.rows[0]?.rowId) === row.rowId;
+            const title = inputValue(local.input.studentLogin || local.input.studentId || local.input.questionText || local.input.partCode || "");
             return (
               <article
-                className={`${s.item} ${local.excluded ? s.excluded : ""}`}
+                className={`${s.importPreviewRow} ${local.excluded ? s.excluded : ""}`}
                 key={row.rowId}
               >
-                <div className={s.header}>
-                  <strong>
-                    Строка {row.sourceRow}
-                    {local.excluded ? " · исключена" : ""}
-                  </strong>
+                <div className={s.importRowSummary}>
+                  <strong>Строка {row.sourceRow}</strong>
+                  <span className={s.importRowTitle}>{title || "—"}</span>
+                  <span className={row.errors.length ? s.dangerText : s.muted}>{local.excluded ? "Исключена" : row.errors.length ? `Ошибок: ${row.errors.length}` : "Готова"}{changes[row.rowId] ? " · изменена" : ""}</span>
+                  <Action onClick={() => setExpanded(isOpen ? "" : row.rowId)}>{isOpen ? "Свернуть" : "Открыть строку"}</Action>
                   <Action
                     disabled={disabled}
                     onClick={() => change(row, { excluded: !local.excluded })}
@@ -246,6 +250,7 @@ export function PreviewEditor({
                     {local.excluded ? "Вернуть строку" : "Исключить строку"}
                   </Action>
                 </div>
+                {isOpen ? <div className={s.stack}>
                 <div className={s.grid}>
                   {Object.entries(local.input).map(([key, value]) => (
                     <Field
@@ -298,6 +303,7 @@ export function PreviewEditor({
                     будут проверены заново.
                   </p>
                 )}
+                </div> : null}
               </article>
             );
           })}
@@ -340,7 +346,7 @@ export function PreviewEditor({
                 >
                   {dirty
                     ? "Сохранить исправления"
-                    : "Перепроверить строки страницы"}
+                    : "Перепроверить импорт"}
                 </Action>
                 <Action
                   disabled={disabled || !dirty}
@@ -434,6 +440,7 @@ function ExamImportWorkspace({
       <h3>Импорт из Excel</h3>
       <p className={s.muted}>{hints[kind]}</p>
       {BFF_DEV && <ImportTemplate examId={props.examId} kind={kind} />}
+      {BFF_DEV && kind === "assignments" && <AssignmentImportGuide examId={props.examId} />}
       <p className={s.muted}>
         Один непустой лист, до 5000 строк и 10 МиБ. Формулы не поддерживаются.
         ID и логин — разные колонки; ФИО не используется как идентификатор.

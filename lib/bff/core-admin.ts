@@ -7,7 +7,7 @@ export interface CoreUser { account_id:number; profile_id:number; role:string; f
 export interface CoreGroup { id:number; name:string; student_count:number; proctor_account_id:number|null }
 export interface CoreRole { id:number; name:string; permissions:{section:string;can_view:boolean|number;can_edit:boolean|number}[] }
 export interface CoreDashboard { organization_id:number; division_id:number; division_name:string; role:string; totals:{students:number|null;staff:number|null;groups:number|null;schools:number|null}; capabilities:string[] }
-export interface CoreCreateUser { role:string; full_name:string; class:number|null; tg_name:string; school_id:number|null; group_id:number|null; role_id:number|null; login:string; password:string }
+export interface CoreCreateUser { division_ids?:number[]; role:string; full_name:string; class:number|null; tg_name:string; school_id:number|null; group_id:number|null; role_id:number|null; login:string; password:string }
 export type CoreProfilePatch = Partial<Pick<CoreUser,"full_name"|"class"|"tg_name"|"school_id"|"group_id"|"role_id"|"login">> & {password?:string};
 
 export function coreCan(section:string, edit=false, user:User|undefined|null=getIdentity()?.user):boolean {
@@ -50,7 +50,7 @@ export const coreSchool=async(schoolId:number) => mapCoreSchool(await domain<Par
 const labels:Record<string,string>={division_required:"Выберите подразделение в меню кабинетов",transport_error:"Не удалось получить ответ сервера. Обновите данные",login_exists:"Этот логин уже используется",invalid_user:"Проверьте ФИО, логин и пароль (не менее 8 символов)",invalid_profile:"Проверьте поля профиля",invalid_credentials:"Укажите логин и новый пароль (не менее 8 символов)",global_profile_requires_organization_admin:"Профиль используется в нескольких подразделениях. Его изменяет администратор организации",conflict:"Изменение конфликтует с текущими данными. Обновите список",cannot_disable_self:"Нельзя заблокировать свою учётную запись",inactive_user:"Сначала активируйте пользователя",dependency_unavailable:"Сервис временно недоступен"};
 export function coreError(error:unknown):Error { const e=error as Error & {code?:string;status?:number}; return Object.assign(new Error(labels[e.code??""]??e.message??"Не удалось выполнить запрос"),{code:e.code,status:e.status}); }
 export function coreUncertain(error:unknown):boolean { const status=(error as {status?:number})?.status; return status===0||status===502||status===503||status===504; }
-interface PendingCreate {scope:string;role:string;full_name:string;class:number|null;login:string;school_id:number|null;group_id:number|null;role_id:number|null}
+interface PendingCreate {division_ids?:number[];scope:string;role:string;full_name:string;class:number|null;login:string;school_id:number|null;group_id:number|null;role_id:number|null}
 const journalKey=() => `cpm-core-create:${scope()}`;
 export function pendingCoreCreate():PendingCreate|null { try { return JSON.parse(sessionStorage.getItem(journalKey())??"null"); } catch { return null; } }
 export async function recoverCoreCreate():Promise<{account_id:number}> {
@@ -58,7 +58,13 @@ export async function recoverCoreCreate():Promise<{account_id:number}> {
   const candidates=(await coreUsers(pending.role)).filter(u=>u.login===pending.login);
   const found=candidates.find(u=>u.full_name===pending.full_name&&(u.class??0)===(pending.class??0)&&u.school_id===pending.school_id&&u.group_id===pending.group_id&&u.role_id===pending.role_id);
   if(!found) throw new Error(candidates.length?"Логин занят другим профилем. Обновите список и проверьте данные.":"Учётная запись пока не найдена. Обновите список перед повторным созданием.");
-  assertScope(pending.scope); sessionStorage.removeItem(journalKey()); return {account_id:found.account_id};
+  assertScope(pending.scope);
+  if (pending.division_ids?.length) {
+    const detail=await domain<{memberships:{division_id:number}[]}>(`/core/organization/users/${found.account_id}/memberships`);
+    assertScope(pending.scope);
+    if(pending.division_ids.some(id=>!detail.memberships.some(member=>member.division_id===id))) throw new Error("Аккаунт найден, но не все подразделения подтверждены. Проверьте его участия; повторное создание не требуется.");
+  }
+  sessionStorage.removeItem(journalKey()); return {account_id:found.account_id};
 }
 export function dismissCoreCreate() { try { sessionStorage.removeItem(journalKey()); } catch {} }
 export async function createCoreUser(payload:CoreCreateUser):Promise<{account_id:number}> {

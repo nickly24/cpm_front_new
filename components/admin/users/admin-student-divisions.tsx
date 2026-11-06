@@ -13,7 +13,7 @@ import {
   coreOrganizationError, coreOrganizationRoles, pendingCoreOrganizationCommand, recoverCoreOrganizationCommand,
   type CoreOrganizationAccount, type CoreOrganizationCatalog, type CoreOrganizationMemberships,
 } from "@/lib/bff/core-organization";
-import { assignStudentDivisions, assignStaffAdminDivisions, type DistributionAccountRole, type StudentDivisionProgress } from "@/lib/bff/student-divisions";
+import { assignStudentDivisions, assignStaffAdminDivisions, assignExaminerDivisions, type DistributionAccountRole, type StudentDivisionProgress } from "@/lib/bff/student-divisions";
 import { useContextGuard } from "@/lib/bff/use-context-guard";
 import styles from "./admin-student-divisions.module.css";
 
@@ -28,6 +28,7 @@ export function AdminStudentDivisions({ onClose, initialRole = "student" }: { on
 function Distribution({ onClose, initialRole }: { onClose: () => void; initialRole: DistributionAccountRole }) {
   const [accountRole, setAccountRole] = useState<DistributionAccountRole>(initialRole);
   const staff = accountRole === "staff_admin";
+  const examiner = accountRole === "examinator";
   const [roles, setRoles] = useState<CoreRole[]>([]);
   const [rolesLoading, setRolesLoading] = useState(false);
   const [rolesError, setRolesError] = useState<string | null>(null);
@@ -61,13 +62,13 @@ function Distribution({ onClose, initialRole }: { onClose: () => void; initialRo
   }, [division]);
   useEffect(() => {
     const controller = new AbortController();
-    void Promise.all([coreOrganizationCatalog(controller.signal), coreOrganizationAccounts(controller.signal)])
+    void Promise.all([coreOrganizationCatalog(controller.signal), coreOrganizationAccounts(controller.signal, accountRole)])
       .then(([nextCatalog, rows]) => {
         if (!controller.signal.aborted) { setCatalog(nextCatalog); setAccounts(rows); setError(null); }
       }).catch(reason => { if (!controller.signal.aborted) setError(coreOrganizationError(reason).message); })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
-  }, [version]);
+  }, [version, accountRole]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -134,7 +135,7 @@ function Distribution({ onClose, initialRole }: { onClose: () => void; initialRo
       const update = (value: StudentDivisionProgress) => { if (alive.current) setProgress(value); };
       const result = staff
         ? await assignStaffAdminDivisions(editing, newTargets.map(divisionId => ({ divisionId, roleId: Number(targetRoles[divisionId]) })), update, () => alive.current)
-        : await assignStudentDivisions(editing, newTargets, update, () => alive.current);
+        : examiner ? await assignExaminerDivisions(editing, newTargets, update, () => alive.current) : await assignStudentDivisions(editing, newTargets, update, () => alive.current);
       if (alive.current) { setNotice(`Готово: добавлено участий — ${result.added}, уже были назначены — ${result.existing}.`); setEditing(null); setSelected([]); }
     } catch (reason) { if (alive.current) setFormError(`${coreOrganizationError(reason).message} Выполнение остановлено. Уже сохранённые участия остаются на месте.`); }
     finally {
@@ -154,13 +155,13 @@ function Distribution({ onClose, initialRole }: { onClose: () => void; initialRo
   const selectedRows = accounts.filter(row => editing?.includes(row.account_id));
 
   return <section className={styles.workspace} aria-label="Распределение пользователей по подразделениям">
-    <header className={styles.header}><div><h2>{staff ? "Администраторы по подразделениям" : "Ученики по подразделениям"}</h2><p>{catalog?.organization.name ?? "Текущая организация"} · Один аккаунт может состоять в нескольких подразделениях.</p></div><Button variant="ghost" disabled={busy} onClick={onClose}>К списку пользователей</Button></header>
+    <header className={styles.header}><div><h2>{staff ? "Администраторы по подразделениям" : examiner ? "Экзаменаторы по подразделениям" : "Ученики по подразделениям"}</h2><p>{catalog?.organization.name ?? "Текущая организация"} · Один аккаунт может состоять в нескольких подразделениях.</p></div><Button variant="ghost" disabled={busy} onClick={onClose}>К списку пользователей</Button></header>
     <div className={styles.toolbar}>
       <label>Кого распределяем<select value={accountRole} disabled={busy || !!editing} onChange={event => {
-        setAccountRole(event.target.value as DistributionAccountRole); setSelected([]); setPage(1); setMembers({}); setMemberErrors({});
+        setAccountRole(event.target.value as DistributionAccountRole); setLoading(true); setAccounts([]); setSelected([]); setPage(1); setMembers({}); setMemberErrors({});
         setDivisionAccounts(null); setFilterLoading(division !== "all"); setError(null); setNotice(null);
-      }}><option value="student">Ученики</option><option value="staff_admin">Администраторы подразделений</option></select></label>
-      <label>{staff ? "Поиск администраторов" : "Поиск учеников"}<input type="search" value={search} placeholder="Имя, логин или ID" onChange={event => { setSearch(event.target.value); setPage(1); setSelected([]); }} /></label>
+      }}><option value="student">Ученики</option><option value="examinator">Экзаменаторы</option><option value="staff_admin">Администраторы подразделений</option></select></label>
+      <label>{staff ? "Поиск администраторов" : examiner ? "Поиск экзаменаторов" : "Поиск учеников"}<input type="search" value={search} placeholder="Имя, логин или ID" onChange={event => { setSearch(event.target.value); setPage(1); setSelected([]); }} /></label>
       <label>Подразделение<select value={division} disabled={busy} onChange={event => { setDivision(event.target.value); setDivisionAccounts(null); setFilterLoading(event.target.value !== "all"); setPage(1); setSelected([]); setError(null); }}><option value="all">Вся организация</option>{catalog?.divisions.map(row => <option key={row.id} value={row.id}>{row.name}</option>)}</select></label>
       <Button variant="ghost" disabled={busy || loading} onClick={refresh}>Обновить</Button>
     </div>
@@ -170,17 +171,17 @@ function Distribution({ onClose, initialRole }: { onClose: () => void; initialRo
     {error ? <p className={styles.error} role="alert">{error}</p> : null}
     {loading || filterLoading ? <p role="status">Загрузка пользователей…</p> : error && (!catalog || division !== "all" && !divisionAccounts) ? null : <>
       <p className={styles.caption}>Найдено: {filtered.length} · Показаны пользователи выбранной организации, без переключения кабинета.</p>
-      <div className={styles.tableWrap}><table className={styles.table}><thead><tr><th><input type="checkbox" aria-label={staff ? "Выбрать администраторов на этой странице" : "Выбрать учеников на этой странице"} disabled={busy || !selectPage.length} checked={allPage} onChange={() => setSelected(previous => allPage ? previous.filter(id => !selectPage.includes(id)) : [...new Set([...previous, ...selectPage])])} /></th><th>{staff ? "Администратор" : "Ученик"}</th><th>Подразделения</th><th>Действия</th></tr></thead><tbody>{pageRows.map(row => <tr key={row.account_id}>
+      <div className={styles.tableWrap}><table className={styles.table}><thead><tr><th><input type="checkbox" aria-label={staff ? "Выбрать администраторов на этой странице" : examiner ? "Выбрать экзаменаторов на этой странице" : "Выбрать учеников на этой странице"} disabled={busy || !selectPage.length} checked={allPage} onChange={() => setSelected(previous => allPage ? previous.filter(id => !selectPage.includes(id)) : [...new Set([...previous, ...selectPage])])} /></th><th>{staff ? "Администратор" : examiner ? "Экзаменатор" : "Ученик"}</th><th>Подразделения</th><th>Действия</th></tr></thead><tbody>{pageRows.map(row => <tr key={row.account_id}>
         <td><input type="checkbox" aria-label={`Выбрать ${row.full_name}`} disabled={busy || row.owner_organization_id !== catalog?.organization.id} checked={selected.includes(row.account_id)} onChange={() => setSelected(previous => previous.includes(row.account_id) ? previous.filter(id => id !== row.account_id) : [...previous, row.account_id])} /></td>
         <td><strong>{row.full_name}</strong><small>{row.login} · ID {row.account_id}{row.is_active === false || row.is_active === 0 ? " · Заблокирован" : ""}</small></td>
         <td><div className={styles.chips}>{members[row.account_id] ? members[row.account_id].memberships.length ? members[row.account_id].memberships.map(member => <span key={member.division_id} className={styles.chip}>{member.division_name}{staff ? ` · ${member.role_name ?? "Роль не указана"}` : ""}</span>) : <span>Нет подразделений</span> : memberErrors[row.account_id] ? <span className={styles.error}>{memberErrors[row.account_id]}</span> : <span className={styles.caption}>Проверяем участия…</span>}</div></td>
         <td>{row.owner_organization_id === catalog?.organization.id ? <Button size="sm" variant="ghost" disabled={busy || !!pending} onClick={() => open([row.account_id])}>Назначить подразделения</Button> : <span className={styles.caption}>Назначает организация владельца</span>}</td>
-      </tr>)}</tbody></table>{!pageRows.length ? <p className={styles.empty}>{staff ? "Администраторы не найдены" : "Ученики не найдены"}</p> : null}</div>
+      </tr>)}</tbody></table>{!pageRows.length ? <p className={styles.empty}>{staff ? "Администраторы не найдены" : examiner ? "Экзаменаторы не найдены" : "Ученики не найдены"}</p> : null}</div>
       <AdminListPaginationBar pagination={toClientPagination(visiblePage, PAGE_SIZE, filtered.length)} onPageChange={setPage} />
     </>}
     {editing ? <dialog ref={dialog} className={styles.dialog} aria-labelledby="division-assignment-title" onCancel={event => { event.preventDefault(); close(); }}>
       <h2 id="division-assignment-title">Добавить в подразделения</h2>
-      <p>{editing.length === 1 ? selectedRows[0]?.full_name : `Выбрано ${staff ? "администраторов" : "учеников"}: ${editing.length}`}</p>
+      <p>{editing.length === 1 ? selectedRows[0]?.full_name : `Выбрано ${staff ? "администраторов" : examiner ? "экзаменаторов" : "учеников"}: ${editing.length}`}</p>
       <p className={styles.caption}>Отметьте одно или несколько подразделений. Текущие участия, роли, группы и история сохранятся. Новые аккаунты не создаются.</p>
       {staff ? <p className={styles.caption}>Для каждого нового подразделения выберите роль. Существующие роли не будут заменены.</p> : null}
       {staff && rolesLoading ? <p role="status">Загрузка ролей организации…</p> : null}

@@ -2,13 +2,12 @@ import { getIdentity } from "./client";
 import { canManageCoreAccess } from "./core-access";
 import {
   coreOrganizationAccountMemberships,
-  coreOrganizationAccounts,
   coreOrganizationRoles,
   saveCoreOrganizationParticipation,
 } from "./core-organization";
 
 export interface StudentDivisionProgress { added: number; existing: number; total: number }
-export type DistributionAccountRole = "student" | "staff_admin";
+export type DistributionAccountRole = "student" | "staff_admin" | "examinator";
 export interface StaffDivisionAssignment { divisionId: number; roleId: number }
 
 /** Additive only: never replaces memberships, moves groups or recreates accounts. */
@@ -17,6 +16,13 @@ export async function assignStudentDivisions(
   shouldContinue: () => boolean = () => true,
 ): Promise<StudentDivisionProgress> {
   return assignDivisions(accounts, divisions.map(divisionId => ({ divisionId, roleId: null })), "student", onProgress, shouldContinue);
+}
+
+export async function assignExaminerDivisions(
+  accounts: number[], divisions: number[], onProgress: (progress: StudentDivisionProgress) => void,
+  shouldContinue: () => boolean = () => true,
+): Promise<StudentDivisionProgress> {
+  return assignDivisions(accounts, divisions.map(divisionId => ({ divisionId, roleId: null })), "examinator", onProgress, shouldContinue);
 }
 
 export async function assignStaffAdminDivisions(
@@ -51,12 +57,8 @@ async function assignDivisions(
   }
   checkContext();
   if (accountRole === "staff_admin") {
-    const [roles, rows] = await Promise.all([coreOrganizationRoles(), coreOrganizationAccounts()]);
-    checkContext();
+    const roles = await coreOrganizationRoles(); checkContext();
     if ([...targets.values()].some(roleId => !roles.some(role => role.id === roleId))) throw new Error("Выберите действующую роль этой организации");
-    if (accountIds.some(id => !rows.some(row => row.account_id === id && row.role === "staff_admin" && row.owner_organization_id === identity?.user.organization_id))) {
-      throw new Error("Выберите администраторов подразделений своей организации");
-    }
   }
   const progress = { added: 0, existing: 0, total: accountIds.length * targets.size };
   onProgress({ ...progress });
@@ -66,6 +68,7 @@ async function assignDivisions(
     const detail = await coreOrganizationAccountMemberships(accountId);
     checkContext();
     if (!detail.can_assign) throw new Error("Назначение доступно только организации владельца аккаунта");
+    if (accountRole !== "student" && (detail.role !== accountRole || detail.owner_organization_id !== identity?.user.organization_id || (accountRole === "examinator" && detail.is_active !== true && detail.is_active !== 1))) throw new Error("Выберите активные аккаунты нужной роли своей организации");
     for (const [divisionId, roleId] of targets) {
       checkContext();
       if (detail.memberships.some(member => member.division_id === divisionId)) progress.existing++;

@@ -1,7 +1,8 @@
+/* Exam journal refinement using unslop by Damir Sokolovsky (@heydamir), CC BY 4.0. */
 .page {
   display: flex;
   flex-direction: column;
-  gap: 22px;
+  gap: 24px;
   color: var(--ds-text);
   min-width: 0;
 }
@@ -17,21 +18,21 @@
 .panel h2,
 .panel h3 {
   margin: 0;
-  letter-spacing: -0.025em;
+  letter-spacing: 0;
   line-height: 1.25;
 }
 .header h1 {
   font-size: clamp(25px, 2.2vw, 32px);
-  font-weight: 750;
+  font-weight: 600;
 }
 .header h2,
 .panel h2 {
   font-size: 20px;
-  font-weight: 700;
+  font-weight: 600;
 }
 .subtitle {
   color: var(--ds-text-secondary);
-  margin: 6px 0 0;
+  margin: 4px 0 0;
   line-height: 1.55;
 }
 .panel {
@@ -39,7 +40,7 @@
   border: 1px solid var(--ds-border);
   border-radius: var(--ds-radius-lg);
   padding: 24px;
-  box-shadow: 0 2px 8px color-mix(in srgb, var(--ds-text) 3%, transparent);
+  box-shadow: none;
   min-width: 0;
   display: flex;
   flex-direction: column;
@@ -57,7 +58,7 @@
 .columns {
   display: grid;
   grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr);
-  gap: 20px;
+  gap: 24px;
   align-items: start;
 }
 .row {
@@ -75,7 +76,7 @@
 .label {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
   font-size: 13px;
   font-weight: 600;
   min-width: 0;
@@ -87,10 +88,10 @@
   background: var(--ds-surface);
   color: var(--ds-text);
   border-radius: 8px;
-  padding: 10px 12px;
+  padding: 8px 12px;
   font: inherit;
   font-weight: 400;
-  min-height: 42px;
+  min-height: 44px;
   width: 100%;
   min-width: 0;
 }
@@ -102,10 +103,10 @@
 .button {
   background: var(--ds-surface);
   border: 1px solid var(--ds-border);
-  border-radius: 9px;
+  border-radius: 8px;
   color: var(--ds-text);
-  min-height: 42px;
-  padding: 9px 15px;
+  min-height: 44px;
+  padding: 8px 16px;
   font: inherit;
   font-weight: 600;
   cursor: pointer;
@@ -134,13 +135,14 @@
   opacity: 0.55;
 }
 .primary {
-  background: var(--ds-accent);
-  color: #fff;
-  border-color: var(--ds-accent);
+  background: var(--ds-text);
+  color: var(--ds-surface);
+  border-color: var(--ds-text);
 }
 .primary:hover:not(:disabled) {
-  background: var(--ds-accent-hover);
-  color: white;
+  background: var(--ds-text-secondary);
+  border-color: var(--ds-text-secondary);
+  color: var(--ds-surface);
 }
 .danger {
   color: #a6232c;
@@ -150,7 +152,7 @@
   display: flex;
   gap: 4px;
   overflow: auto;
-  padding: 5px;
+  padding: 4px;
   background: var(--ds-surface-muted);
   border: 1px solid var(--ds-border);
   border-radius: 12px;
@@ -175,8 +177,8 @@
 }
 .badge {
   display: inline-flex;
-  padding: 4px 10px;
-  border-radius: 20px;
+  padding: 4px 8px;
+  border-radius: 4px;
   background: var(--ds-surface-muted);
   font-size: 13px;
   line-height: 1.5;
@@ -186,8 +188,8 @@
 .warning,
 .error,
 .success {
-  padding: 14px 16px;
-  border-radius: 9px;
+  padding: 12px 16px;
+  border-radius: 8px;
   line-height: 1.6;
   overflow-wrap: anywhere;
 }
@@ -236,7 +238,7 @@
 }
 .itemTitle {
   font-size: 18px;
-  font-weight: 650;
+  font-weight: 600;
   overflow-wrap: anywhere;
 }
 .text {
@@ -247,7 +249,7 @@
 }
 .score {
   font-size: 30px;
-  font-weight: 750;
+  font-weight: 600;
   line-height: 1.2;
 }
 .stats {
@@ -258,7 +260,7 @@
 .stat {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
   padding: 16px 20px;
   border-radius: 12px;
   background: var(--ds-surface-muted);
@@ -281,7 +283,7 @@
 }
 .table th,
 .table td {
-  padding: 14px 16px;
+  padding: 12px 16px;
   border-bottom: 1px solid var(--ds-border);
   vertical-align: top;
 }
@@ -302,8 +304,7 @@
   position: fixed;
   inset: 0;
   z-index: 1200;
-  background: rgba(10, 25, 20, 0.4);
-  backdrop-filter: blur(4px);
+  background: rgba(16, 18, 20, 0.48);
   padding: 24px;
   display: flex;
   align-items: center;
@@ -319,7 +320,7 @@
   padding: 24px;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 24px;
   box-shadow: 0 24px 80px #0003;
   overscroll-behavior: contain;
   scrollbar-width: thin;
@@ -369,7 +370,7 @@
     padding: 12px;
   }
   .dialog {
-    padding: 18px;
+    padding: 16px;
     max-height: 95dvh;
   }
   .voteBar {
@@ -380,7 +381,7 @@
     z-index: 10;
   }
   .header h1 {
-    font-size: 25px;
+    font-size: 24px;
   }
   .table th,
   .table td {
@@ -392,7 +393,7 @@
   display: flex;
   align-items: flex-end;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 12px;
   padding: 16px;
   border: 1px solid var(--ds-border);
   border-radius: 12px;
@@ -424,21 +425,21 @@
   grid-column: 1 / -1;
 }
 .examCard {
-  gap: 14px;
+  gap: 16px;
   position: relative;
   transition: border-color 150ms ease, box-shadow 150ms ease;
 }
 .examCard:hover {
   border-color: color-mix(in srgb, var(--ds-accent) 40%, var(--ds-border));
-  box-shadow: 0 5px 16px color-mix(in srgb, var(--ds-text) 5%, transparent);
+  box-shadow: none;
 }
 .examCard h2 {
-  font-size: 19px;
+  font-size: 20px;
   line-height: 1.4;
   overflow-wrap: anywhere;
 }
 .examCard .score {
-  font-size: 23px;
+  font-size: 24px;
   color: var(--ds-accent);
   padding: 8px 12px;
   border-radius: 10px;
@@ -448,7 +449,7 @@
 .cardTags {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 8px;
 }
 .cardTags:empty {
   display: none;
@@ -484,13 +485,13 @@
   justify-content: space-between;
   gap: 16px;
   margin: -24px -24px 0;
-  padding: 18px 24px;
+  padding: 16px 24px;
   border-bottom: 1px solid var(--ds-border);
   background: var(--ds-surface);
   z-index: 2;
 }
 .dialogHeader h2 {
-  font-size: 21px;
+  font-size: 20px;
   line-height: 1.35;
 }
 .closeButton {
@@ -519,7 +520,7 @@
 .trainingSummary {
   cursor: pointer;
   color: var(--ds-text);
-  font-weight: 650;
+  font-weight: 600;
   line-height: 1.6;
 }
 .trainingSummary .badge {
@@ -548,9 +549,9 @@
     max-width: none;
   }
   .dialogHeader {
-    top: -18px;
-    margin: -18px -18px 0;
-    padding: 16px 18px;
+    top: -16px;
+    margin: -16px -16px 0;
+    padding: 16px;
   }
   .dialogHeader h2 {
     font-size: 18px;
@@ -566,3 +567,63 @@
     margin: 8px 0 0;
   }
 }
+
+.page { font-size: 14px; line-height: 1.5; font-variant-numeric: tabular-nums; }
+.page h3 { font-size: 16px; font-weight: 600; }
+.header h1 { font-size: clamp(24px, 2.2vw, 32px); }
+.page svg { flex-shrink: 0; }
+.button svg { width: 16px; height: 16px; stroke-width: 1.75; }
+.error, .warning, .success { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+.error p, .warning p, .success p { margin: 0; }
+.table td { font-size: 14px; line-height: 1.5; }
+.table th { position: sticky; top: 0; z-index: 1; }
+.tableWrap { max-height: 72vh; scrollbar-width: thin; }
+.table .input { min-width: 120px; }
+.stats { gap: 0; border-block: 1px solid var(--ds-border); }
+.stat { background: transparent; border-radius: 0; flex: 1 1 140px; padding: 16px; }
+.stat + .stat { border-left: 1px solid var(--ds-border); }
+.score { font-weight: 500; }
+.assignmentRow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 24px; padding: 16px 20px; border-radius: 0; border: 0; border-bottom: 1px solid var(--ds-border); }
+.assignmentRow > .header { grid-column: 1; justify-content: flex-start; gap: 12px; }
+.assignmentRow > p { grid-column: 1; }
+.assignmentRow > .button { grid-column: 2; grid-row: 1 / span 3; align-self: center; }
+.assignmentRow > .error, .assignmentRow > .warning, .assignmentRow > .success { grid-column: 1 / -1; }
+.journal { gap: 0; border: 1px solid var(--ds-border); border-radius: 12px; overflow: hidden; background: var(--ds-surface); }
+.journal > :last-child { border-bottom: 0; }
+.assignmentRow .itemTitle { font-size: 16px; }
+.assignmentRow:hover { background: color-mix(in srgb, var(--ds-text) 2%, var(--ds-surface)); }
+@media (prefers-reduced-motion: reduce) { .button, .examCard { transition: none; } }
+@media (max-width: 700px) {
+ .assignmentRow { grid-template-columns: minmax(0, 1fr); padding: 16px; }
+ .assignmentRow > .button { grid-column: 1; grid-row: auto; width: 100%; margin-top: 4px; }
+ .assignmentRow > .header { align-items: flex-start; }
+ .stat { flex-basis: 40%; padding: 12px; }
+ .stat + .stat { border-left: 0; }
+ .page > .header > .row { width: 100%; }
+ .page > .header > .row > .button { flex: 1; }
+}
+
+.importPreviewRow { border-radius: 8px; padding: 12px 16px; gap: 16px; }
+.importRowSummary { display: grid; grid-template-columns: 112px minmax(120px, 1fr) 120px auto auto; align-items: center; gap: 12px; }
+.importRowTitle { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 400; }
+.importRowSummary strong { font-weight: 600; }
+.importRowSummary .button { min-height: 36px; padding: 8px 12px; }
+.dangerText { color: #b42318; }
+:global(html.dark) .dangerText { color: #fda29b; }
+@media (max-width: 960px) {
+ .importRowSummary { grid-template-columns: 96px minmax(0, 1fr); }
+ .importRowTitle { white-space: normal; overflow-wrap: anywhere; }
+ .importRowSummary .button { min-height: 44px; }
+ .importRowSummary > :nth-child(3) { grid-column: 1 / -1; }
+}
+
+.importPreviewRow { display: flex; flex-direction: column; background: var(--ds-surface); border: 1px solid var(--ds-border); }
+.importBuilder { background: var(--ds-surface); border: 1px solid var(--ds-border); border-radius: 12px; padding: 16px; }
+.importBuilder > summary, .importInstructions > summary { cursor: pointer; font-weight: 600; line-height: 1.5; }
+.importBuilder > .stack { margin-top: 16px; }
+.importBuilder > .stack > .label { max-width: 400px; }
+.importInstructions { font-size: 14px; }
+.importInstructions ol { padding-left: 24px; margin: 12px 0 0; }
+.importInstructions li { line-height: 1.6; margin-block: 8px; }
+.importMember { display: inline-flex; align-items: center; gap: 8px; padding: 4px 4px 4px 12px; border: 1px solid var(--ds-border); border-radius: 8px; font-size: 14px; }
+.importMember .button { padding: 4px; min-height: 36px; border: 0; background: transparent; }

@@ -6,6 +6,7 @@ import { LoadingState } from "@/components/ui/loading-state";
 import { useCabinetChrome } from "@/contexts/cabinet-chrome-context";
 import {
   fetchSectionStudyView,
+  fetchExamTrainingSelection,
   fetchSectionBatch,
   markCardLearned,
 } from "@/lib/training/training-api";
@@ -133,7 +134,7 @@ export function TrainingFlashcards({
   useEffect(() => {
     if ((!BFF_DEV && sectionKind !== "exam") || previewCards || loading || cards.length || !learnedCount) return;
     let cancelled = false;
-    fetchSectionStudyView(studentId, sectionKind, sectionRefId).then((view) => {
+    (sectionKind === "exam" ? fetchExamTrainingSelection(studentId, sectionRefId, { summary: true }) : fetchSectionStudyView(studentId, sectionKind, sectionRefId)).then((view) => {
       if (!cancelled) setSummary(view.stats);
     }, (err) => {
       if (!cancelled) { setError(trainingError(err)); setFatal(trainingUnavailable(err)); }
@@ -227,7 +228,7 @@ export function TrainingFlashcards({
         if (updated) setCards((prev) => prev.map((item) => item.card_ref === card.card_ref ? updated : item));
         else {
           try {
-            const fresh = await fetchSectionStudyView(studentId, sectionKind, sectionRefId);
+            const fresh = sectionKind === "exam" && batchIndex >= 0 ? await fetchSectionBatch(studentId, sectionKind, sectionRefId, batchIndex, "all") : await fetchSectionStudyView(studentId, sectionKind, sectionRefId);
             const updatedCard = fresh.cards.find((item) => item.card_ref === card.card_ref);
             if (updatedCard) setCards((prev) => prev.map((item) => item.card_ref === card.card_ref ? updatedCard : item));
           } catch (reloadError) { setError(trainingError(reloadError)); setFatal(true); }

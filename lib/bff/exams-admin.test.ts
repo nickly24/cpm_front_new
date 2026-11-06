@@ -35,23 +35,18 @@ describe("exams administration owner boundary", () => {
     it("sends outside result numeric values and account identifiers to owner", async () => { domainMock.mockResolvedValue({}); await examsAdminMutate({ path: "/api/exams/81/outside-lms/results", method: "POST", body: { studentId: 9, points: 0, grade: 0, examinator: "Иван" }, key }); expect(domainMock.mock.calls[0][0]).toBe("/exams/81/outside-results"); expect(JSON.parse(domainMock.mock.calls[0][1].body)).toEqual({ student_account_id: 9, points: 0, grade: 0, examinator: "Иван" }); });
     it("keeps physical-delete confirmation in headers and revision in JSON", async () => { domainMock.mockResolvedValue({ deleted: true }); await examsAdminMutate({ path: "/api/exams/81/classic/questions/4?expectedVersion=3", method: "DELETE", confirmationToken: "hash", key }); expect(domainMock.mock.calls[0][0]).toBe("/exams/81/questions/4"); expect(JSON.parse(domainMock.mock.calls[0][1].body)).toEqual({ expected_revision: 3 }); expect(domainMock.mock.calls[0][1].headers["X-Exam-Confirmation"]).toBe("hash"); });
     it("does not swallow rejected deletes", async () => { domainMock.mockRejectedValue(Object.assign(new Error("preview_changed"), { status: 409 })); await expect(examsAdminMutate({ path: "/api/exams/81", method: "DELETE", body: { expectedVersion: 7 }, key })).rejects.toMatchObject({ status: 409 }); });
-    it("read-back maps outside IDs without profile lookups", async () => { domainMock.mockResolvedValue({ items: [{ id: 1, student: { account_id: 9, full_name: "Первый" }, points: 0, grade: 0, revision: 3 }, { id: 2, student: { account_id: 10, full_name: "Второй" }, points: 2, grade: 5, revision: 1 }], total: 2 }); const result = await examsAdminGet("/api/exams/81/outside-lms/results", { sort: "grade_desc", page: 1, limit: 1 }) as {
-        items: {
-            studentId: number;
-            grade: number;
-        }[];
-        pagination: {
-            total: number;
-        };
-    }; expect(result.items[0]).toMatchObject({ studentId: 10, grade: 5 }); expect(result.pagination.total).toBe(2); });
-    it("searches, sorts and paginates all catalogue pages, with bank scope preserved", async () => { const rows = Array.from({ length: 201 }, (_, i) => ({ ...ownerExam, id: i + 1, name: i === 200 ? "Unique" : "Common" })); domainMock.mockImplementation((path: string) => path === "/core/directions" ? Promise.resolve([{ id: 3, name: "Математика" }]) : path.startsWith("/exams?") ? Promise.resolve({ items: path.includes("offset=200") ? rows.slice(200) : rows.slice(0, 200), total: 201 }) : Promise.resolve({ ...ownerExam, ...rows[Number(path.split("/")[2]) - 1] })); const response = await examsAdminGet("/api/exams", { scope: "bank", search: "Unique", page: 1, limit: 20 }) as {
-        items: {
-            id: number;
-        }[];
-        pagination: {
-            total: number;
-        };
-    }; expect(response.items.map(x => x.id)).toEqual([201]); expect(response.pagination.total).toBe(1); expect(domainMock.mock.calls.some(([path]) => path.includes("scope=bank") && path.includes("offset=200"))).toBe(true); });
+    it("reads one owner page for outside results, preserving server order and total", async () => {
+        domainMock.mockResolvedValue({ items: [{ id: 2, student: { account_id: 10, full_name: "Второй" }, points: 2, grade: 5, revision: 1 }], total: 2000 });
+        const result = await examsAdminGet("/api/exams/81/outside-lms/results", { sort: "grade_desc", page: 2, limit: 1 }) as { items: { studentId: number; grade: number }[]; pagination: { total: number; page: number } };
+        expect(result.items[0]).toMatchObject({ studentId: 10, grade: 5 }); expect(result.pagination).toMatchObject({ total: 2000, page: 2 });
+        expect(domainMock).toHaveBeenCalledTimes(1); expect(domainMock.mock.calls[0][0]).toBe("/exams/81/results?sort=grade_desc&limit=1&offset=1");
+    });
+    it("forwards catalogue search and bank scope before reading one visible page", async () => {
+        domainMock.mockImplementation((path: string) => path === "/core/directions" ? [{ id: 3, name: "Математика" }] : { items: [{ ...ownerExam, id: 201, name: "Unique" }], total: 1 });
+        const response = await examsAdminGet("/api/exams", { scope: "bank", search: "Unique", page: 1, limit: 20 }) as { items: { id: number }[]; pagination: { total: number } };
+        expect(response.items.map(x => x.id)).toEqual([201]); expect(response.pagination.total).toBe(1);
+        expect(domainMock.mock.calls.map(([path]) => path)).toEqual(["/exams?scope=bank&sort=date_desc&q=Unique&limit=20&offset=0", "/core/directions"]);
+    });
     it("preserves UUID import sessions and computes errors on included rows", () => { const session = mapImport({ id: key, revision: 2, state: "editable", rows: [{ row_id: "r1", source_row: 2, input: { studentId: 9 }, errors: ["student_not_found"], excluded: true }, { row_id: "r2", source_row: 3, input: { points: 0 }, errors: [], excluded: false }] }, 81); expect(session.id).toBe(key); expect(session.summary).toMatchObject({ included: 1, excluded: 1, errors: 0 }); expect(session.rows[0].errors[0].code).toBe("student_not_found"); });
     it("edits and commits the exact owner import session with CAS", async () => { domainMock.mockResolvedValue({ committed: true, counts: { results_created: 1 } }); await examsAdminMutate({ path: `/api/exams/81/imports/outside/sessions/${key}/commit`, method: "POST", body: { expectedPreviewVersion: 2 }, key }); expect(domainMock.mock.calls[0][0]).toBe(`/exams/81/imports/outside/${key}/commit`); expect(JSON.parse(domainMock.mock.calls[0][1].body)).toEqual({ expected_revision: 2 }); });
     it("uploads XLSX as FormData without a manual content type", async () => { domainMock.mockResolvedValue({ id: key, revision: 1, rows: [] }); await examsParseImport(81, "outside", new File(["fixture"], "outside.xlsx"), key); const [path, options] = domainMock.mock.calls[0]; expect(path).toBe("/exams/81/imports/outside"); expect(options.body).toBeInstanceOf(FormData); expect(options.headers["Content-Type"]).toBeUndefined(); });

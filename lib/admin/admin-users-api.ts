@@ -71,7 +71,7 @@ export async function addAdminStaffUser(
   role: AdminStaffRole,
   payload: AdminStaffFormData,
 ): Promise<AdminStaffAddResponse> {
-  if (BFF_DEV) { const result = await createCoreUser({role, full_name:payload.full_name.trim(), class:0, tg_name:"", school_id:null, group_id:payload.group_id??null, role_id:payload.role_id??null, login:payload.login?.trim()??"",password:payload.password??""}); return {status:true,user_data:{id:result.account_id,full_name:payload.full_name,login:payload.login!,password:payload.password!,group_id:payload.group_id}}; }
+  if (BFF_DEV) { const result = await createCoreUser({role, ...(payload.division_ids ? {division_ids:payload.division_ids} : {}), full_name:payload.full_name.trim(), class:0, tg_name:"", school_id:null, group_id:payload.group_id??null, role_id:payload.role_id??null, login:payload.login?.trim()??"",password:payload.password??""}); return {status:true,user_data:{id:result.account_id,full_name:payload.full_name,login:payload.login!,password:payload.password!,group_id:payload.group_id}}; }
   return apiRequest<AdminStaffAddResponse>("/api/add-staff-user", {
     method: "POST",
     body: JSON.stringify({

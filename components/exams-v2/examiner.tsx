@@ -4,6 +4,7 @@ import { BFF_DEV } from "@/lib/config";
 import { useContextGuard } from "@/lib/bff/use-context-guard";
 import { FilterPopover } from "@/components/ui/filter-popover";
 import { useState } from "react";
+import { ArrowLeft, RefreshCw } from "lucide-react";
 import { queryString } from "@/lib/exams-v2/api";
 import {
   useExamMutation,
@@ -59,7 +60,7 @@ function AssignmentCard({
     (data) => open(data.attempt.id),
   );
   return (
-    <article className={s.item}>
+    <article className={`${s.item} ${s.assignmentRow}`}>
       <div className={s.header}>
         <strong className={s.itemTitle}>{row.student.fullName}</strong>
         <span className={s.badge}>{statusLabel(row.status)}</span>
@@ -74,7 +75,7 @@ function AssignmentCard({
       <ValidationList items={row.unavailableReasons} />
       <MutationNotice mutation={mutation} />
       <Action
-        primary
+        primary={row.status === "in_progress"}
         disabled={
           mutation.busy ||
           mutation.uncertain ||
@@ -161,7 +162,7 @@ function AttemptWorkspace({
     <div className={s.page}>
       <div className={s.header}>
         <Action onClick={back} disabled={mutation.busy || mutation.uncertain}>
-          ← К студентам
+          <ArrowLeft aria-hidden="true" /> К студентам
         </Action>
         <Action
           disabled={resource.loading || mutation.busy}
@@ -544,17 +545,16 @@ export function ExaminerExams({
                 nav.navigate({ examId: null });
               }}
             >
-              ← К экзаменам
+              <ArrowLeft aria-hidden="true" /> К экзаменам
             </Action>
           )}
           <Action disabled={resource.loading} onClick={resource.reload}>
-            Обновить
+            <RefreshCw aria-hidden="true" /> Обновить
           </Action>
         </div>
       </div>
       <p className={s.subtitle}>
-        Здесь только экзамены и студенты вашей комиссии. Студент отвечает устно,
-        без устройства.
+        Назначения вашей комиссии. Ответы принимаются устно, оценки сохраняются в протоколе.
       </p>
       <form
         className={s.toolbar}
@@ -626,7 +626,7 @@ export function ExaminerExams({
         </div>
       )}
       {examId && (
-        <div className={s.list}>
+        <div className={`${s.list} ${s.journal}`}>
           {students.data?.items.map((row) => (
             <AssignmentCard
               key={row.assignmentId}

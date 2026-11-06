@@ -1,3 +1,4 @@
+import { ApiError } from "@/lib/api/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 const { domain, identity } = vi.hoisted(() => ({ domain: vi.fn(), identity: { context_revision: "a", user: { account_id: 91, id: 123, role: "examinator", organization_id: 7, division_id: 8, permissions: {} } } }));
 vi.mock("./client", () => ({ domain, getIdentity: () => identity }));
@@ -41,7 +42,27 @@ describe("oral exam boundary", () => {
     const page = await examsConductGet("/api/exams/10/classic/attempts/50/questions?page=3&limit=10&throughSequenceNo=25") as { throughSequenceNo: number; pagination: { page: number } };
     expect(domain.mock.calls[0][0]).toBe("/exams/10/attempts/50/protocol?limit=10&offset=20&through_sequence_no=25"); expect(page).toMatchObject({ throughSequenceNo: 25, pagination: { page: 3 } });
   });
-  it("does not widen user lookup rights for exams-only staff", async () => {
-    await expect(examsConductGet("/api/exams/lookups/students")).rejects.toMatchObject({ status: 403 }); expect(domain).not.toHaveBeenCalled();
+  it("requests a bounded scoped participant page and preserves backend denial", async () => {
+    domain.mockResolvedValueOnce({ items: [{ account_id: 91, full_name: "Ученик", profile_id: 999 }], total: 1000, limit: 20, offset: 20 });
+    const result = await examsConductGet("/api/exams/lookups/students", { page: 2, search: "Ученик" }) as { items: { id: number }[]; pagination: { total: number } };
+    expect(result.items[0].id).toBe(91); expect(result.pagination.total).toBe(1000);
+    expect(domain).toHaveBeenCalledWith("/core/exam-participants?role=student&q=%D0%A3%D1%87%D0%B5%D0%BD%D0%B8%D0%BA&limit=20&offset=20", { signal: undefined });
+    domain.mockRejectedValueOnce(new ApiError("Нет доступа", 403, undefined, "access_denied"));
+    await expect(examsConductGet("/api/exams/lookups/students")).rejects.toMatchObject({ status: 403 });
+    expect(domain).toHaveBeenCalledTimes(2);
+  });
+  it("gets inline readiness only for one page of 500 examiner assignments", async () => {
+    const rows = Array.from({ length: 20 }, (_, i) => ({ id: i + 21, student: { account_id: i + 91 }, members: [{ account_id: 92 }], readiness: { can_prepare: true, can_start_now: false, errors: [{ code: "exam_not_started" }] } }));
+    domain.mockResolvedValue({ items: rows, total: 500, limit: 20, offset: 20 });
+    const result = await examsConductGet("/api/examiner/exams/10/students", { page: 2, status: "not_started", search: "Имя" }) as { items: { canPrepare: boolean; canStart: boolean; unavailableReasons: { code: string }[] }[]; pagination: { total: number } };
+    expect(result.items).toHaveLength(20); expect(result.items[0]).toMatchObject({ canPrepare: true, canStart: false, unavailableReasons: [{ code: "exam_not_started" }] }); expect(result.pagination.total).toBe(500);
+    expect(domain).toHaveBeenCalledTimes(1); expect(domain.mock.calls[0][0]).toContain("include_readiness=true&limit=20&offset=20");
+    expect(domain.mock.calls[0][0]).toContain("status=not_started");
+  });
+  it("uses compact examiner catalogue summaries without exam or assignment fan-out", async () => {
+    domain.mockImplementation((path: string) => path === "/core/directions" ? [] : { items: [{ id: 10, name: "Алгебра", start_at: "2026-11-06T09:00:00Z", end_at: null, assigned_students_count: 500 }], total: 100 });
+    const result = await examsConductGet("/api/examiner/exams", { limit: 6 }) as { items: { assignedStudentsCount: number; startAt: string }[] };
+    expect(result.items[0]).toMatchObject({ assignedStudentsCount: 500, startAt: "2026-11-06T09:00:00Z" }); expect(domain).toHaveBeenCalledTimes(2);
+    expect(domain.mock.calls[0][0]).toBe("/exams?type=classic&limit=6&offset=0");
   });
 });

@@ -3,14 +3,14 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { User } from "@/lib/auth/types";
 const state = vi.hoisted(() => ({ user: { account_id: 8, id: 8, role: "admin", organization_admin: true, organization_id: 1, division_id: 10, context_revision: "r1", full_name: "Admin" } as User,
-  catalog: vi.fn(), accounts: vi.fn(), memberships: vi.fn(), divisionUsers: vi.fn(), assign: vi.fn(), assignStaff: vi.fn(), roles: vi.fn(), pending: vi.fn(), recover: vi.fn() }));
+  catalog: vi.fn(), accounts: vi.fn(), memberships: vi.fn(), divisionUsers: vi.fn(), assign: vi.fn(), assignStaff: vi.fn(), assignExaminer: vi.fn(), roles: vi.fn(), pending: vi.fn(), recover: vi.fn() }));
 vi.mock("@/contexts/AuthContext", () => ({ useAuth: () => ({ user: state.user }) }));
 vi.mock("@/lib/config", () => ({ BFF_DEV: true }));
 vi.mock("@/lib/bff/use-context-guard", () => ({ useContextGuard: vi.fn() }));
 vi.mock("@/lib/bff/core-organization", () => ({ coreOrganizationCatalog: state.catalog, coreOrganizationAccounts: state.accounts, coreOrganizationAccountMemberships: state.memberships,
   coreOrganizationRoles:state.roles, coreOrganizationError: (reason: Error) => reason, pendingCoreOrganizationCommand: state.pending, recoverCoreOrganizationCommand: state.recover }));
 vi.mock("@/lib/bff/core-admin", () => ({ coreAll: state.divisionUsers }));
-vi.mock("@/lib/bff/student-divisions", () => ({ assignStudentDivisions: state.assign, assignStaffAdminDivisions:state.assignStaff }));
+vi.mock("@/lib/bff/student-divisions", () => ({ assignStudentDivisions: state.assign, assignStaffAdminDivisions:state.assignStaff, assignExaminerDivisions:state.assignExaminer }));
 import { AdminStudentDivisions } from "./admin-student-divisions";
 
 const rows = Array.from({ length: 17 }, (_, index) => ({ account_id: 45 + index, profile_id: 900 + index, role: "student", login: `demo${index}`, full_name: `Ученик ${index + 1}`, is_active: true, owner_organization_id: 1 }));
@@ -117,4 +117,17 @@ describe("restricted administrators in the same distribution window",()=>{
     await modal.findByText(mode==="empty"?/пока нет ролей/:/Сервис ролей недоступен/);
     expect((modal.getByRole("button",{name:"Добавить в выбранные"}) as HTMLButtonElement).disabled).toBe(true);expect(state.assignStaff).not.toHaveBeenCalled();
   });
+});
+
+
+describe("examiner distribution workspace",()=>{
+ it("opens examiner mode and adds the same account to selected subdivisions",async()=>{
+  state.accounts.mockResolvedValue([{...rows[0],role:"examinator",full_name:"Экзаменатор А"}]);state.assignExaminer.mockResolvedValue({added:1,existing:0,total:1});
+  render(<AdminStudentDivisions initialRole="examinator" onClose={vi.fn()}/>);await screen.findByText("Экзаменатор А");expect(screen.getByText("Экзаменаторы по подразделениям")).toBeTruthy();
+  fireEvent.click(screen.getByRole("button",{name:"Назначить подразделения"}));const modal=within(screen.getByRole("dialog"));
+  const original=modal.getByRole("checkbox",{name:/Основная/}) as HTMLInputElement;expect(original.checked).toBe(true);expect(original.disabled).toBe(true);
+  fireEvent.click(modal.getByRole("checkbox",{name:"Резерв"}));fireEvent.click(modal.getByRole("button",{name:"Добавить в выбранные"}));
+  await waitFor(()=>expect(state.assignExaminer).toHaveBeenCalledWith([45],[20],expect.any(Function),expect.any(Function)));
+  expect(state.assign).not.toHaveBeenCalled();expect(state.assignStaff).not.toHaveBeenCalled();expect(state.roles).not.toHaveBeenCalled();
+ });
 });

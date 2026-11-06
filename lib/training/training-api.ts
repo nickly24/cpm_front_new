@@ -1,3 +1,6 @@
+import { examGet } from "@/lib/exams-v2/api";
+import { studyBatches, trainingStats } from "./exam-training";
+import type { ExamTrainingSelection } from "@/lib/bff/exams-student";
 import { BFF_DEV } from "@/lib/config";
 import { cardsTrainingTree, cardsStudyView, cardsStudyBatch, cardsStudySettings, cardsStudyMark, cardsStudyUnmark, cardsCatalogPage } from "@/lib/bff/cards";
 import { apiRequest } from "@/lib/api/client";
@@ -123,7 +126,7 @@ export async function fetchSectionStudyView(
   sectionRefId: string,
   signal?: AbortSignal,
 ): Promise<SectionStudyViewResponse> {
-  if (BFF_DEV && sectionKind === "exam") return (await import("@/lib/bff/exams-student")).examTrainingView(sectionRefId);
+  if (BFF_DEV && sectionKind === "exam") return (await import("@/lib/bff/exams-student")).examTrainingView(sectionRefId, false, signal);
   if (BFF_DEV) return cardsStudyView(sectionKind, sectionRefId, signal);
   const data = await apiRequest<SectionStudyViewResponse>(
     `/section-study/${studentId}/${sectionKind}/${encodeURIComponent(sectionRefId)}`,
@@ -132,6 +135,23 @@ export async function fetchSectionStudyView(
     throw new Error("Не удалось загрузить раздел");
   }
   return data;
+}
+
+/** Only an explicit all-cards study action omits summary/page/batch selection. */
+export async function fetchExamTrainingSelection(studentId: number, ref: string, selection: ExamTrainingSelection = {}, preview = false, signal?: AbortSignal): Promise<SectionStudyViewResponse> {
+  if (BFF_DEV) return (await import("@/lib/bff/exams-student")).examTrainingView(ref, preview, signal, selection);
+  const [examId, partId] = ref.split(":").map(Number);
+  let view = preview ? await examGet<SectionStudyViewResponse>(`/api/exams/${examId}/training/preview`, {}, signal) : await fetchSectionStudyView(studentId, "exam", ref, signal);
+  if (preview && partId) {
+    const part = view.parts?.find(item => item.part_id === partId);
+    if (!part) throw new Error("Часть удалена из экзамена");
+    const cards = view.cards.filter(card => card.part_id === partId);
+    view = { ...view, section_name: part.name, section_ref_id: ref, part_id: partId, cards, stats: trainingStats(cards), batches: studyBatches(cards, selection.batchSize ?? 10) };
+  }
+  if (preview && selection.batchSize) view = { ...view, settings: { ...view.settings, batch_size: selection.batchSize }, batches: studyBatches(view.cards, selection.batchSize) };
+  const limit = selection.limit ?? 20, start = ((selection.page ?? 1) - 1) * limit;
+  const cards = selection.summary ? [] : selection.batchIndex !== undefined ? view.cards.slice(selection.batchIndex * view.settings.batch_size, (selection.batchIndex + 1) * view.settings.batch_size) : selection.page ? view.cards.slice(start, start + limit) : view.cards;
+  return { ...view, cards };
 }
 
 export async function fetchSectionBatch(

@@ -140,13 +140,13 @@ function Detail({
 }
 function AvailableExamTraining() {
   const [page, setPage] = useState(1);
-  const resource = useExamResource<Page<TrainingSectionNode>>(BFF_DEV ? `/api/student/exams/training?page=${page}&limit=12` : null);
+  const resource = useExamResource<Page<Pick<TrainingSectionNode, "refId" | "name" | "exam_id" | "parts_count" | "total_cards">>>(BFF_DEV ? `/api/student/exams/training?page=${page}&limit=12` : null);
   if (!BFF_DEV) return null;
   return <section className={studentStyles.trainingList} aria-label="Доступная подготовка к экзаменам">
     <ErrorNotice error={resource.error} reload={resource.reload} />
     {resource.loading && <Loading />}
     <div>{resource.data?.items.map(exam => <article className={studentStyles.trainingRow} key={exam.refId}>
-      <h3>{exam.name}</h3><p>{exam.learned_cards} из {exam.total_cards} карточек выучено</p>
+      <h3>{exam.name}</h3><p>{exam.total_cards} карточек · частей: {exam.parts_count}</p>
       <Link className={s.button} href={examTrainingPath("student", exam.exam_id!)}>Подготовка по карточкам</Link>
     </article>)}</div>
     {resource.data?.items.length === 0 ? <p className={s.muted}>Здесь появятся экзамены с открытой подготовкой.</p> : null}
