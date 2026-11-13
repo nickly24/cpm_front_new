@@ -97,12 +97,16 @@ async function studentResults(params: Query, signal?: AbortSignal): Promise<Page
 }
 async function studentDetail(id: number, signal?: AbortSignal): Promise<StudentResultDetail> {
   const account = selfAccount();
-  const [detail, raw, directions] = await Promise.all([examDetail(id, signal), request<unknown>(`/exams/${id}/results/${account}`, { signal }), examsDirections(signal)]);
-  const result = record(raw), exam = ownerExam(detail, directions);
+  const [raw, directions] = await Promise.all([request<unknown>(`/exams/${id}/results/${account}`, { signal }), examsDirections(signal)]);
+  const result = record(raw);
+  // Old releases remain readable during rollout; new responses carry bounded metadata.
+  const detail = result.exam && typeof result.exam === "object" ? record(result.exam) : await examDetail(id, signal);
+  if (number(detail.id) !== id) throw new ApiError("Некорректный результат экзамена", 502, undefined, "invalid_response");
+  const exam = ownerExam(detail, directions);
   if (exam.examType === "outside_lms") return { examId: id, examName: exam.name || undefined, examType: "outside_lms", directionName: exam.directionName, examDate: exam.examDate, current: outsideStudent(result.current ?? raw, exam), history: [] };
   const current = record(result.current);
   if (!completedResult(current)) throw new ApiError("Результат появится после завершения экзамена", 404, undefined, "not_found");
-  const training = await availableTraining(id, signal);
+  const training = typeof result.training_available === "boolean" ? result.training_available : Boolean(await availableTraining(id, signal));
   return { examId: id, examName: exam.name || undefined, examType: "classic", directionName: exam.directionName, examDate: exam.examDate, ...retakeState(current), current: ownerResult(current), history: records(result.history).filter(completedResult).map(ownerResult), trainingEnabled: Boolean(training) };
 }
 function studentQuestion(value: unknown): PresentedQuestion {

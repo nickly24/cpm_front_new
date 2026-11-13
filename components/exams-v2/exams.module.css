@@ -627,3 +627,12 @@
 .importInstructions li { line-height: 1.6; margin-block: 8px; }
 .importMember { display: inline-flex; align-items: center; gap: 8px; padding: 4px 4px 4px 12px; border: 1px solid var(--ds-border); border-radius: 8px; font-size: 14px; }
 .importMember .button { padding: 4px; min-height: 36px; border: 0; background: transparent; }
+
+/* Oral exam workspace: the question is the focus; metadata stays quiet. */
+.currentQuestion { font-size: 18px; line-height: 1.7; }
+.ovSummary { display: flex; flex-direction: column; gap: 8px; overflow-wrap: anywhere; }
+.ovSummary strong { font-weight: 600; }
+.ovSummary p { margin: 0; }
+.panel details summary { cursor: pointer; color: var(--ds-accent); font-weight: 500; }
+.panel details[open] summary { margin-bottom: 12px; }
+@media (max-width: 700px) { .currentQuestion { font-size: 16px; } }

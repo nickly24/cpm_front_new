@@ -92,3 +92,12 @@ export function selectionBody(
 ) {
   return { presentedQuestionId, expectedStateVersion };
 }
+
+/** State commands and OV edits have independent revisions. Never roll either back. */
+export function mergeAttempt(current: AttemptState | null, incoming: AttemptState | null | undefined, attemptId: number): AttemptState | null {
+  if (!incoming || incoming.id !== attemptId) return current?.id === attemptId ? current : null;
+  if (!current || current.id !== attemptId) return incoming;
+  const state = incoming.stateVersion >= current.stateVersion ? incoming : current;
+  const ov = (incoming.ovRevision ?? 0) >= (current.ovRevision ?? 0) ? incoming : current;
+  return { ...state, ovStatus: ov.ovStatus ?? null, ovComment: ov.ovComment ?? null, ovRevision: ov.ovRevision ?? 0 };
+}

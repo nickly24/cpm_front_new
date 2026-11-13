@@ -34,6 +34,7 @@ import {
 } from "./shared";
 import { ResultSummary } from "./student";
 import { ExamProtocol } from "./protocol";
+import { OvEditor, OvSummary } from "./ov";
 import { DeleteEntity } from "./admin-delete";
 import { CommissionSelector } from "./admin-assignments";
 import { ExamImport } from "./import";
@@ -450,22 +451,29 @@ export function AdminAttemptDetail({
   const [appeal, setAppeal] = useState(false),
     [deletion, setDeletion] = useState(false),
     [appealHistory, setAppealHistory] = useState(false),
+    [ovDirty, setOvDirty] = useState(false),
     [revision, setRevision] = useState(0);
   const attempt = resource.data?.attempt;
   const changed = () => {
+    setOvDirty(false);
     resource.reload();
     setRevision((n) => n + 1);
     props.onChanged();
   };
+  const ovMutation = useExamMutation(`${props.actor}:attempt-ov:${props.examId}:${attemptId}`, () => changed());
+  const refresh = () => {
+    if (ovDirty && !window.confirm("Есть несохранённая отметка OV. Обновить состояние и отменить изменения?")) return;
+    changed();
+  };
   return (
     <div className={s.stack}>
       <div className={s.header}>
-        <Action onClick={back}>← К списку</Action>
-        <Action onClick={changed} disabled={resource.loading}>
+        <Action onClick={back} disabled={ovMutation.busy || ovMutation.uncertain}>← К списку</Action>
+        <Action onClick={refresh} disabled={resource.loading || ovMutation.busy}>
           Обновить сдачу
         </Action>
       </div>
-      <ErrorNotice error={resource.error} reload={resource.reload} />
+      <ErrorNotice error={resource.error} reload={refresh} />
       {resource.loading && <Loading />}
       {attempt && (
         <>
@@ -488,7 +496,7 @@ export function AdminAttemptDetail({
             ) : null}
             <div className={s.row}>
               {props.canEdit && attempt.status === "completed" && (
-                <Action primary onClick={() => setAppeal(true)}>
+                <Action primary onClick={() => setAppeal(true)} disabled={ovMutation.busy || ovMutation.uncertain || ovDirty}>
                   Апелляция
                 </Action>
               )}
@@ -498,13 +506,25 @@ export function AdminAttemptDetail({
                 </Action>
               )}
               {props.canEdit && (
-                <Action danger onClick={() => setDeletion(true)}>
+                <Action danger onClick={() => setDeletion(true)} disabled={ovMutation.busy || ovMutation.uncertain || ovDirty}>
                   Очистить всю историю студента
                 </Action>
               )}
             </div>
           </section>
-          {attempt.result && <ResultSummary result={attempt.result} />}
+          {attempt.result && <ResultSummary result={attempt.result} showOv={false} />}
+          {BFF_DEV && <>
+            <MutationNotice mutation={ovMutation} reload={refresh} />
+            <OvEditor
+              key={`${attempt.id}:${attempt.ovRevision ?? 0}:${revision}`}
+              value={attempt}
+              canEdit={props.canEdit && attempt.canEditOv === true}
+              disabled={ovMutation.busy || ovMutation.uncertain || resource.loading || Boolean(resource.error)}
+              saving={ovMutation.busy}
+              onDirtyChange={setOvDirty}
+              onSave={body => void ovMutation.execute({ path: `/api/exams/${props.examId}/classic/attempts/${attempt.id}/ov`, method: "POST", body })}
+            />
+          </>}
           {appealHistory && (
             <AppealHistory
               key={revision}
@@ -629,6 +649,7 @@ export function ClassicAttempts({
             {attempt.attemptNo === 2 ? "Пересдача" : "Первая сдача"} · #
             {attempt.id}
           </p>
+          {BFF_DEV && <OvSummary value={attempt} />}
           <Action onClick={() => selectAttempt(attempt.id)}>
             Открыть протокол и действия
           </Action>
@@ -734,6 +755,7 @@ export function ClassicResults({
           <p>
             Баллы: {formatScore(row.roundedTotal)} / {formatScore(row.maxScore)}
           </p>
+          {BFF_DEV && <OvSummary value={row} />}
           <div className={s.row}>
             <span className={s.badge}>
               {row.currentAttemptNo === 2

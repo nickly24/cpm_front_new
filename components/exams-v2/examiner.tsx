@@ -21,7 +21,7 @@ import type {
   Vote,
 } from "@/lib/exams-v2/types";
 import {
-  acceptAttempt,
+  mergeAttempt,
   formatDate,
   formatScore,
   selectionBody,
@@ -40,6 +40,8 @@ import {
   ValidationList,
 } from "./shared";
 import { ExamProtocol, RoundVotes } from "./protocol";
+import { OvEditor } from "./ov";
+import { useAttemptSync } from "@/lib/exams-v2/use-attempt-sync";
 import s from "./exams.module.css";
 
 function AssignmentCard({
@@ -101,7 +103,7 @@ function AssignmentCard({
   );
 }
 
-function AttemptWorkspace({
+export function AttemptWorkspace({
   examId,
   attemptId,
   actor,
@@ -131,25 +133,38 @@ function AttemptWorkspace({
     | null
   >(null);
   const [showProtocol, setShowProtocol] = useState(false);
+  const [ovDirty, setOvDirty] = useState(false);
+  const [ovEditorEpoch, setOvEditorEpoch] = useState(0);
   const fetched = resource.data?.attempt;
-  const attempt =
-    fetched && acceptAttempt(commandState, fetched, attemptId)
-      ? fetched
-      : commandState;
+  const attempt = mergeAttempt(commandState, fetched, attemptId);
   const mutation = useExamMutation<CommandResult>(
     `${actor}:attempt:${examId}:${attemptId}`,
     (data) => {
       if (data.attempt.id !== attemptId) return;
-      setCommandState((previous) =>
-        !previous || data.attempt.stateVersion >= previous.stateVersion
-          ? { ...data.attempt, directionName: fetched?.directionName ?? data.attempt.directionName }
-          : previous,
-      );
+      setCommandState((previous) => mergeAttempt(previous, data.attempt, attemptId));
+      if (data.receipt.outcome === "ov_updated" || data.receipt.outcome === "ov_unchanged") {
+        setOvDirty(false);
+        setOvEditorEpoch(value => value + 1);
+      }
       setReceipt(data.receipt);
       setConfirm(null);
     },
   );
-  const disabled = !enabled || mutation.busy || mutation.uncertain;
+  const sync = useAttemptSync({
+    path: BFF_DEV && attempt && attempt.status !== "completed" ? `${attemptPath}/state` : null,
+    stateVersion: attempt?.stateVersion ?? 0,
+    ovRevision: attempt?.ovRevision ?? 0,
+    workspaceRevision: attempt?.workspaceRevision,
+    suspended: !enabled || mutation.busy || mutation.uncertain || resource.loading || ovDirty || confirm !== null,
+    onChange: resource.reload,
+  });
+  const disabled = !enabled || mutation.busy || mutation.uncertain || Boolean(sync.error) || Boolean(resource.error);
+  const refresh = () => {
+    if (ovDirty && !window.confirm("Есть несохранённая отметка OV. Обновить состояние и отменить изменения?")) return;
+    setOvDirty(false);
+    setOvEditorEpoch(value => value + 1);
+    resource.reload();
+  };
   const command = (name: string, body: unknown) =>
     void mutation.execute({
       path: `${attemptPath}/${name}`,
@@ -166,14 +181,15 @@ function AttemptWorkspace({
         </Action>
         <Action
           disabled={resource.loading || mutation.busy}
-          onClick={resource.reload}
+          onClick={refresh}
         >
           Обновить состояние
         </Action>
       </div>
-      <ErrorNotice error={resource.error} reload={resource.reload} />
-      <MutationNotice mutation={mutation} reload={resource.reload} />
-      {resource.loading && <Loading />}
+      <ErrorNotice error={resource.error} reload={refresh} />
+      <MutationNotice mutation={mutation} reload={refresh} />
+      <ErrorNotice error={sync.error} reload={refresh} />
+      {resource.loading && !attempt && <Loading />}
       {!enabled && (
         <div className={s.warning}>
           Проведение временно недоступно. Сохранённый прогресс доступен для
@@ -240,8 +256,8 @@ function AttemptWorkspace({
                   {!attempt.permissions.canStart && (
                     <p className={s.muted}>
                       Для старта нужны готовность полного состава, настройки и
-                      действующий период экзамена. После готовности коллег
-                      нажмите «Обновить состояние».
+                      действующий период экзамена. Готовность коллег обновляется
+                      автоматически в открытой вкладке.
                     </p>
                   )}
                 </section>
@@ -258,7 +274,7 @@ function AttemptWorkspace({
                         : `Вес ${formatScore(question.weight)}`}
                     </span>
                   </div>
-                  <p className={s.text}>{question.questionText}</p>
+                  <p className={`${s.text} ${s.currentQuestion}`}>{question.questionText}</p>
                   <details>
                     <summary>Посмотреть эталонный ответ</summary>
                     <p className={s.text}>{question.answerText}</p>
@@ -285,15 +301,15 @@ function AttemptWorkspace({
                         {question.round.votesReceived} из{" "}
                         {question.round.votesRequired} оценок
                         {question.round.hasVoted
-                          ? ` · Ваша оценка ${formatScore(question.round.myVote)}`
+                          ? ` · Ваш голос принят: ${formatScore(question.round.myVote)}`
                           : ""}
                       </p>
                       <div className={s.voteBar}>
                         {(
                           [
-                            { value: 0, text: "Неудовлетворительный" },
-                            { value: 0.5, text: "Частичный" },
-                            { value: 1, text: "Полный" },
+                            { value: 0, text: "Не зачтён" },
+                            { value: 0.5, text: "Частично" },
+                            { value: 1, text: "Полностью" },
                           ] as const
                         ).map(({ value, text }) => (
                           <Action
@@ -387,6 +403,15 @@ function AttemptWorkspace({
               )}
             </main>
             <aside className={s.stack}>
+              {BFF_DEV && <OvEditor
+                key={`${attempt.id}:${attempt.ovRevision ?? 0}:${ovEditorEpoch}`}
+                value={attempt}
+                canEdit={attempt.permissions.canEditOv === true}
+                disabled={disabled}
+                saving={mutation.busy && mutation.pending?.path.endsWith("/ov")}
+                onDirtyChange={setOvDirty}
+                onSave={body => command("ov", body)}
+              />}
               <section className={s.panel}>
                 <h3>Комиссия</h3>
                 {attempt.members.map((member) => (
@@ -415,7 +440,10 @@ function AttemptWorkspace({
                   {attempt.progress.replacementLimit}
                 </p>
                 <p className={s.muted}>
-                  Данные обновляются только вручную и после ваших действий.
+                  {BFF_DEV && attempt.status !== "completed"
+                    ? ovDirty ? "Обновление приостановлено, пока вы редактируете OV" : "Состояние комиссии обновляется автоматически в открытой вкладке"
+                    : "Обновите состояние, чтобы увидеть последние изменения"}
+                  {sync.checkedAt && ` · Проверено ${formatDate(sync.checkedAt)}`}
                 </p>
               </section>
             </aside>
@@ -461,7 +489,7 @@ function AttemptWorkspace({
                   оценку. Заменённый вопрос больше не выпадет в этой сдаче.
                 </p>
               )}
-              <MutationNotice mutation={mutation} reload={resource.reload} />
+              <MutationNotice mutation={mutation} reload={refresh} />
               <Action
                 primary
                 disabled={disabled}

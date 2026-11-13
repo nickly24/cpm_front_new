@@ -173,3 +173,13 @@ describe("student exam boundary", () => {
     expect(await examsStudentGet("/api/exams/15/parts")).toBeUndefined(); expect(await examsStudentMutate({ path: "/api/exams/15/parts", method: "POST", key: crypto.randomUUID() })).toBeUndefined(); expect(handlesStudentPath("/api/student/exams/results?grade=0")).toBe(true); expect(domain).not.toHaveBeenCalled();
   });
 });
+
+
+describe("bounded student result detail", () => {
+  it("uses embedded exam metadata and availability without separate detail/training requests", async () => {
+    domain.mockImplementation((path: string) => path === "/core/directions" ? [{ id: 1, name: "Математика" }] : path === "/exams/15/results/91" ? { exam, training_available: true, current: completed, history: [] } : (() => { throw new Error(`Unexpected route ${path}`); })());
+    const { examsStudentGet } = await import("./exams-student");
+    expect(await examsStudentGet("/api/student/exams/15/result")).toMatchObject({ examName: "Весенний экзамен", directionName: "Математика", trainingEnabled: true, current: { attemptId: 51 } });
+    expect(domain.mock.calls.map(call => call[0])).toEqual(["/exams/15/results/91", "/core/directions"]);
+  });
+});

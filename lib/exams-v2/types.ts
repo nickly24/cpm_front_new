@@ -189,7 +189,20 @@ export interface PresentedQuestion {
   lastCompletedRound?: Round | null;
   completedRoundsCount?: number;
 }
-export interface AttemptResult {
+export type OvStatus = "accepted" | "remarks" | "missing";
+export interface OvState {
+  ovStatus?: OvStatus | null;
+  ovComment?: string | null;
+  ovRevision?: number;
+}
+export interface AttemptDigest {
+  id: number;
+  stateVersion: number;
+  ovRevision: number;
+  workspaceRevision?: string;
+  serverNow: string;
+}
+export interface AttemptResult extends OvState {
   attemptId: number;
   attemptNo: 1 | 2;
   rawTotal: number;
@@ -212,7 +225,7 @@ export interface Receipt {
   resolvedQuestion?: { id: number; consensus: Vote; sequenceNo?: number };
   [key: string]: unknown;
 }
-export interface AttemptState {
+export interface AttemptState extends OvState {
   id: number;
   examId: number;
   directionName: string;
@@ -223,6 +236,7 @@ export interface AttemptState {
   status: Exclude<AttemptStatus, "not_started">;
   phase: "preparation" | "regular_questions" | "tie_breaker" | "completed";
   stateVersion: number;
+  workspaceRevision?: string;
   members: (Person & { ready: boolean; readyAt: string | null })[];
   allMembersReady: boolean;
   startedAt: string | null;
@@ -247,6 +261,7 @@ export interface AttemptState {
     canVote: boolean;
     canReplace: boolean;
     canGoNext: boolean;
+    canEditOv?: boolean;
   };
   serverNow: string;
 }
@@ -279,7 +294,8 @@ export interface ExaminerAssignment {
   unavailableReasons: Validation[];
   progress?: { answered: number; required: number };
 }
-export interface AdminAttempt {
+export interface AdminAttempt extends OvState {
+  canEditOv?: boolean;
   id: number;
   attemptId?: number;
   student: Person;
@@ -297,7 +313,7 @@ export interface AdminAttempt {
   maxScore?: number;
   hasAppeal?: boolean;
 }
-export interface AdminCurrentResult {
+export interface AdminCurrentResult extends OvState {
   student: Person;
   currentAttemptId: number;
   currentAttemptNo: 1 | 2;

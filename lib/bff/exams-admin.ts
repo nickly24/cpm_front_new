@@ -2,7 +2,7 @@ import { bffBlobRequest, domain, getIdentity } from "./client";
 import { ApiError } from "@/lib/api/client";
 import type { ExamCommand, Query } from "@/lib/exams-v2/api";
 import type { AdminAttempt, AdminCurrentResult, Commission, Grade, ImportCommit, ImportKind, ImportSession, Privilege, Scoring } from "@/lib/exams-v2/types";
-import { clientPage, ownerPage, examOwnerPage, mappedExamPage, examPageQuery, examsDirections, number, nullableString, ownerAssignment, ownerConfig, ownerExam, ownerOutsideResult, ownerPerson, ownerQuestion, ownerReadiness, ownerResult, ownerValidation, record, records, string, type OwnerRecord } from "./exams-shared";
+import { clientPage, ownerPage, examOwnerPage, mappedExamPage, examPageQuery, examsDirections, number, nullableString, ownerAssignment, ownerConfig, ownerExam, ownerOutsideResult, ownerPerson, ownerOv, ownerQuestion, ownerReadiness, ownerResult, ownerValidation, record, records, string, type OwnerRecord } from "./exams-shared";
 const previews = new Map<string, OwnerRecord>();
 function pathParts(path: string, params: Query = {}) { const url = new URL(path, "http://bff.invalid"); const query: Record<string, string> = Object.fromEntries(url.searchParams); return { path: url.pathname, params: { ...query, ...params } as Query }; }
 function headers(command: ExamCommand) { return { "Idempotency-Key": command.key, ...(command.confirmationToken ? { "X-Exam-Confirmation": command.confirmationToken } : {}) }; }
@@ -30,7 +30,7 @@ async function overview(id: number, signal?: AbortSignal) {
     return { ...base, classic: { partsCount: number(counts.parts), questionsCount: number(counts.questions), commissionsCount: number(counts.commissions), assignmentsCount: number(counts.assignments), resultsCount: number(counts.results), attempts: { pending: number(counts.pending), inProgress: number(counts.in_progress), completed: number(counts.completed) } } };
 }
 function ownerCommission(row: OwnerRecord): Commission { return { id: number(row.id), name: string(row.name), members: records(row.members).map(ownerPerson), assignedStudentsCount: number(row.assigned_students_count), version: number(row.revision) }; }
-function adminAttempt(row: OwnerRecord): AdminAttempt { const result = row.result === null || row.result === undefined ? null : ownerResult(row.result); return { id: number(row.id), attemptId: number(row.id), student: ownerPerson(row.student), attemptNo: number(row.attempt_no, 1) as 1 | 2, status: string(row.status) as AdminAttempt["status"], phase: string(row.phase), grade: result?.grade ?? null, result, historyGeneration: number(row.history_generation), resultVersion: number(row.result_version), members: records(row.members).map(ownerPerson) }; }
+function adminAttempt(row: OwnerRecord): AdminAttempt { const result = row.result === null || row.result === undefined ? null : ownerResult(row.result); return { ...ownerOv(row), canEditOv: record(row.permissions).can_edit_ov === true, id: number(row.id), attemptId: number(row.id), student: ownerPerson(row.student), attemptNo: number(row.attempt_no, 1) as 1 | 2, status: string(row.status) as AdminAttempt["status"], phase: string(row.phase), grade: result?.grade ?? null, result, historyGeneration: number(row.history_generation), resultVersion: number(row.result_version), members: records(row.members).map(ownerPerson) }; }
 function ownerPrivilege(row: OwnerRecord): Privilege { const student = record(row.student); return { student: ownerPerson({ ...student, account_id: number(student.account_id, number(row.student_account_id)), full_name: string(student.full_name) || undefined }), replacementLimit: number(row.replacement_limit), version: number(row.revision) }; }
 function invalidPreview(): never { throw new ApiError("Некорректный предпросмотр импорта. Обновите данные.", 502, undefined, "invalid_response"); }
 async function importRead(id: number, kind: string, session: string, params: Query, signal?: AbortSignal) {
@@ -120,9 +120,8 @@ export async function examsAdminGet(rawPath: string, rawParams: Query = {}, sign
     }
     const attempt = suffix.match(/^classic\/attempts\/(\d+)(?:\/(appeals))?$/);
     if (attempt) {
-        const v = record(await domain(`/exams/${id}/attempts/${attempt[1]}`, { signal }));
-        if (attempt[2])
-            return clientPage(records(record(v.result).appeals).map(r => ({ id: number(r.id), previousGrade: number(r.previous_grade), newGrade: number(r.new_grade), createdAt: nullableString(r.created_at) })), params);
+        if (attempt[2]) return mappedExamPage(await examOwnerPage(`/exams/${id}/attempts/${attempt[1]}/appeals`, params, {}, signal), r => ({ id: number(r.id), previousGrade: number(r.previous_grade), newGrade: number(r.new_grade), createdAt: nullableString(r.created_at) }));
+        const v = record(await domain(`/exams/${id}/attempts/${attempt[1]}/workspace`, { signal }));
         return { attempt: adminAttempt(v) };
     }
     const partPreview = suffix.match(/^classic\/parts\/(\d+)\/delete-preview$/);
@@ -138,7 +137,7 @@ export async function examsAdminGet(rawPath: string, rawParams: Query = {}, sign
     if (suffix === "outside-lms/results") return mappedExamPage(await examOwnerPage(`/exams/${id}/results`, params, { q: params.search, sort: params.sort }, signal), ownerOutsideResult);
     if (suffix === "classic/results") {
         const raw = await examOwnerPage(`/exams/${id}/results`, params, { q: params.search, grade: params.grade, has_appeal: params.hasAppeal, completed_only: true }, signal);
-        return mappedExamPage(raw, (r): AdminCurrentResult => ({ student: ownerPerson(r.student), currentAttemptId: number(r.id), currentAttemptNo: number(r.attempt_no, 1) as 1 | 2, rawTotal: number(r.raw_total), roundedTotal: number(r.rounded_total), maxScore: number(r.max_score), calculatedGrade: number(r.calculated_grade) as Grade, effectiveGrade: number(r.effective_grade) as Grade, hasAppeal: r.has_appeal === true, resultVersion: number(r.result_version), firstAttemptId: number(r.first_attempt_id, number(r.id)), retakeAssignmentId: number(r.retake_assignment_id) || null, retakeStatus: r.retake_status ? string(r.retake_status) as AdminCurrentResult["retakeStatus"] : null, historyGeneration: number(r.history_generation) }));
+        return mappedExamPage(raw, (r): AdminCurrentResult => ({ ...ownerOv(r), student: ownerPerson(r.student), currentAttemptId: number(r.id), currentAttemptNo: number(r.attempt_no, 1) as 1 | 2, rawTotal: number(r.raw_total), roundedTotal: number(r.rounded_total), maxScore: number(r.max_score), calculatedGrade: number(r.calculated_grade) as Grade, effectiveGrade: number(r.effective_grade) as Grade, hasAppeal: r.has_appeal === true, resultVersion: number(r.result_version), firstAttemptId: number(r.first_attempt_id, number(r.id)), retakeAssignmentId: number(r.retake_assignment_id) || null, retakeStatus: r.retake_status ? string(r.retake_status) as AdminCurrentResult["retakeStatus"] : null, historyGeneration: number(r.history_generation) }));
     }
     throw new Error(`Маршрут экзаменов ещё не подключён: ${suffix}`);
 }
@@ -195,6 +194,7 @@ export async function examsAdminMutate(command: ExamCommand): Promise<unknown> {
             const outside = s.match(/^outside-lms\/results(?:\/(\d+))?$/);
             const privilege = s.match(/^classic\/students\/(\d+)\/privilege$/);
             const appeal = s.match(/^classic\/attempts\/(\d+)\/appeals$/);
+            const ov = s.match(/^classic\/attempts\/(\d+)\/ov$/);
             const retake = s.match(/^classic\/students\/(\d+)\/retake$/);
             const history = s.match(/^classic\/students\/(\d+)\/history$/);
             if (resource) {
@@ -233,6 +233,11 @@ export async function examsAdminMutate(command: ExamCommand): Promise<unknown> {
             else if (appeal) {
                 target = `${prefix}/attempts/${appeal[1]}/appeals`;
                 body = { grade: b.grade, expected_result_version: b.expectedResultVersion };
+            }
+            else if (ov) {
+                target = `${prefix}/attempts/${ov[1]}/ov`;
+                method = "POST";
+                body = { expected_ov_revision: b.expectedOvRevision, ov_status: b.ovStatus ?? null, ov_comment: b.ovStatus === "remarks" ? b.ovComment ?? null : null };
             }
             else if (retake) {
                 target = `${prefix}/retakes/${retake[1]}`;

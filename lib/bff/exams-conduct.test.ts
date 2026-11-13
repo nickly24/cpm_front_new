@@ -62,7 +62,40 @@ describe("oral exam boundary", () => {
   it("uses compact examiner catalogue summaries without exam or assignment fan-out", async () => {
     domain.mockImplementation((path: string) => path === "/core/directions" ? [] : { items: [{ id: 10, name: "Алгебра", start_at: "2026-11-06T09:00:00Z", end_at: null, assigned_students_count: 500 }], total: 100 });
     const result = await examsConductGet("/api/examiner/exams", { limit: 6 }) as { items: { assignedStudentsCount: number; startAt: string }[] };
-    expect(result.items[0]).toMatchObject({ assignedStudentsCount: 500, startAt: "2026-11-06T09:00:00Z" }); expect(domain).toHaveBeenCalledTimes(2);
+    expect(result.items[0]).toMatchObject({ assignedStudentsCount: 500, startAt: "2026-11-06T09:00:00Z" }); expect(domain).toHaveBeenCalledTimes(1);
     expect(domain.mock.calls[0][0]).toBe("/exams?type=classic&limit=6&offset=0");
+  });
+});
+
+describe("focused exam workspace and OV boundaries", () => {
+  it("loads the workspace in one owner call and takes the title from its DTO", async () => {
+    domain.mockResolvedValue({ id: 50, exam_id: 10, exam_name: "Конституционное право", status: "pending_ready", ov_status: null, ov_revision: 0 });
+    expect(await examsConductGet("/api/examiner/exams/10/attempts/50")).toMatchObject({ attempt: { directionName: "Конституционное право", ovStatus: null, ovRevision: 0 } });
+    expect(domain).toHaveBeenCalledTimes(1);
+    expect(domain).toHaveBeenCalledWith("/exams/10/attempts/50/workspace", expect.anything());
+  });
+  it("accepts the compact state only for the requested attempt and valid revisions", async () => {
+    domain.mockResolvedValueOnce({ id: 50, state_version: 3, ov_revision: 4, workspace_revision: "config-2:inside-window", server_now: "now" });
+    expect(await examsConductGet("/api/examiner/exams/10/attempts/50/state")).toEqual({ id: 50, stateVersion: 3, ovRevision: 4, workspaceRevision: "config-2:inside-window", serverNow: "now" });
+    domain.mockResolvedValueOnce({ id: 51, state_version: 3, ov_revision: 4 });
+    await expect(examsConductGet("/api/examiner/exams/10/attempts/50/state")).rejects.toMatchObject({ status: 502 });
+  });
+  it("keeps an OV revision and UUID separate from the voting state version", async () => {
+    domain.mockResolvedValue({ attempt: { id: 50, ov_status: "remarks", ov_comment: "Уточнить", ov_revision: 3, permissions: { can_edit_ov: true } }, receipt: { outcome: "ov_updated" } });
+    const result = await examsConductMutate({ path: "/api/examiner/exams/10/attempts/50/ov", method: "POST", key: "stable-ov-uuid", body: { expectedOvRevision: 2, ovStatus: "remarks", ovComment: "Уточнить" } });
+    expect(domain).toHaveBeenCalledWith("/exams/10/attempts/50/ov", expect.objectContaining({ headers: { "Idempotency-Key": "stable-ov-uuid" }, body: JSON.stringify({ expected_ov_revision: 2, ov_status: "remarks", ov_comment: "Уточнить" }) }));
+    expect(result).toMatchObject({ attempt: { ovStatus: "remarks", ovComment: "Уточнить", ovRevision: 3, permissions: { canEditOv: true } } });
+  });
+  it("never forwards a hidden stale comment for a nonremarks status", async () => {
+    domain.mockResolvedValue({ attempt: {}, receipt: {} });
+    await examsConductMutate({ path: "/api/examiner/exams/10/attempts/50/ov", method: "POST", key: "key", body: { expectedOvRevision: 2, ovStatus: "accepted", ovComment: "Old remark" } });
+    expect(JSON.parse(domain.mock.calls[0][1].body)).toEqual({ expected_ov_revision: 2, ov_status: "accepted", ov_comment: null });
+    expect(conductAttempt({ ov_status: "missing", ov_comment: "Old remark" }).ovComment).toBeNull();
+  });
+  it("can show the preceding dispute without loading all historical rounds", () => {
+    const q = conductQuestion({ id: 4, round: { id: 10, status: "open", round_no: 4 }, last_completed_round: { id: 9, status: "disputed", round_no: 3, votes: [{ examinator_account_id: 91, full_name: "А", value: 0 }] }, completed_rounds_count: 3 });
+    expect(q.lastCompletedRound).toMatchObject({ id: 9, status: "disputed" });
+    expect(q.completedRoundsCount).toBe(3);
+    expect(q.round?.votes).toBeUndefined();
   });
 });

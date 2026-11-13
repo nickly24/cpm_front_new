@@ -1,8 +1,8 @@
 import { ApiError } from "@/lib/api/client";
 import type { ExamCommand, Query } from "@/lib/exams-v2/api";
-import type { AttemptState, CommandResult, ExaminerAssignment, ExaminerExam, PresentedQuestion, Receipt, Round, Vote } from "@/lib/exams-v2/types";
+import type { AttemptDigest, AttemptState, CommandResult, ExaminerAssignment, ExaminerExam, PresentedQuestion, Receipt, Round, Vote } from "@/lib/exams-v2/types";
 import { domain } from "./client";
-import { examDetail, examOwnerPage, mappedExamPage, examsDirections, nullableString, number, ownerPage, ownerPerson, ownerResult, ownerValidation, record, records, string } from "./exams-shared";
+import { examOwnerPage, mappedExamPage, nullableString, number, ownerPage, ownerPerson, ownerOv, ownerResult, ownerValidation, record, records, string } from "./exams-shared";
 
 export function conductRound(value: unknown): Round {
   const v = record(value);
@@ -10,11 +10,11 @@ export function conductRound(value: unknown): Round {
 }
 export function conductQuestion(value: unknown): PresentedQuestion {
   const v = record(value), rounds = records(v.rounds).map(conductRound), closed = rounds.filter(r => r.status !== "open");
-  return { id: number(v.id), sequenceNo: number(v.sequence_no), purpose: string(v.purpose) as PresentedQuestion["purpose"], partCode: string(v.part_code), questionText: string(v.question_text), answerText: string(v.answer_text), weight: number(v.question_weight), cycleNo: number(v.cycle_no), status: string(v.status) as PresentedQuestion["status"], consensus: typeof v.consensus === "number" ? v.consensus as Vote : null, awardedPoints: typeof v.weighted_score === "number" ? v.weighted_score : undefined, replacesPresentedQuestionId: number(v.replaces_id) || null, canReplace: v.can_replace === true, canGoNext: v.can_go_next === true, round: v.round ? conductRound(v.round) : null, lastCompletedRound: closed.at(-1) ?? null, completedRoundsCount: closed.length };
+  return { id: number(v.id), sequenceNo: number(v.sequence_no), purpose: string(v.purpose) as PresentedQuestion["purpose"], partCode: string(v.part_code), questionText: string(v.question_text), answerText: string(v.answer_text), weight: number(v.question_weight), cycleNo: number(v.cycle_no), status: string(v.status) as PresentedQuestion["status"], consensus: typeof v.consensus === "number" ? v.consensus as Vote : null, awardedPoints: typeof v.weighted_score === "number" ? v.weighted_score : undefined, replacesPresentedQuestionId: number(v.replaces_id) || null, canReplace: v.can_replace === true, canGoNext: v.can_go_next === true, round: v.round ? conductRound(v.round) : null, lastCompletedRound: v.last_completed_round ? conductRound(v.last_completed_round) : closed.at(-1) ?? null, completedRoundsCount: number(v.completed_rounds_count, closed.length) };
 }
 export function conductAttempt(value: unknown, directionName = "Экзамен"): AttemptState {
   const v = record(value), p = record(v.progress), permission = record(v.permissions);
-  return { id: number(v.id), examId: number(v.exam_id), directionName, assignmentId: number(v.assignment_id), attemptNo: number(v.attempt_no, 1) as 1 | 2, historyGeneration: number(v.history_generation), student: ownerPerson(v.student), status: string(v.status) as AttemptState["status"], phase: string(v.phase) as AttemptState["phase"], stateVersion: number(v.state_version), members: records(v.members).map(m => ({ ...ownerPerson(m), ready: m.ready === true, readyAt: nullableString(m.ready_at) })), allMembersReady: v.all_members_ready === true, startedAt: nullableString(v.started_at), completedAt: nullableString(v.completed_at), serverNow: string(v.server_now), currentQuestion: v.current_question ? conductQuestion(v.current_question) : null, progress: { regularConsensus: number(p.regular_consensus), regularRequired: number(p.regular_required), replacementUsed: number(p.replacement_used), replacementLimit: number(p.replacement_limit), parts: records(p.parts).map(r => ({ sourcePartId: number(r.part_id), code: string(r.code), consensus: number(r.consensus), required: number(r.required) })) }, result: v.status === "completed" && v.result ? ownerResult(v.result) : null, permissions: { canReady: permission.can_ready === true, canStart: permission.can_start === true, canVote: permission.can_vote === true, canReplace: permission.can_replace === true, canGoNext: permission.can_go_next === true } };
+  return { ...ownerOv(v), ...(typeof v.workspace_revision === "string" ? { workspaceRevision: v.workspace_revision } : {}), id: number(v.id), examId: number(v.exam_id), directionName: string(v.exam_name, directionName), assignmentId: number(v.assignment_id), attemptNo: number(v.attempt_no, 1) as 1 | 2, historyGeneration: number(v.history_generation), student: ownerPerson(v.student), status: string(v.status) as AttemptState["status"], phase: string(v.phase) as AttemptState["phase"], stateVersion: number(v.state_version), members: records(v.members).map(m => ({ ...ownerPerson(m), ready: m.ready === true, readyAt: nullableString(m.ready_at) })), allMembersReady: v.all_members_ready === true, startedAt: nullableString(v.started_at), completedAt: nullableString(v.completed_at), serverNow: string(v.server_now), currentQuestion: v.current_question ? conductQuestion(v.current_question) : null, progress: { regularConsensus: number(p.regular_consensus), regularRequired: number(p.regular_required), replacementUsed: number(p.replacement_used), replacementLimit: number(p.replacement_limit), parts: records(p.parts).map(r => ({ sourcePartId: number(r.part_id), code: string(r.code), consensus: number(r.consensus), required: number(r.required) })) }, result: v.status === "completed" && v.result ? ownerResult(v.result) : null, permissions: { canReady: permission.can_ready === true, canStart: permission.can_start === true, canVote: permission.can_vote === true, canReplace: permission.can_replace === true, canGoNext: permission.can_go_next === true, canEditOv: permission.can_edit_ov === true } };
 }
 function receipt(value: unknown): Receipt {
   const v = record(value);
@@ -37,18 +37,24 @@ export async function examsConductGet(input: string, params: Query = {}, signal?
     return mappedExamPage(await examOwnerPage("/core/exam-participants", q, { role, q: q.search }, signal), ownerPerson);
   }
   if (path === "/api/examiner/exams") {
-    const [page, directions] = await Promise.all([examOwnerPage("/exams", q, { type: "classic", q: q.search }, signal), examsDirections(signal)]);
-    return mappedExamPage(page, exam => ({ id: number(exam.id), directionId: number(exam.direction_id), directionName: string(exam.name, directions.find(d => d.id === number(exam.direction_id))?.name), startAt: nullableString(exam.start_at), endAt: nullableString(exam.end_at), readiness: "", assignedStudentsCount: number(exam.assigned_students_count) } satisfies ExaminerExam));
+    const page = await examOwnerPage("/exams", q, { type: "classic", q: q.search }, signal);
+    return mappedExamPage(page, exam => ({ id: number(exam.id), directionId: number(exam.direction_id), directionName: string(exam.name, "Экзамен"), startAt: nullableString(exam.start_at), endAt: nullableString(exam.end_at), readiness: "", assignedStudentsCount: number(exam.assigned_students_count) } satisfies ExaminerExam));
   }
   let m = path.match(/^\/api\/examiner\/exams\/(\d+)\/students$/);
   if (m) return mappedExamPage(await examOwnerPage(`/exams/${m[1]}/assignments`, q, { q: q.search, status: q.status, include_readiness: true }, signal), assignment);
   if (/^\/api\/examiner\/attempts\//.test(path)) throw new ApiError("Выберите экзамен перед открытием сдачи", 400, undefined, "exam_required");
+  const digest = path.match(/^\/api\/examiner\/exams\/(\d+)\/attempts\/(\d+)\/state$/);
+  if (digest) {
+    const v = record(await domain(`/exams/${digest[1]}/attempts/${digest[2]}/state`, { signal }));
+    if (v.id !== Number(digest[2]) || !Number.isSafeInteger(v.state_version) || number(v.state_version) < 1 || !Number.isSafeInteger(v.ov_revision) || number(v.ov_revision) < 0) throw new ApiError("Некорректное состояние сдачи", 502, undefined, "invalid_response");
+    return { id: number(v.id), stateVersion: number(v.state_version), ovRevision: number(v.ov_revision), ...(typeof v.workspace_revision === "string" ? { workspaceRevision: v.workspace_revision } : {}), serverNow: string(v.server_now) } satisfies AttemptDigest;
+  }
   m = path.match(/^\/api\/examiner\/exams\/(\d+)\/attempts\/(\d+)(?:\/questions(?:\/(\d+)\/rounds)?)?$/) ?? path.match(/^\/api\/exams\/(\d+)\/classic\/attempts\/(\d+)\/questions(?:\/(\d+)\/rounds)?$/);
   if (!m) return undefined;
   const examId = Number(m[1]), attemptId = Number(m[2]);
   if (!path.includes("/questions")) {
-    const [raw, detail] = await Promise.all([domain(`/exams/${examId}/attempts/${attemptId}`, { signal }), examDetail(examId, signal)]);
-    return { attempt: conductAttempt(raw, string(detail.name, "Экзамен")) };
+    const raw = await domain(`/exams/${examId}/attempts/${attemptId}/workspace`, { signal });
+    return { attempt: conductAttempt(raw) };
   }
   const questionId = m[3], limit = Math.max(1, Math.min(200, Number(q.limit) || 10)), offset = (Math.max(1, Number(q.page) || 1) - 1) * limit, query = new URLSearchParams({ limit: String(limit), offset: String(offset) });
   if (q.throughSequenceNo !== undefined) query.set("through_sequence_no", String(q.throughSequenceNo));
@@ -59,10 +65,10 @@ export async function examsConductGet(input: string, params: Query = {}, signal?
 export async function examsConductMutate(command: ExamCommand): Promise<unknown> {
   const { path } = parse(command.path, {}), v = record(command.body);
   if (/^\/api\/examiner\/attempts\//.test(path)) throw new ApiError("Выберите экзамен перед изменением сдачи", 400, undefined, "exam_required");
-  const ensure = path.match(/^\/api\/examiner\/exams\/(\d+)\/assignments\/(\d+)\/attempts\/ensure$/), action = path.match(/^\/api\/examiner\/exams\/(\d+)\/attempts\/(\d+)\/(ready|start|vote|next-question|replace-question)$/);
+  const ensure = path.match(/^\/api\/examiner\/exams\/(\d+)\/assignments\/(\d+)\/attempts\/ensure$/), action = path.match(/^\/api\/examiner\/exams\/(\d+)\/attempts\/(\d+)\/(ready|start|vote|next-question|replace-question|ov)$/);
   if (!ensure && !action) return undefined;
   const examId = Number(ensure?.[1] ?? action?.[1]);
-  const name = action?.[3], body = ensure ? { expected_history_generation: v.expectedHistoryGeneration } : name === "ready" ? {} : name === "vote" ? { presented_question_id: v.presentedQuestionId, round_id: v.roundId, value: v.value } : name === "start" ? { expected_state_version: v.expectedStateVersion } : { presented_question_id: v.presentedQuestionId, expected_state_version: v.expectedStateVersion };
+  const name = action?.[3], body = ensure ? { expected_history_generation: v.expectedHistoryGeneration } : name === "ready" ? {} : name === "ov" ? { expected_ov_revision: v.expectedOvRevision, ov_status: v.ovStatus ?? null, ov_comment: v.ovStatus === "remarks" ? v.ovComment ?? null : null } : name === "vote" ? { presented_question_id: v.presentedQuestionId, round_id: v.roundId, value: v.value } : name === "start" ? { expected_state_version: v.expectedStateVersion } : { presented_question_id: v.presentedQuestionId, expected_state_version: v.expectedStateVersion };
   const response = record(await domain(`/exams/${examId}/${ensure ? `assignments/${ensure[2]}/attempts/ensure` : `attempts/${action![2]}/${name}`}`, { method: "POST", body: JSON.stringify(body), headers: { "Idempotency-Key": command.key } }));
   const attempt = conductAttempt(response.attempt);
   return { attempt, receipt: receipt(response.receipt), replayed: response.replayed === true, created: response.created === true } satisfies CommandResult;

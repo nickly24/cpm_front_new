@@ -19,6 +19,7 @@ import {
 } from "@/lib/exams-v2/utils";
 import { Action, ErrorNotice, Loading, Pager } from "./shared";
 import { ExamProtocol } from "./protocol";
+import { OvSummary } from "./ov";
 import s from "./exams.module.css";
 import { StudentExamResultList } from "@/components/student/exams/student-exam-result-list";
 import studentStyles from "@/components/student/exams/student-exam-results.module.css";
@@ -28,7 +29,7 @@ export function PendingRetakeNotice({ active, status, compact = false }: { activ
   const label = status === "in_progress" ? "Пересдача в процессе" : status === "pending_ready" ? "Пересдача ожидает готовности комиссии" : "Пересдача ожидает начала";
   return compact ? <span className={s.badge}>{label}</span> : <p className={s.warning} role="status">{label}. До её завершения показан последний завершённый результат.</p>;
 }
-export function ResultSummary({ result }: { result: AttemptResult }) {
+export function ResultSummary({ result, showOv = true }: { result: AttemptResult; showOv?: boolean }) {
   return (
     <section className={s.panel}>
       <div className={s.header}>
@@ -50,6 +51,7 @@ export function ResultSummary({ result }: { result: AttemptResult }) {
           </span>
         </div>
       </div>
+      {showOv && Object.hasOwn(result, "ovStatus") && <OvSummary value={result} />}
       <p className={s.muted}>Завершён {formatDate(result.completedAt)}</p>
       {result.commission?.length ? (
         <p className={s.muted}>
