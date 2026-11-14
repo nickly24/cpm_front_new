@@ -37,7 +37,6 @@ import { ReviewQueueSection } from "@/components/homework/review-queue-section";
 import { HomeworkMonitoringSection } from "@/components/admin/homework/homework-monitoring-section";
 import { HomeworkArchiveSection } from "@/components/admin/homework/homework-archive-section";
 import { ProctorStudentsSection } from "@/components/proctor/proctor-students-section";
-import { ProctorRatingsSection } from "@/components/proctor/ratings/proctor-ratings-section";
 import { SupervisorDashboardSection } from "@/components/supervisor/supervisor-dashboard-section";
 import { SupervisorAttendanceSection } from "@/components/supervisor/reports/supervisor-attendance-section";
 import { SupervisorExamsSection } from "@/components/supervisor/reports/supervisor-exams-section";
@@ -61,7 +60,7 @@ export function SectionContent(props: SectionContentProps) {
     || props.section === "tests" && (props.role === "student" || isAdminCabinet(props.role))
     || props.section === "test-results" && isAdminCabinet(props.role)
     || props.section === "exams" && (isAdminCabinet(props.role) || props.role === "student" || props.role === "examinator")
-    || props.section === "ratings" && (isAdminCabinet(props.role) || props.role === "supervisor" || props.role === "proctor")
+    || props.section === "ratings" && (isAdminCabinet(props.role) || props.role === "supervisor")
     || ["performance", "profile", "menu", "settings", "install-ios"].includes(props.section) && props.role === "student"
     || props.section === "train" && props.role === "student"
     || ["users", "schools", "dashboard", "train", "access", "upload", "organizations", "divisions", "directions"].includes(props.section) && isAdminCabinet(props.role)
@@ -200,7 +199,6 @@ function ConnectedSectionBody({
   if (role === "proctor" && section === "students") {
     return <ProctorStudentsSection />;
   }
-  if (role === "proctor" && section === "ratings") return <ProctorRatingsSection />;
   if (role === "proctor" && section === "review-queue") return <ReviewQueueSection />;
   if (role === "proctor" && section === "homework-archive") return <HomeworkArchiveSection />;
 
