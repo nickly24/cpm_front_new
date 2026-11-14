@@ -80,6 +80,17 @@ describe("focused exam workspace and OV boundaries", () => {
     domain.mockResolvedValueOnce({ id: 51, state_version: 3, ov_revision: 4 });
     await expect(examsConductGet("/api/examiner/exams/10/attempts/50/state")).rejects.toMatchObject({ status: 502 });
   });
+  it("forwards a long poll cursor and reads the owner's capability", async () => {
+    domain.mockResolvedValueOnce({ id: 50, state_version: 3, ov_revision: 4, long_poll: true });
+    const path = "/api/examiner/exams/10/attempts/50/state";
+    expect(await examsConductGet(path, {
+      since_state_version: 3, since_ov_revision: 4, since_workspace_revision: "1/2/3",
+    })).toMatchObject({ longPoll: true });
+    expect(domain).toHaveBeenCalledWith(
+      "/exams/10/attempts/50/state?since_state_version=3&since_ov_revision=4&since_workspace_revision=1%2F2%2F3",
+      expect.anything(),
+    );
+  });
   it("keeps an OV revision and UUID separate from the voting state version", async () => {
     domain.mockResolvedValue({ attempt: { id: 50, ov_status: "remarks", ov_comment: "Уточнить", ov_revision: 3, permissions: { can_edit_ov: true } }, receipt: { outcome: "ov_updated" } });
     const result = await examsConductMutate({ path: "/api/examiner/exams/10/attempts/50/ov", method: "POST", key: "stable-ov-uuid", body: { expectedOvRevision: 2, ovStatus: "remarks", ovComment: "Уточнить" } });

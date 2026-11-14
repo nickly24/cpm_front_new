@@ -24,18 +24,27 @@ export function useAttemptSync({ path, stateVersion, ovRevision, workspaceRevisi
     let request: AbortController | null = null;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let failures = 0;
+    let longPoll = false;
     const schedule = () => {
       if (stopped || document.visibilityState === "hidden") return;
-      timer = setTimeout(poll, Math.min(30000, 3000 * 2 ** failures) + Math.floor(Math.random() * 400));
+      const delay = longPoll && failures === 0 ? 200 : Math.min(30000, 3000 * 2 ** failures);
+      timer = setTimeout(poll, delay + Math.floor(Math.random() * 400));
     };
     const poll = async () => {
       if (stopped || request || document.visibilityState === "hidden") return;
       const controller = new AbortController();
       request = controller;
       try {
-        const data = await examGet<AttemptDigest>(path, {}, controller.signal);
+        const known = latest.current;
+        const knownWorkspace = known.workspaceRevision ?? (observedWorkspace.current?.path === path ? observedWorkspace.current.revision : undefined);
+        const data = await examGet<AttemptDigest>(path, longPoll ? {
+          since_state_version: known.stateVersion,
+          since_ov_revision: known.ovRevision,
+          since_workspace_revision: knownWorkspace,
+        } : {}, controller.signal);
         if (stopped || controller.signal.aborted) return;
         failures = 0;
+        longPoll = data.longPoll === true;
         setStatus({ path, error: null, checkedAt: data.serverNow });
         const priorWorkspace = latest.current.workspaceRevision ?? (observedWorkspace.current?.path === path ? observedWorkspace.current.revision : undefined);
         const workspaceChanged = data.workspaceRevision !== undefined && data.workspaceRevision !== priorWorkspace;
@@ -46,6 +55,7 @@ export function useAttemptSync({ path, stateVersion, ovRevision, workspaceRevisi
       } catch (error) {
         if (stopped || controller.signal.aborted) return;
         failures = Math.min(failures + 1, 4);
+        longPoll = false;
         setStatus(previous => ({ path, checkedAt: previous?.path === path ? previous.checkedAt : null, error: error instanceof Error ? error : new Error("Не удалось проверить обновления") }));
         // A lost permission is not retried forever against the same inaccessible object.
         if (error instanceof ApiError && [401, 403, 404].includes(error.status ?? 0)) stopped = true;

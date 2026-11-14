@@ -196,6 +196,7 @@ export interface OvState {
   ovRevision?: number;
 }
 export interface AttemptDigest {
+  longPoll?: boolean;
   id: number;
   stateVersion: number;
   ovRevision: number;

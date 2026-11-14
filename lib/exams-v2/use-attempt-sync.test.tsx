@@ -26,6 +26,25 @@ describe("bounded visible workspace synchronization", () => {
     get.mockResolvedValue({ ...digest, ovRevision: 1, stateVersion: 2 });
     await advance(); expect(changed).toHaveBeenCalledTimes(2);
   });
+  it("waits with the current revisions after capability detection", async () => {
+    const onChange = vi.fn();
+    get.mockResolvedValueOnce({ ...digest, longPoll: true, workspaceRevision: "revision-1" });
+    let resolve: (data: typeof digest) => void = () => {};
+    get.mockImplementationOnce(() => new Promise<typeof digest>((done) => { resolve = done; }));
+    renderHook(() => useAttemptSync({ ...base, workspaceRevision: "revision-1", onChange }));
+    await advance();
+    await advance(600);
+    expect(get).toHaveBeenCalledTimes(2);
+    expect(get.mock.calls[1].slice(0, 2)).toEqual([base.path, {
+      since_state_version: 1,
+      since_ov_revision: 0,
+      since_workspace_revision: "revision-1",
+    }]);
+    await advance(15000);
+    expect(get).toHaveBeenCalledTimes(2);
+    await act(async () => { resolve({ ...digest, stateVersion: 2 }); });
+    expect(onChange).toHaveBeenCalledTimes(1);
+  });
   it("stops while a command or edit is pending and while hidden", async () => {
     const changed = vi.fn();
     const { rerender } = renderHook(props => useAttemptSync(props), { initialProps: { ...base, suspended: true, onChange: changed } });

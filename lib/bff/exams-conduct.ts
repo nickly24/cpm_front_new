@@ -45,9 +45,15 @@ export async function examsConductGet(input: string, params: Query = {}, signal?
   if (/^\/api\/examiner\/attempts\//.test(path)) throw new ApiError("Выберите экзамен перед открытием сдачи", 400, undefined, "exam_required");
   const digest = path.match(/^\/api\/examiner\/exams\/(\d+)\/attempts\/(\d+)\/state$/);
   if (digest) {
-    const v = record(await domain(`/exams/${digest[1]}/attempts/${digest[2]}/state`, { signal }));
+    const wait = new URLSearchParams();
+    if (q.since_state_version !== undefined) {
+      wait.set("since_state_version", String(q.since_state_version));
+      wait.set("since_ov_revision", String(q.since_ov_revision ?? 0));
+      if (q.since_workspace_revision) wait.set("since_workspace_revision", String(q.since_workspace_revision));
+    }
+    const v = record(await domain(`/exams/${digest[1]}/attempts/${digest[2]}/state${wait.size ? `?${wait}` : ""}`, { signal }));
     if (v.id !== Number(digest[2]) || !Number.isSafeInteger(v.state_version) || number(v.state_version) < 1 || !Number.isSafeInteger(v.ov_revision) || number(v.ov_revision) < 0) throw new ApiError("Некорректное состояние сдачи", 502, undefined, "invalid_response");
-    return { id: number(v.id), stateVersion: number(v.state_version), ovRevision: number(v.ov_revision), ...(typeof v.workspace_revision === "string" ? { workspaceRevision: v.workspace_revision } : {}), serverNow: string(v.server_now) } satisfies AttemptDigest;
+    return { ...(v.long_poll === true ? { longPoll: true } : {}), id: number(v.id), stateVersion: number(v.state_version), ovRevision: number(v.ov_revision), ...(typeof v.workspace_revision === "string" ? { workspaceRevision: v.workspace_revision } : {}), serverNow: string(v.server_now) } satisfies AttemptDigest;
   }
   m = path.match(/^\/api\/examiner\/exams\/(\d+)\/attempts\/(\d+)(?:\/questions(?:\/(\d+)\/rounds)?)?$/) ?? path.match(/^\/api\/exams\/(\d+)\/classic\/attempts\/(\d+)\/questions(?:\/(\d+)\/rounds)?$/);
   if (!m) return undefined;
